@@ -21,6 +21,8 @@ This section provides a complete guide to setting up OpenCode for local developm
 #### Required Software
 
 1. **Bun 1.3+** (JavaScript runtime)
+   
+   **Unix/Linux/macOS:**
    ```bash
    # Install Bun
    curl -fsSL https://bun.sh/install | bash
@@ -31,14 +33,37 @@ This section provides a complete guide to setting up OpenCode for local developm
    # Verify installation
    bun --version  # Should be 1.3.10 or higher
    ```
+   
+   **Windows (PowerShell):**
+   ```powershell
+   # Install using npm (if available)
+   npm install -g bun
+   
+   # Or download installer from https://bun.sh
+   # Verify installation
+   bun --version  # Should be 1.3.10 or higher
+   ```
 
 2. **Git**
-   ```bash
-   # macOS
-   brew install git
    
-   # Ubuntu/Debian
+   **macOS:**
+   ```bash
+   brew install git
+   ```
+   
+   **Linux (Ubuntu/Debian):**
+   ```bash
    sudo apt-get install git
+   ```
+   
+   **Windows (PowerShell):**
+   ```powershell
+   # Using winget (Windows 10+)
+   winget install Git.Git
+   
+   # Or download from https://git-scm.com/download/win
+   # Verify installation
+   git --version
    ```
 
 3. **Node.js (Optional)** - Not required for core development but useful for some tooling
@@ -49,8 +74,21 @@ This section provides a complete guide to setting up OpenCode for local developm
 If you plan to work on the desktop app (`packages/desktop`), you'll need:
 
 1. **Rust toolchain**
+   
+   **Unix/Linux/macOS:**
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+   
+   **Windows (PowerShell):**
+   ```powershell
+   # Download and run rustup-init.exe from https://rustup.rs
+   # Or use winget
+   winget install Rustlang.Rustup
+   
+   # Verify installation
+   rustc --version
+   cargo --version
    ```
 
 2. **Platform-specific dependencies**
@@ -338,7 +376,14 @@ bun run --inspect=ws://localhost:6499/ --cwd packages/opencode --conditions=brow
 
 - Use `--inspect-wait` to pause execution until debugger attaches
 - Use `--inspect-brk` to break on first line
-- Set `export BUN_OPTIONS=--inspect=ws://localhost:6499/` to avoid repeating the flag
+- Set environment variable to avoid repeating the flag:
+  ```bash
+  # Unix/Linux/macOS
+  export BUN_OPTIONS=--inspect=ws://localhost:6499/
+  
+  # Windows (PowerShell)
+  $env:BUN_OPTIONS="--inspect=ws://localhost:6499/"
+  ```
 - Check `bun dev spawn` if breakpoints aren't working in worker threads
 
 ### Testing
@@ -440,20 +485,45 @@ cd packages/opencode
 #### Issue: `bun: command not found`
 
 **Solution**: Install Bun or add it to PATH
+
+**Unix/Linux/macOS:**
 ```bash
 curl -fsSL https://bun.sh/install | bash
 source ~/.bashrc  # or ~/.zshrc
 ```
 
+**Windows (PowerShell):**
+```powershell
+# Install using npm (if available)
+npm install -g bun
+
+# Or download from https://bun.sh and add to PATH manually
+# After installation, restart PowerShell
+```
+
 #### Issue: Port 4096 already in use
 
 **Solution**: Kill existing process or use different port
+
+**Unix/Linux/macOS:**
 ```bash
 # Find process using port 4096
 lsof -i :4096
 
 # Kill it
 kill -9 <PID>
+
+# Or use different port
+bun dev serve --port 8080
+```
+
+**Windows (PowerShell):**
+```powershell
+# Find process using port 4096
+Get-NetTCPConnection -LocalPort 4096 | Select-Object OwningProcess
+
+# Kill it (replace <PID> with actual process ID)
+Stop-Process -Id <PID> -Force
 
 # Or use different port
 bun dev serve --port 8080
@@ -469,6 +539,8 @@ bun dev serve --port 8080
 #### Issue: Desktop app won't build
 
 **Solution**: Verify Tauri prerequisites
+
+**Unix/Linux/macOS:**
 ```bash
 # Check Rust installation
 rustc --version
@@ -478,9 +550,21 @@ cargo --version
 dpkg -l | grep webkit2gtk
 ```
 
+**Windows (PowerShell):**
+```powershell
+# Check Rust installation
+rustc --version
+cargo --version
+
+# Check if WebView2 is installed (usually pre-installed on Windows 10/11)
+Get-AppxPackage -Name Microsoft.WebView2
+```
+
 #### Issue: Bun version mismatch
 
 **Solution**: Use exact version specified in package.json
+
+**Unix/Linux/macOS:**
 ```bash
 # Check required version
 grep packageManager package.json
@@ -492,12 +576,32 @@ bun upgrade
 curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
 ```
 
+**Windows (PowerShell):**
+```powershell
+# Check required version
+Select-String -Path package.json -Pattern "packageManager"
+
+# Update Bun
+bun upgrade
+
+# Or download specific version from https://bun.sh and install manually
+```
+
 #### Issue: Dependencies won't install
 
 **Solution**: Clear cache and reinstall
+
+**Unix/Linux/macOS:**
 ```bash
 rm -rf node_modules
 rm bun.lockb
+bun install
+```
+
+**Windows (PowerShell):**
+```powershell
+Remove-Item -Recurse -Force node_modules
+Remove-Item -Force bun.lockb
 bun install
 ```
 
