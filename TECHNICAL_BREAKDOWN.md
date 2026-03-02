@@ -4,12 +4,574 @@ This document provides a comprehensive technical breakdown of the OpenCode proje
 
 ## Table of Contents
 
+- [Local Development Setup](#local-development-setup)
 - [Project Overview](#project-overview)
 - [Repository Structure](#repository-structure)
 - [Core Components](#core-components)
 - [Build Process](#build-process)
 - [Infrastructure & Deployment](#infrastructure--deployment)
 - [Integration Points](#integration-points)
+
+## Local Development Setup
+
+This section provides a complete guide to setting up OpenCode for local development, from system prerequisites to running and debugging the application.
+
+### Prerequisites
+
+#### Required Software
+
+1. **Bun 1.3+** (JavaScript runtime)
+   ```bash
+   # Install Bun
+   curl -fsSL https://bun.sh/install | bash
+   
+   # Or on macOS
+   brew install oven-sh/bun/bun
+   
+   # Verify installation
+   bun --version  # Should be 1.3.10 or higher
+   ```
+
+2. **Git**
+   ```bash
+   # macOS
+   brew install git
+   
+   # Ubuntu/Debian
+   sudo apt-get install git
+   ```
+
+3. **Node.js (Optional)** - Not required for core development but useful for some tooling
+   - Bun can replace Node.js for most operations
+
+#### Optional (For Desktop App Development)
+
+If you plan to work on the desktop app (`packages/desktop`), you'll need:
+
+1. **Rust toolchain**
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+2. **Platform-specific dependencies**
+   - **macOS**: Xcode Command Line Tools
+     ```bash
+     xcode-select --install
+     ```
+   
+   - **Linux (Ubuntu/Debian)**:
+     ```bash
+     sudo apt update
+     sudo apt install libwebkit2gtk-4.0-dev \
+       build-essential \
+       curl \
+       wget \
+       file \
+       libssl-dev \
+       libgtk-3-dev \
+       libayatana-appindicator3-dev \
+       librsvg2-dev
+     ```
+   
+   - **Windows**: 
+     - Microsoft Visual Studio C++ Build Tools
+     - WebView2 (usually pre-installed on Windows 10/11)
+
+   See [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/) for detailed platform-specific instructions.
+
+### Initial Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/anomalyco/opencode.git
+   cd opencode
+   ```
+
+2. **Install dependencies**
+   ```bash
+   bun install
+   ```
+   
+   This installs all dependencies for the monorepo. The process may take a few minutes.
+
+3. **Verify installation**
+   ```bash
+   bun turbo typecheck
+   ```
+   
+   This will type-check all packages and ensure everything is set up correctly.
+
+### Running Locally
+
+#### CLI/TUI (Default Development Mode)
+
+Run the OpenCode terminal interface:
+
+```bash
+# From repository root
+bun dev
+
+# Run in a specific directory
+bun dev /path/to/your/project
+
+# Run in the OpenCode repo itself
+bun dev .
+```
+
+**What this does**: Starts the OpenCode TUI with hot reload enabled. Changes to TypeScript files will automatically reload.
+
+#### API Server (Headless Mode)
+
+Run just the API server without the TUI:
+
+```bash
+# Start server on default port (4096)
+bun dev serve
+
+# Start on custom port
+bun dev serve --port 8080
+```
+
+**Access the API**: `http://localhost:4096` (or your custom port)
+
+**API Documentation**: The server exposes OpenAPI specs at `/openapi.json`
+
+#### Web UI
+
+Run the web interface (browser-based UI):
+
+**Option 1: Integrated (server + web)**
+```bash
+bun dev web
+```
+This starts the server and opens the web interface in your default browser.
+
+**Option 2: Separate processes (for development)**
+
+Terminal 1 - Start the server:
+```bash
+bun dev serve
+```
+
+Terminal 2 - Start the web dev server:
+```bash
+cd packages/app
+bun dev
+```
+
+Access at: `http://localhost:5173` (default Vite port)
+
+#### Desktop App
+
+Run the native desktop application:
+
+```bash
+cd packages/desktop
+
+# Development mode (hot reload enabled)
+bun run tauri dev
+
+# Just the web server without native shell
+bun dev
+```
+
+**Note**: First run will be slower as Rust dependencies compile. Subsequent runs are faster.
+
+#### Documentation Site
+
+Run the docs website locally:
+
+```bash
+cd packages/web
+bun dev
+```
+
+Access at: `http://localhost:4321` (default Astro port)
+
+### Configuration
+
+#### Environment Variables
+
+OpenCode uses environment variables for configuration. Create a `.env` file in the repository root or set them in your shell:
+
+**Common Variables:**
+```bash
+# API Configuration
+OPENCODE_API_KEY=your_api_key_here
+
+# Server Configuration
+OPENCODE_SERVER_PASSWORD=your_password
+OPENCODE_SERVER_USERNAME=opencode  # Optional, defaults to "opencode"
+
+# LLM Provider Configuration
+ANTHROPIC_API_KEY=your_anthropic_key
+OPENAI_API_KEY=your_openai_key
+GOOGLE_API_KEY=your_google_key
+
+# Models API (defaults to https://models.dev)
+OPENCODE_MODELS_URL=https://models.dev
+
+# Feature Flags
+OPENCODE_DISABLE_SHARE=true  # Disable share feature
+
+# Debugging
+OPENCODE_LOG_LEVEL=debug
+```
+
+**For Console Development:**
+```bash
+# Database (PlanetScale)
+DATABASE_HOST=your_db_host
+DATABASE_USERNAME=your_db_user
+DATABASE_PASSWORD=your_db_password
+
+# OAuth
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+
+# Stripe
+STRIPE_SECRET_KEY=your_stripe_key
+STRIPE_PUBLISHABLE_KEY=your_publishable_key
+```
+
+#### Configuration Files
+
+- **`bunfig.toml`**: Bun configuration (package manager settings)
+- **`turbo.json`**: Turborepo build configuration
+- **`tsconfig.json`**: Root TypeScript configuration
+- **`packages/*/tsconfig.json`**: Package-specific TypeScript configs
+- **`.vscode/settings.json`**: VSCode editor settings (optional)
+
+### Development Workflow
+
+#### Typical Development Session
+
+```bash
+# 1. Pull latest changes
+git pull origin dev
+
+# 2. Install any new dependencies
+bun install
+
+# 3. Start development server
+bun dev
+
+# 4. Make your changes in src/
+
+# 5. Type check (in another terminal)
+bun turbo typecheck
+
+# 6. Run tests for the package you're working on
+cd packages/opencode
+bun test
+
+# 7. Commit your changes
+git add .
+git commit -m "feat: your feature description"
+```
+
+#### Hot Reload
+
+Most components support hot reload:
+- **CLI/TUI**: Automatic reload on file changes
+- **Web UI**: Vite HMR (Hot Module Replacement)
+- **Desktop**: Web portion uses HMR, native portion requires restart
+- **API Server**: Automatic reload with `bun dev serve`
+
+#### Working on Multiple Packages
+
+When working across multiple packages (e.g., SDK + CLI):
+
+```bash
+# Terminal 1: Watch SDK changes
+cd packages/sdk/js
+bun --watch src/index.ts
+
+# Terminal 2: Run CLI with changes
+cd ../..
+bun dev
+```
+
+### Debugging
+
+#### VSCode Debugging
+
+1. **Copy example configurations**:
+   ```bash
+   cp .vscode/settings.example.json .vscode/settings.json
+   cp .vscode/launch.example.json .vscode/launch.json
+   ```
+
+2. **Start debugging**:
+   - Open VSCode
+   - Set breakpoints in your code
+   - Run via `bun run --inspect=ws://localhost:6499/ dev`
+   - Attach debugger using VSCode's "Attach" configuration
+
+**Recommended approach** (most reliable):
+```bash
+# In terminal
+bun run --inspect=ws://localhost:6499/ dev
+
+# Then attach VSCode debugger to ws://localhost:6499/
+```
+
+#### Debugging Server Separately
+
+For debugging server code:
+```bash
+# Terminal 1: Run server with debugging
+bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts serve --port 4096
+
+# Terminal 2: Attach TUI
+opencode attach http://localhost:4096
+```
+
+#### Debugging TUI
+
+```bash
+bun run --inspect=ws://localhost:6499/ --cwd packages/opencode --conditions=browser ./src/index.ts
+```
+
+#### Debug Tips
+
+- Use `--inspect-wait` to pause execution until debugger attaches
+- Use `--inspect-brk` to break on first line
+- Set `export BUN_OPTIONS=--inspect=ws://localhost:6499/` to avoid repeating the flag
+- Check `bun dev spawn` if breakpoints aren't working in worker threads
+
+### Testing
+
+#### Unit Tests
+
+```bash
+# Run all tests in a package
+cd packages/opencode
+bun test
+
+# Run specific test file
+bun test src/storage/db.test.ts
+
+# Watch mode
+bun test --watch
+
+# With coverage
+bun test --coverage
+```
+
+#### E2E Tests
+
+```bash
+cd packages/app
+
+# Run E2E tests
+bun test:e2e
+
+# Interactive UI mode
+bun test:e2e:ui
+
+# View test report
+bun test:e2e:report
+```
+
+#### Important Testing Rules
+
+- **DO NOT** run tests from repository root
+- Tests include a guard: `do-not-run-tests-from-root`
+- Always `cd` into the package directory first
+- Each package has its own test configuration
+
+### Database Development
+
+#### Local Database
+
+OpenCode uses SQLite for local development. The database is stored at:
+- **Linux/macOS**: `~/.local/share/opencode/opencode.db`
+- **Windows**: `%APPDATA%\opencode\opencode.db`
+
+#### Database Migrations
+
+```bash
+cd packages/opencode
+
+# Generate a new migration
+bun db generate
+
+# Apply migrations
+bun db migrate
+
+# Open Drizzle Studio (database GUI)
+bun db studio
+```
+
+#### Schema Changes
+
+1. Edit schema in `packages/opencode/src/storage/schema.sql.ts`
+2. Generate migration: `bun db generate`
+3. Review generated SQL in `migration/` directory
+4. Apply migration: `bun db migrate`
+5. Commit both schema and migration files
+
+### Regenerating Generated Files
+
+#### SDK Regeneration
+
+After making API changes:
+```bash
+./script/generate.ts
+```
+
+This regenerates:
+- JavaScript SDK (`packages/sdk/js/`)
+- Type definitions
+- API documentation
+
+#### Models Snapshot
+
+The models snapshot is auto-generated during build, but you can manually update:
+```bash
+cd packages/opencode
+./script/build.ts
+```
+
+### Common Issues & Solutions
+
+#### Issue: `bun: command not found`
+
+**Solution**: Install Bun or add it to PATH
+```bash
+curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc  # or ~/.zshrc
+```
+
+#### Issue: Port 4096 already in use
+
+**Solution**: Kill existing process or use different port
+```bash
+# Find process using port 4096
+lsof -i :4096
+
+# Kill it
+kill -9 <PID>
+
+# Or use different port
+bun dev serve --port 8080
+```
+
+#### Issue: Type errors in IDE but builds succeed
+
+**Solution**: Restart TypeScript server in VSCode
+- Press `Cmd+Shift+P` (Mac) or `Ctrl+Shift+P` (Windows/Linux)
+- Type "TypeScript: Restart TS Server"
+- Select it
+
+#### Issue: Desktop app won't build
+
+**Solution**: Verify Tauri prerequisites
+```bash
+# Check Rust installation
+rustc --version
+cargo --version
+
+# On Linux, ensure webkit2gtk is installed
+dpkg -l | grep webkit2gtk
+```
+
+#### Issue: Bun version mismatch
+
+**Solution**: Use exact version specified in package.json
+```bash
+# Check required version
+grep packageManager package.json
+
+# Update Bun
+bun upgrade
+
+# Or install specific version
+curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.10"
+```
+
+#### Issue: Dependencies won't install
+
+**Solution**: Clear cache and reinstall
+```bash
+rm -rf node_modules
+rm bun.lockb
+bun install
+```
+
+### Performance Tips
+
+1. **Use Bun's cache**: Bun caches builds aggressively
+2. **Parallel type checking**: `bun turbo typecheck` uses all CPU cores
+3. **Incremental builds**: Turbo caches unchanged packages
+4. **Watch mode**: More efficient than restarting for each change
+5. **Use single build** for testing: `./packages/opencode/script/build.ts --single`
+
+### IDE Setup
+
+#### Recommended VSCode Extensions
+
+- **Bun for VSCode**: Official Bun extension
+- **TypeScript**: Built-in
+- **SolidJS**: Solid language support
+- **Tailwind CSS IntelliSense**: For styling
+- **Prettier**: Code formatting (configured in package.json)
+- **ESLint**: Linting (if enabled)
+
+#### Settings
+
+The repository includes example settings:
+```bash
+cp .vscode/settings.example.json .vscode/settings.json
+```
+
+Key settings:
+- TypeScript version: Use workspace version
+- Formatting: Prettier with semicolons disabled
+- Line width: 120 characters
+
+### Next Steps
+
+Once your environment is set up:
+
+1. **Read the style guide**: See `AGENTS.md` for coding conventions
+2. **Explore the codebase**: Start with `packages/opencode/src/index.ts`
+3. **Check existing issues**: Look for "good first issue" labels
+4. **Join Discord**: Get help from the community
+5. **Read CONTRIBUTING.md**: Understand the contribution workflow
+
+### Useful Commands Reference
+
+```bash
+# Development
+bun dev                              # Run CLI/TUI
+bun dev serve                        # Run API server
+bun dev web                          # Run web interface
+bun dev <directory>                  # Run in specific directory
+
+# Building
+bun turbo build                      # Build all packages
+bun turbo typecheck                  # Type check all packages
+./packages/opencode/script/build.ts  # Build CLI binary
+
+# Testing
+bun test                             # Run tests (from package dir)
+bun test --watch                     # Watch mode
+bun test:e2e                         # E2E tests (app package)
+
+# Database
+bun db generate                      # Generate migration
+bun db migrate                       # Apply migrations
+bun db studio                        # Open database GUI
+
+# Utilities
+./script/generate.ts                 # Regenerate SDK
+bun install                          # Install dependencies
+bun upgrade                          # Update Bun
+git pull origin dev                  # Pull latest changes
+```
 
 ## Project Overview
 
