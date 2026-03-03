@@ -1,0 +1,51 @@
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: claude-bedrock
+    main: ./cmd/main.go
+    binary: claude-bedrock
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    goamd64:
+      - v1
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/clouds-anr/GovClaudeClient/internal/version.Version={{.Version}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - distribution-guide.md
+      - user-guide.md
+      - env.*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - 'README'
+      - 'typo'

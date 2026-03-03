@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Audit Events DynamoDB Table for GovClaudeClient'
+
+Resources:
+  AuditEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuditEvents
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Purpose
+          Value: AuditLogging
+        - Key: Application
+          Value: GovClaudeClient
+
+Outputs:
+  TableName:
+    Description: Name of the audit events table
+    Value: !Ref AuditEventsTable
+  TableArn:
+    Description: ARN of the audit events table
+    Value: !GetAtt AuditEventsTable.Arn

@@ -1,0 +1,10 @@
+#!/usr/bin/env bun
+/**
+ * OpenCode ANR CLI launcher
+ * Runs the base OpenCode CLI with ANR enterprise integrations
+ * (Features will be added incrementally)
+ */
+
+// Import and execute the ANR edition
+// This automatically loads and runs the base OpenCode CLI via src/index.ts
+import "../src/index"

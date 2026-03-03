@@ -1,0 +1,7 @@
+# Binaries
+claude-bedrock
+claude-bedrock.exe
+claude-bedrock-mac
+*.log
+*.out
+/dist/
