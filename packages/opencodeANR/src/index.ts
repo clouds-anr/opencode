@@ -12,8 +12,8 @@ import { exchangeTokenForAWSCredentials } from "./integrations/aws-federation"
  * Main entry point - authenticate then launch OpenCode CLI
  */
 async function main() {
-  // Import OpenCode CLI function at runtime using a relative path
-  const { main: opencodeCLI } = await import("../opencode/src/index.ts")
+  // Import OpenCode CLI function at runtime using workspace module resolution
+  const { main: opencodeCLI } = await import("opencode")
   try {
     // Check if this is an info-only flag (--help, --version)
     const args = process.argv.slice(2)

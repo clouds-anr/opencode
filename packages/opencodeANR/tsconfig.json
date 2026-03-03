@@ -12,7 +12,11 @@
     "module": "esnext",
     "target": "esnext",
     "lib": ["esnext"],
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "paths": {
+      "opencode/*": ["../opencode/src/*"],
+      "opencode": ["../opencode/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
