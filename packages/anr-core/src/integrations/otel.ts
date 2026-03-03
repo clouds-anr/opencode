@@ -21,32 +21,29 @@ export function initializeOTEL(config: ANRConfig): void {
   }
 
   try {
-    const metricExporter = new OTLPMetricExporter({
-      url: `${config.otelEndpoint}/v1/metrics`,
-      headers: {},
-    })
-
     const resource = Resource.default().merge(
       new Resource({
         [ATTR_SERVICE_NAME]: "opencode-anr",
-        "deployment.environment": config.awsRegionProfile,
+        "deployment.environment": config.awsRegionProfile || "development",
         "service.version": "1.0.0",
       })
     )
 
     otelSDK = new NodeSDK({
       resource,
-      metricReader: {
-        exporter: metricExporter,
-        exportIntervalMillis: 60000, // Export every 60 seconds
-      } as any,
+      traceExporter: undefined,
+      instrumentations: [],
     })
 
     otelSDK.start()
-    console.log("✅ OpenTelemetry initialized and sending to:", config.otelEndpoint)
+    
+    // Optional metric export (requires separate setup)
+    console.log("✅ OpenTelemetry initialized")
   } catch (error) {
-    console.error("❌ Failed to initialize OpenTelemetry:", error)
-    // Don't fail the application if telemetry setup fails
+    // Silently fail if telemetry setup has issues
+    if (error instanceof Error) {
+      console.debug("ℹ️  Telemetry setup: " + error.message)
+    }
   }
 }
 

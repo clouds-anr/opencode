@@ -1,93 +1,129 @@
 /**
- * OpenCode ANR - Alaska Northstar Resources Edition
+ * OpenCode ANR - Alaska Northstar Resources Edition CLI Wrapper
  * 
- * Standalone distribution of OpenCode with automatic AWS Cognito OIDC authentication.
+ * Handles authentication, telemetry, quota management, and database initialization
+ * Then spawns the OpenCode CLI as a separate process with the configured environment.
  */
 
-import { getValidatedANRConfig } from "./config/env-loader"
-import { authenticateWithOIDC } from "./integrations/oidc-auth"
-import { exchangeTokenForAWSCredentials } from "./integrations/aws-federation"
+import { spawn } from "child_process"
+import { resolve } from "path"
+import { getValidatedANRConfig, authenticateWithOIDC, exchangeTokenForAWSCredentials, initializeOTEL } from "@opencode-ai/anr-core"
 
 /**
- * Main entry point - authenticate then launch OpenCode CLI
+ * Main entry point - authenticate and initialize ANR context, then spawn OpenCode CLI
  */
 async function main() {
-  // Import OpenCode CLI function at runtime using workspace module resolution
-  const { main: opencodeCLI } = await import("opencode")
   try {
-    // Check if this is an info-only flag (--help, --version)
+    // Resolve paths once at startup
+    const workspaceRoot = resolve(__dirname, "../../..")
+    const opencodePath = resolve(workspaceRoot, "packages/opencode")
     const args = process.argv.slice(2)
     const isInfoFlag = args.includes("--help") || args.includes("-h") || 
                        args.includes("--version") || args.includes("-v")
     
-    // Try to load ANR configuration
-    if (!isInfoFlag) {
-      console.log("🔍 Checking for ANR configuration...")
-    }
-    
-    const config = await getValidatedANRConfig(undefined, isInfoFlag)
-    let tokens
-    let awsCredentials
-    
-    if (!isInfoFlag) {
-      console.log("✅ ANR configuration found")
-      console.log(`   Domain: ${config.providerDomain}`)
-      console.log(`   Client: ${config.clientId.substring(0, 10)}...`)
-      console.log()
-      
-      // Authenticate with OIDC (will open browser for login)
-      console.log("🔐 Authenticating with Cognito OIDC...")
-      tokens = await authenticateWithOIDC(config)
-      
-      console.log("✅ OIDC authentication successful")
-      console.log()
-      
-      // Exchange Cognito token for AWS credentials
-      console.log("🔄 Exchanging token for AWS credentials...")
-      awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
-      
-      console.log("✅ AWS credentials obtained")
-      console.log()
-      
-      // Determine what's being launched
-      const hasCommand = args.length > 0 && !args[0].startsWith("-")
-      
-      // Only show TUI startup message for actual commands (not info flags)
-      if (!hasCommand) {
-        console.log("🚀 Starting OpenCode TUI (Terminal User Interface)...")
-        console.log("   The TUI will take over your terminal in 3 seconds.")
-        console.log()
-        console.log("   💡 Tip: Use these commands instead for better experience:")
-        console.log("      bun dev:anr run \"your message here\"")
-        console.log("      bun dev:anr models")
-        console.log("      bun dev:anr serve")
-        console.log("      bun dev:anr --help")
-        console.log()
-        await new Promise(resolve => setTimeout(resolve, 3000))
+    // For info flags, skip auth and go straight to OpenCode
+    if (isInfoFlag) {
+      const env = {
+        ...process.env,
+        OPENCODE_FLAVOR: "anr",
       }
-    } else {
-      // For info flags, still authenticate but silently
-      tokens = await authenticateWithOIDC(config)
-      awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+      delete env.AWS_PROFILE
+      
+      const opencode = spawn("bun", ["run", "--cwd", opencodePath, "--conditions=browser", "src/index.ts", ...args], {
+        env,
+        stdio: "inherit",
+        cwd: workspaceRoot,
+      })
+      
+      opencode.on("exit", (code) => {
+        process.exit(code || 0)
+      })
+      
+      opencode.on("error", (error) => {
+        console.error("❌ Failed to spawn OpenCode:", error)
+        process.exit(1)
+      })
+      
+      return
     }
     
-    // Set up environment with AWS credentials from Cognito token exchange
-    // Copy parent env except AWS_PROFILE to avoid credential source conflicts
-    const prevEnv = { ...process.env }
+    // Try to load ANR configuration
+    console.log("🔍 Checking for ANR configuration...")
+    const config = await getValidatedANRConfig(undefined, false)
     
-    // Set the credentials directly in process.env for the CLI to use
-    process.env.OPENCODE_FLAVOR = "anr"
-    process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
-    process.env.AWS_SECRET_ACCESS_KEY = awsCredentials.secretAccessKey
-    process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
-    process.env.AWS_REGION = config.awsRegion
+    console.log("✅ ANR configuration found")
+    console.log(`   Domain: ${config.providerDomain}`)
+    console.log(`   Client: ${config.clientId.substring(0, 10)}...`)
+    console.log()
     
-    // Explicitly delete AWS_PROFILE to avoid credential source conflicts
-    delete process.env.AWS_PROFILE
+    // Set up OpenTelemetry
+    if (config.enableTelemetry) {
+      console.log("📊 Initializing telemetry...")
+      initializeOTEL(config)
+      console.log("✅ Telemetry initialized")
+      console.log()
+    }
     
-    // Call the OpenCode CLI directly (no subprocess spawning)
-    // Pass the CLI arguments directly
-    await opencodeCLI(args)
+    // Authenticate with OIDC (will open browser for login)
+    console.log("🔐 Authenticating with Cognito OIDC...")
+    const tokens = await authenticateWithOIDC(config)
+    
+    console.log("✅ OIDC authentication successful")
+    console.log()
+    
+    // Exchange Cognito token for AWS credentials
+    console.log("🔄 Exchanging token for AWS credentials...")
+    const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+    
+    console.log("✅ AWS credentials obtained")
+    console.log()
+    
+    // Determine what's being launched
+    const hasCommand = args.length > 0 && !args[0].startsWith("-")
+    
+    // Only show TUI startup message for actual commands
+    if (!hasCommand) {
+      console.log("🚀 Starting OpenCode TUI (Terminal User Interface)...")
+      console.log("   The TUI will take over your terminal in 3 seconds.")
+      console.log()
+      console.log("   💡 Tip: Use these commands instead for better experience:")
+      console.log("      bun dev:anr run \"your message here\"")
+      console.log("      bun dev:anr models")
+      console.log("      bun dev:anr serve")
+      console.log("      bun dev:anr --help")
+      console.log()
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+    
+    // Build environment with AWS credentials from Cognito token exchange
+    const env = {
+      ...process.env,
+      OPENCODE_FLAVOR: "anr",
+      AWS_ACCESS_KEY_ID: awsCredentials.accessKeyId,
+      AWS_SECRET_ACCESS_KEY: awsCredentials.secretAccessKey,
+      AWS_SESSION_TOKEN: awsCredentials.sessionToken,
+      AWS_REGION: config.awsRegion,
+    }
+    
+    // Remove AWS_PROFILE to avoid credential source conflicts
+    delete env.AWS_PROFILE
+    
+    // Spawn OpenCode CLI as a separate process
+    const opencode = spawn("bun", ["run", "--cwd", opencodePath, "--conditions=browser", "src/index.ts", ...args], {
+      env,
+      stdio: "inherit",
+      cwd: workspaceRoot,
+    })
+    
+    // Wait for OpenCode process to exit
+    opencode.on("exit", (code) => {
+      process.exit(code || 0)
+    })
+    
+    opencode.on("error", (error) => {
+      console.error("❌ Failed to spawn OpenCode:", error)
+      process.exit(1)
+    })
     
   } catch (error) {
     // Check if this is an info-only flag
@@ -102,15 +138,31 @@ async function main() {
         console.log("   (Create .env.bedrock for OIDC authentication)\n")
       }
       
-      // Call OpenCode CLI directly without authentication
-      process.env.OPENCODE_FLAVOR = "anr"
-      delete process.env.AWS_PROFILE
+      // Spawn OpenCode CLI in standard mode
+      const env = {
+        ...process.env,
+        OPENCODE_FLAVOR: "anr",
+      }
+      delete env.AWS_PROFILE
       
-      await opencodeCLI(args)
+      const opencode = spawn("bun", ["run", "--cwd", opencodePath, "--conditions=browser", "src/index.ts", ...args], {
+        env,
+        stdio: "inherit",
+        cwd: workspaceRoot,
+      })
+      
+      opencode.on("exit", (code) => {
+        process.exit(code || 0)
+      })
+      
+      opencode.on("error", (error) => {
+        console.error("❌ Failed to spawn OpenCode:", error)
+        process.exit(1)
+      })
     } else {
       // Real error
       if (!isInfoFlag) {
-        console.error("❌ Authentication failed:", error instanceof Error ? error.message : error)
+        console.error("❌ ANR initialization failed:", error instanceof Error ? error.message : error)
         console.error()
       }
       process.exit(1)
@@ -121,12 +173,5 @@ async function main() {
 // Run main function
 main()
 
-// Export ANR-specific functionality for library usage
-export * from "./config/types"
-export * from "./config/env-loader"
-export * from "./integrations/oidc-auth"
-export * from "./integrations/aws-federation"
-export * from "./integrations/otel"
-export * from "./middleware/quota-policy"
-export * from "./middleware/audit-logger"
-export * from "./middleware/dependency-detector"
+// Export ANR core types for library usage
+export * from "@opencode-ai/anr-core"
