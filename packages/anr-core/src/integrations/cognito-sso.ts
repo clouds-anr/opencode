@@ -26,15 +26,15 @@ async function checkSSOCredentials(profile: string): Promise<boolean> {
     const creds = await Promise.race([
       credentialProvider(),
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000))
-    ])
+    ]) as any
     
     // Check if credentials appear expired locally
-    if (creds.expiration) {
+    if (creds?.expiration) {
       const now = new Date()
       // Add 1 minute buffer to proactively refresh expiring credentials
       const bufferTime = new Date(now.getTime() + 1 * 60 * 1000)
       
-      if (creds.expiration <= bufferTime) {
+      if ((creds.expiration as any) <= bufferTime) {
         return false // Credentials are expired or expiring soon
       }
     }

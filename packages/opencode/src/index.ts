@@ -33,6 +33,221 @@ import path from "path"
 import { Global } from "./global"
 import { JsonMigration } from "./storage/json-migration"
 import { Database } from "./storage/db"
+import { 
+  getValidatedANRConfig, 
+  authenticateWithOIDC, 
+  exchangeTokenForAWSCredentials, 
+  initializeOTEL, 
+  shutdownOTEL, 
+  trackSessionStart, 
+  trackSessionEnd,
+  trackCommand,
+  initializeAuditLogger,
+  logAuthEvent,
+  logSessionStart,
+  logSessionEnd,
+  checkQuota,
+  type TelemetryContext 
+} from "@opencode-ai/anr-core"
+import { randomUUID } from "crypto"
+import { platform, arch, release } from "os"
+
+// ANR mode state (when running with OPENCODE_FLAVOR=anr)
+let anrContext: {
+  telemetryContext: TelemetryContext
+  config: any
+  sessionStartTime: number
+  commandName: string
+} | null = null
+
+/**
+ * Detect terminal type based on environment variables
+ */
+function detectTerminalType(): string {
+  if (process.env.WT_SESSION) return "windows-terminal"
+  if (process.env.ITERM_SESSION_ID) return "iterm2"
+  if (process.env.GNOME_TERMINAL_SCREEN) return "gnome-terminal"
+  if (process.env.VTE_VERSION) return "vte-based"
+  if (process.env.KITTY_WINDOW_ID) return "kitty"
+  if (process.env.TERM_PROGRAM === "iTerm.app") return "iterm2"
+  if (process.env.TERM === "screen" && process.env.TMUX) return "tmux"
+  if (process.env.TERM === "screen") return "screen"
+  if (process.env.WSL_DISTRO_NAME) return `wsl-${process.env.WSL_DISTRO_NAME}`
+  if (process.env.WSL_INTEROP) return "wsl"
+  return process.env.TERM || "unknown"
+}
+
+/**
+ * Extract OIDC token claims
+ */
+function extractTokenClaims(idToken: string): Record<string, any> {
+  const parts = idToken.split(".")
+  if (parts.length !== 3) return {}
+  try {
+    const payload = parts[1]
+    if (!payload) return {}
+    return JSON.parse(Buffer.from(payload, "base64").toString())
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Build comprehensive telemetry context from OIDC token and config
+ */
+function buildTelemetryContext(idToken: string, config: any, sessionId: string): TelemetryContext {
+  const claims = extractTokenClaims(idToken)
+  const userId = claims.sub || claims.cognito_username || "unknown"
+
+  const ctx: TelemetryContext = {
+    userId,
+    userEmail: claims.email,
+    userName: claims.name || claims.preferred_username,
+    osType: platform(),
+    osVersion: release(),
+    hostArch: arch(),
+    terminalType: detectTerminalType(),
+    sessionId,
+    organization: claims.organization || claims["custom:organization"],
+  }
+
+  // Enrich from config
+  if (config.department) ctx.department = config.department
+  if (config.teamId) ctx.teamId = config.teamId
+  if (config.costCenter) ctx.costCenter = config.costCenter
+  if (config.manager) ctx.manager = config.manager
+  if (config.role) ctx.role = config.role
+  if (config.location) ctx.location = config.location
+  if (config.organization) ctx.organization = config.organization
+  if (config.accountId) ctx.accountId = config.accountId
+
+  return ctx
+}
+
+/**
+ * Initialize ANR mode: authentication, quota, telemetry
+ */
+async function initializeANR(): Promise<void> {
+  console.log("\n🚀 OpenCode ANR - Alaska Northstar Resources Edition\n")
+  
+  // Load configuration
+  console.log("🔍 Loading ANR configuration...")
+  const config = await getValidatedANRConfig(undefined, false)
+  console.log("✅ Configuration loaded")
+  console.log(`   Domain: ${config.providerDomain}`)
+  console.log(`   Region: ${config.awsRegion}\n`)
+  
+  // Generate session ID
+  const sessionId = randomUUID()
+  
+  // Authenticate with OIDC
+  console.log("🔐 Authenticating with Cognito OIDC...")
+  const tokens = await authenticateWithOIDC(config)
+  console.log("✅ Authentication successful\n")
+  
+  // Build telemetry context
+  const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
+  
+  // Exchange token for AWS credentials
+  console.log("🔄 Exchanging token for AWS credentials...")
+  const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  console.log("✅ AWS credentials obtained\n")
+  
+  // Set AWS credentials in environment for model calls
+  process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
+  process.env.AWS_SECRET_ACCESS_KEY = awsCredentials.secretAccessKey
+  process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
+  process.env.AWS_REGION = config.awsRegion
+  delete process.env.AWS_PROFILE // Avoid credential conflicts
+  
+  // Initialize audit logging
+  initializeAuditLogger(config, {
+    accessKeyId: awsCredentials.accessKeyId,
+    secretAccessKey: awsCredentials.secretAccessKey,
+    sessionToken: awsCredentials.sessionToken,
+  })
+  await logAuthEvent(config, telemetryContext.userId, "success", telemetryContext)
+  
+  // Initialize telemetry
+  if (config.enableTelemetry) {
+    console.log("📊 Initializing telemetry...")
+    initializeOTEL(config, telemetryContext)
+    trackSessionStart(telemetryContext.userId)
+    console.log("✅ Telemetry initialized\n")
+  }
+  await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
+  
+  // Check quota
+  console.log("🎯 Checking quota...")
+  const quotaResult = await checkQuota(
+    {
+      userEmail: telemetryContext.userEmail || telemetryContext.userId,
+      organization: telemetryContext.organization,
+      teamId: telemetryContext.teamId,
+    },
+    config.quotaApiEndpoint,
+    config.quotaFailMode,
+    tokens.idToken
+  )
+  
+  if (!quotaResult.usage.allowed) {
+    console.error("❌ Quota exceeded. Access denied.")
+    await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
+    if (config.enableTelemetry) {
+      trackSessionEnd(telemetryContext.userId, 0)
+      await shutdownOTEL()
+    }
+    process.exit(1)
+  }
+  
+  console.log("✅ Quota check passed")
+  if (quotaResult.usage) {
+    console.log(`   Daily: ${Math.round(quotaResult.usage.dailyUsagePercent)}% (${quotaResult.usage.dailyTokens.toLocaleString()} tokens)`)
+    console.log(`   Monthly: ${Math.round(quotaResult.usage.monthlyUsagePercent)}% (${quotaResult.usage.monthlyTokens.toLocaleString()} tokens)`)
+  }
+  console.log()
+  
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+  console.log("✅ ANR Initialization Complete")
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+  
+  // Store context for later use
+  anrContext = {
+    telemetryContext,
+    config,
+    sessionStartTime: Date.now(),
+    commandName: process.argv[2] || "tui",
+  }
+  
+  // Also store in global for cross-module access (logToFile happens in initializeOTEL)
+  ;(global as any).__ANR_TELEMETRY_CONTEXT__ = telemetryContext
+  
+  // Setup exit handlers for telemetry cleanup
+  const exitHandler = async () => {
+    if (anrContext) {
+      const duration = (Date.now() - anrContext.sessionStartTime) / 1000
+      if (anrContext.config.enableTelemetry) {
+        trackSessionEnd(anrContext.telemetryContext.userId, duration)
+        await shutdownOTEL()
+      }
+      await logSessionEnd(anrContext.config, anrContext.telemetryContext.userId, duration, anrContext.telemetryContext)
+    }
+  }
+  
+  process.on("SIGINT", async () => {
+    await exitHandler()
+    process.exit(0)
+  })
+  
+  process.on("SIGTERM", async () => {
+    await exitHandler()
+    process.exit(0)
+  })
+  
+  process.on("exit", () => {
+    // Synchronous cleanup only
+  })
+}
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -47,10 +262,17 @@ process.on("uncaughtException", (e) => {
 })
 
 /**
- * Main CLI function that can be called by ANR or directly
+ * Main CLI function
  * Pass argv to test/override, or undefined to use process.argv
  */
 export async function main(argv?: string[]) {
+  // Check if running in ANR mode
+  const anrMode = process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
+  
+  if (anrMode) {
+    await initializeANR()
+  }
+
   let cli = yargs(argv ?? hideBin(process.argv))
     .parserConfiguration({ "populate--": true })
     .scriptName("opencode")
@@ -208,6 +430,15 @@ export async function main(argv?: string[]) {
     }
     process.exitCode = 1
   } finally {
+    // Flush telemetry metrics with a timeout to prevent hanging
+    try {
+      const shutdownPromise = shutdownOTEL()
+      const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2000))
+      await Promise.race([shutdownPromise, timeoutPromise])
+    } catch {
+      // Silently fail if shutdown has issues, don't block exit
+    }
+    
     // Some subprocesses don't react properly to SIGTERM and similar signals.
     // Most notably, some docker-container-based MCP servers don't handle such signals unless
     // run using `docker run --init`.

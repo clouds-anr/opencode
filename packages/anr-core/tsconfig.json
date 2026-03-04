@@ -12,8 +12,7 @@
     "moduleResolution": "bundler",
     "module": "esnext",
     "target": "esnext",
-    "lib": ["esnext"],
-    "types": ["bun-types"]
+    "lib": ["esnext"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

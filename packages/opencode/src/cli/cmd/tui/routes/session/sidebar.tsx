@@ -2,6 +2,7 @@ import { useSync } from "@tui/context/sync"
 import { createMemo, For, Show, Switch, Match } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useTheme } from "../../context/theme"
+import { useQuota } from "../../context/quota"
 import { Locale } from "@/util/locale"
 import path from "path"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
@@ -15,6 +16,7 @@ import { TodoItem } from "../../component/todo-item"
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
   const { theme } = useTheme()
+  const quota = useQuota()
   const session = createMemo(() => sync.session.get(props.sessionID)!)
   const diff = createMemo(() => sync.data.session_diff[props.sessionID] ?? [])
   const todo = createMemo(() => sync.data.todo[props.sessionID] ?? [])
@@ -106,6 +108,47 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               <text fg={theme.textMuted}>{context()?.percentage ?? 0}% used</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
             </box>
+            <Show when={quota.dailyLimit > 0 || quota.monthlyLimit > 0}>
+              <box>
+                <text fg={theme.text}>
+                  <b>Quota</b>
+                </text>
+                <Show when={quota.dailyLimit > 0}>
+                  <box>
+                    <text
+                      fg={{
+                        green: theme.success,
+                        yellow: theme.warning,
+                        red: theme.error,
+                      }[quota.warningColor]}
+                    >
+                      Daily: {quota.dailyPercent}% used
+                    </text>
+                    <text fg={theme.textMuted}>{quota.dailyTokens.toLocaleString()} / {quota.dailyLimit.toLocaleString()} tokens</text>
+                  </box>
+                </Show>
+                <Show when={quota.monthlyLimit > 0}>
+                  <box>
+                    <text
+                      fg={{
+                        green: theme.success,
+                        yellow: theme.warning,
+                        red: theme.error,
+                      }[quota.warningColor]}
+                    >
+                      Monthly: {quota.monthlyPercent}% used
+                    </text>
+                    <text fg={theme.textMuted}>{quota.monthlyTokens.toLocaleString()} / {quota.monthlyLimit.toLocaleString()} tokens</text>
+                  </box>
+                </Show>
+                <Show when={quota.warningLevel === "warning"}>
+                  <text fg={theme.warning}>⚠️ Approaching quota limit (80%)</text>
+                </Show>
+                <Show when={quota.warningLevel === "critical"}>
+                  <text fg={theme.error}>🚫 Quota limit exceeded (90%+)</text>
+                </Show>
+              </box>
+            </Show>
             <Show when={mcpEntries().length > 0}>
               <box>
                 <box

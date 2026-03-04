@@ -22,28 +22,34 @@ export function detectDependenciesFromCode(code: string, language: string): Depe
     const importRegex = /import\s+.*?\s+from\s+['"]([^'"]+)['"]/g
     let match
     while ((match = importRegex.exec(code)) !== null) {
-      const pkg = match[1]
-      if (!pkg.startsWith(".") && !pkg.startsWith("/")) {
-        dependencies.push({
-          name: pkg.split("/")[0] || pkg,
-          type: "npm",
-          detected: true,
-          installed: false, // Check this against package.json
-        })
+      const pkg = match?.[1]
+      if (pkg && !pkg.startsWith(".") && !pkg.startsWith("/")) {
+        const pkgName = pkg.split("/")[0]
+        if (pkgName) {
+          dependencies.push({
+            name: pkgName,
+            type: "npm",
+            detected: true,
+            installed: false, // Check this against package.json
+          })
+        }
       }
     }
 
     // CommonJS requires
     const requireRegex = /require\s*\(['"]([^'"]+)['"]\)/g
     while ((match = requireRegex.exec(code)) !== null) {
-      const pkg = match[1]
-      if (!pkg.startsWith(".") && !pkg.startsWith("/")) {
-        dependencies.push({
-          name: pkg.split("/")[0] || pkg,
-          type: "npm",
-          detected: true,
-          installed: false,
-        })
+      const pkg = match?.[1]
+      if (pkg && !pkg.startsWith(".") && !pkg.startsWith("/")) {
+        const pkgName = pkg.split("/")[0]
+        if (pkgName) {
+          dependencies.push({
+            name: pkgName,
+            type: "npm",
+            detected: true,
+            installed: false,
+          })
+        }
       }
     }
   } else if (language === "python") {
@@ -51,12 +57,15 @@ export function detectDependenciesFromCode(code: string, language: string): Depe
     const pythonImportRegex = /(?:from|import)\s+([a-zA-Z0-9_]+)/g
     let match
     while ((match = pythonImportRegex.exec(code)) !== null) {
-      dependencies.push({
-        name: match[1],
-        type: "python",
-        detected: true,
-        installed: false,
-      })
+      const pkgName = match?.[1]
+      if (pkgName) {
+        dependencies.push({
+          name: pkgName,
+          type: "python",
+          detected: true,
+          installed: false,
+        })
+      }
     }
   }
 

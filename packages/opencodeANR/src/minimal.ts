@@ -3,8 +3,7 @@
  * Use this while debugging integration issues
  */
 
-import { getValidatedANRConfig } from "./config/env-loader"
-import { authenticateWithCognito, setAWSCredentialsEnv } from "./integrations/cognito-sso"
+import { getValidatedANRConfig, authenticateWithCognito, setAWSCredentialsEnv } from "@opencode-ai/anr-core"
 
 async function startMinimal() {
   console.log("🚀 Starting ANR OpenCode (Minimal Mode)\n")

@@ -33,6 +33,7 @@ import { ExitProvider, useExit } from "./context/exit"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
+import { QuotaProvider } from "./context/quota"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
@@ -139,7 +140,8 @@ export function tui(input: {
             <ArgsProvider {...input.args}>
               <ExitProvider onExit={onExit}>
                 <KVProvider>
-                  <ToastProvider>
+                  <QuotaProvider>
+                    <ToastProvider>
                     <RouteProvider>
                       <TuiConfigProvider config={input.config}>
                         <SDKProvider
@@ -174,6 +176,7 @@ export function tui(input: {
                       </TuiConfigProvider>
                     </RouteProvider>
                   </ToastProvider>
+                </QuotaProvider>
                 </KVProvider>
               </ExitProvider>
             </ArgsProvider>

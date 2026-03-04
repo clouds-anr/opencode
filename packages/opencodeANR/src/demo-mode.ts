@@ -3,15 +3,13 @@
  * Use this for testing without real AWS credentials
  */
 
-import type { ANRConfig } from "./config/types"
-import { getValidatedANRConfig } from "./config/env-loader"
-import { initializeOTEL, registerOTELShutdownHandlers } from "./integrations/otel"
-import { createQuotaMiddleware } from "./middleware/quota-policy"
+import type { ANRConfig } from "@opencode-ai/anr-core"
+import { getValidatedANRConfig, initializeOTEL, registerOTELShutdownHandlers, checkQuota } from "@opencode-ai/anr-core"
 
 export interface ANRDemoSession {
   config: ANRConfig
   userId: string
-  checkQuota: ReturnType<typeof createQuotaMiddleware>
+  checkQuota: typeof checkQuota
 }
 
 /**
@@ -34,9 +32,8 @@ export async function initializeANRDemo(envPath?: string): Promise<ANRDemoSessio
     console.log("⏭️  Skipped (telemetry disabled)\n")
   }
 
-  // Create quota middleware
-  console.log("🎯 Creating quota middleware...")
-  const checkQuota = createQuotaMiddleware(config)
+  // Setup quota checking
+  console.log("🎯 Quota checking available...")
   console.log("✅ Ready\n")
 
   const userId = process.env.USER || process.env.USERNAME || "demo-user"

@@ -3,8 +3,7 @@
  * Shows the initialization flow without requiring real credentials
  */
 
-import { loadANRConfig, validateANRConfig } from "../src/config/env-loader"
-import { detectDependenciesFromCode, getMissingDependencies, generateInstallCommand } from "../src/middleware/dependency-detector"
+import { loadANRConfig, validateANRConfig, detectDependenciesFromCode, getMissingDependencies, generateInstallCommand } from "@opencode-ai/anr-core"
 
 console.log("🧪 ANR OpenCode Demo\n")
 

@@ -16,6 +16,9 @@ export interface ANRConfig {
   otelMetricsExporter: string
   otelProtocol: string
   otelEndpoint: string
+  enableAudit: boolean
+  metricsBatchSize: number
+  metricsIntervalSeconds: number
 
   // Audit & Compliance
   auditTableName: string
@@ -23,6 +26,7 @@ export interface ANRConfig {
   // Quota & Policy
   quotaApiEndpoint: string
   quotaFailMode: "open" | "closed"
+  quotaCheckInterval: "PROMPT" | number // "PROMPT" for per-prompt checks, or seconds (default: 300 for 5min)
 
   // AWS Cognito SSO
   providerDomain: string
@@ -38,13 +42,27 @@ export interface ANRConfig {
   // Optional installer URLs
   installerUrlClaude?: string
   installerUrlGit?: string
+
+  // Organization context (for telemetry enrichment)
+  department?: string
+  teamId?: string
+  costCenter?: string
+  manager?: string
+  role?: string
+  location?: string
+  organization?: string
+  accountId?: string
 }
 
 export const defaultConfig: Partial<ANRConfig> = {
   awsRegion: "us-east-2",
   useBedrockProvider: true,
   enableTelemetry: true,
+  enableAudit: true,
+  metricsBatchSize: 100,
+  metricsIntervalSeconds: 60,
   quotaFailMode: "closed",
+  quotaCheckInterval: 300, // 5 minutes default
   providerType: "cognito",
   credentialStorage: "session",
   federationType: "cognito",

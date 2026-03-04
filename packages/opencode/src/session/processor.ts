@@ -15,6 +15,7 @@ import { Config } from "@/config/config"
 import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
+import { trackModelCall, getTelemetryContext, logTokenUsage } from "@opencode-ai/anr-core"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -46,6 +47,17 @@ export namespace SessionProcessor {
         log.info("process")
         needsCompaction = false
         const shouldBreak = (await Config.get()).experimental?.continue_loop_on_deny !== true
+        
+        // Check quota before attempting model invocation
+        const quotaAllowed = process.env.OPENCODE_ANR_QUOTA_ALLOWED !== "false"
+        if (!quotaAllowed) {
+          const warningLevel = process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL || "normal"
+          const reason = warningLevel === "critical" 
+            ? "Quota limit exceeded. Cannot proceed with model invocation."
+            : "Quota check failed. Please review your usage."
+          throw new Error(reason)
+        }
+        
         while (true) {
           try {
             let currentText: MessageV2.TextPart | undefined
@@ -250,6 +262,41 @@ export namespace SessionProcessor {
                   input.assistantMessage.finish = value.finishReason
                   input.assistantMessage.cost += usage.cost
                   input.assistantMessage.tokens = usage.tokens
+                  
+                  // Track token usage for telemetry and audit if in ANR mode
+                  if (process.env.OPENCODE_FLAVOR === "anr") {
+                    try {
+                      // Get context and track metrics
+                      const context = getTelemetryContext()
+                      
+                      trackModelCall(
+                        input.model.name || input.model.id,
+                        usage.tokens.input,
+                        usage.tokens.output,
+                        context || undefined  // Pass context explicitly
+                      )
+                      
+                      // Log to audit trail
+                      if (context) {
+                        const config = {
+                          auditTableName: process.env.AUDIT_TABLE_NAME || "AuditEvents",
+                          awsRegion: process.env.AWS_REGION || "us-east-2",
+                        } as any
+                        
+                        logTokenUsage(
+                          config,
+                          context.userId,
+                          input.model.name || input.model.id,
+                          usage.tokens.input,
+                          usage.tokens.output,
+                          context
+                        )
+                      }
+                    } catch (err) {
+                      // Silently fail - don't block model calls if telemetry fails
+                    }
+                  }
+                  
                   await Session.updatePart({
                     id: Identifier.ascending("part"),
                     reason: value.finishReason,

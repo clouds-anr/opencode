@@ -1,10 +1,13 @@
-- To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
-- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
-- Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
+# AGENTS.md
 
-## Style Guide
+## Build/Lint/Test Commands
+
+- **Build**: `npm run build`
+- **Lint**: `npm run lint`
+- **Test**: `npm run test`
+- **Run a single test**: `npm run test -- -t <test_name>`
+
+## Code Style Guidelines
 
 ### General Principles
 
@@ -111,3 +114,11 @@ const table = sqliteTable("session", {
 - Avoid mocks as much as possible
 - Test actual implementation, do not duplicate logic into tests
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/opencode`.
+
+## Cursor Rules
+
+- No specific Cursor rules found.
+
+## Copilot Rules
+
+- No specific Copilot rules found.

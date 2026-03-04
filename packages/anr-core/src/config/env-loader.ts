@@ -24,7 +24,9 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
     // Try to load from default locations
     const cwd = process.cwd()
     const configHome = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr")
-    const packageDir = resolve(process.env.npm_package_json ? resolve(process.env.npm_package_json, "..") : import.meta.url.replace("file://", "").split("/src/")[0])
+    const npmPkgJson = process.env.npm_package_json
+    const rootPath = npmPkgJson ? resolve(npmPkgJson, "..") : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
+    const packageDir = resolve(rootPath || process.cwd())
     
     // Search for .env or .env.* files in multiple locations
     const searchPaths = [cwd, packageDir, configHome]
@@ -39,7 +41,7 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
       // Look for .env or .env.* files
       const envFiles = files.filter(f => f === ".env" || f.startsWith(".env."))
       
-      if (envFiles.length > 0) {
+      if (envFiles.length > 0 && envFiles[0]) {
         // Use the first match
         const envFile = resolve(dir, envFiles[0])
         if (!quiet) console.log(`📄 Loading config from: ${envFile}`)
@@ -55,7 +57,7 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
   }
 
   // Parse environment variables into config object
-  return parseEnvConfig()
+  return parseEnvConfig(quiet)
 }
 
 /**
@@ -86,22 +88,25 @@ async function loadEnvFile(path: string): Promise<void> {
 /**
  * Parse process.env into ANRConfig structure
  */
-function parseEnvConfig(): ANRConfig {
+function parseEnvConfig(quiet = false): ANRConfig {
   const env = process.env
 
   return {
     // AWS & Bedrock
-    awsProfile: env.AWS_PROFILE || defaultConfig.awsProfile || "",
-    awsRegion: env.AWS_REGION || defaultConfig.awsRegion!,
+    awsProfile: env.AWS_PROFILE || env.OPENCODE_AWS_PROFILE || defaultConfig.awsProfile || "",
+    awsRegion: env.AWS_REGION || env.OPENCODE_AWS_REGION || defaultConfig.awsRegion!,
     useBedrockProvider: env.CLAUDE_CODE_USE_BEDROCK === "1",
     anthropicModel: env.ANTHROPIC_MODEL || "",
     anthropicSmallFastModel: env.ANTHROPIC_SMALL_FAST_MODEL || "",
 
     // Telemetry
-    enableTelemetry: env.CLAUDE_CODE_ENABLE_TELEMETRY === "1",
+    enableTelemetry: env.OPENCODE_ENABLE_TELEMETRY === "1" || env.CLAUDE_CODE_ENABLE_TELEMETRY === "1",
+    enableAudit: env.OPENCODE_ENABLE_AUDIT !== "0", // enabled by default unless explicitly disabled
     otelMetricsExporter: env.OTEL_METRICS_EXPORTER || defaultConfig.otelMetricsExporter!,
     otelProtocol: env.OTEL_EXPORTER_OTLP_PROTOCOL || defaultConfig.otelProtocol!,
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || "",
+    metricsBatchSize: parseInt(env.OPENCODE_METRICS_BATCH_SIZE || String(defaultConfig.metricsBatchSize), 10),
+    metricsIntervalSeconds: parseInt(env.OPENCODE_METRICS_INTERVAL_SECONDS || String(defaultConfig.metricsIntervalSeconds), 10),
 
     // Audit & Compliance
     auditTableName: env.AUDIT_TABLE_NAME || "",
@@ -109,6 +114,9 @@ function parseEnvConfig(): ANRConfig {
     // Quota & Policy
     quotaApiEndpoint: env.QUOTA_API_ENDPOINT || "",
     quotaFailMode: (env.QUOTA_FAIL_MODE as "open" | "closed") || defaultConfig.quotaFailMode!,
+    quotaCheckInterval: env.OPENCODE_QUOTA_CHECK_INTERVAL === "PROMPT" 
+      ? "PROMPT" 
+      : parseInt(env.OPENCODE_QUOTA_CHECK_INTERVAL || String(defaultConfig.quotaCheckInterval), 10),
 
     // AWS Cognito SSO
     providerDomain: env.PROVIDER_DOMAIN || "",
@@ -134,8 +142,8 @@ export function validateANRConfig(config: ANRConfig): string[] {
   const errors: string[] = []
 
   // Only require AWS config for Phase 1 (authentication)
-  if (!config.awsProfile) errors.push("AWS_PROFILE is required")
-  if (!config.awsRegion) errors.push("AWS_REGION is required")
+  if (!config.awsProfile) errors.push("AWS_PROFILE or OPENCODE_AWS_PROFILE is required")
+  if (!config.awsRegion) errors.push("AWS_REGION or OPENCODE_AWS_REGION is required")
 
   return errors
 }

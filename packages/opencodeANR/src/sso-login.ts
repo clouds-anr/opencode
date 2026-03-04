@@ -4,7 +4,7 @@
 
 import { exec } from "child_process"
 import { promisify } from "util"
-import { loadANRConfig } from "./config/env-loader"
+import { loadANRConfig } from "@opencode-ai/anr-core"
 
 const execAsync = promisify(exec)
 
