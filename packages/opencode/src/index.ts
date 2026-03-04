@@ -190,7 +190,7 @@ async function initializeANR(): Promise<void> {
     tokens.idToken
   )
   
-  if (!quotaResult.usage.allowed) {
+  if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
     await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
     if (config.enableTelemetry) {
@@ -201,7 +201,7 @@ async function initializeANR(): Promise<void> {
   }
   
   console.log("✅ Quota check passed")
-  if (quotaResult.usage) {
+  if (quotaResult?.usage) {
     console.log(`   Daily: ${Math.round(quotaResult.usage.dailyUsagePercent)}% (${quotaResult.usage.dailyTokens.toLocaleString()} tokens)`)
     console.log(`   Monthly: ${Math.round(quotaResult.usage.monthlyUsagePercent)}% (${quotaResult.usage.monthlyTokens.toLocaleString()} tokens)`)
   }
