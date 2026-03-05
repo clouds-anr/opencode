@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./util/debug-logger": "./src/util/debug-logger.ts",
     "./util/metrics-validator": "./src/util/metrics-validator.ts",
-    "./util/context-tracer": "./src/util/context-tracer.ts"
+    "./util/context-tracer": "./src/util/context-tracer.ts",
+    "./util/otel-test-harness": "./src/util/otel-test-harness.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
