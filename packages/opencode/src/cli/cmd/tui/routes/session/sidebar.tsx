@@ -114,30 +114,56 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   <b>Quota</b>
                 </text>
                 <Show when={quota.dailyLimit > 0}>
-                  <box>
-                    <text
-                      fg={{
-                        green: theme.success,
-                        yellow: theme.warning,
-                        red: theme.error,
-                      }[quota.warningColor]}
-                    >
-                      Daily: {quota.dailyPercent}% used
-                    </text>
+                  <box gap={1}>
+                    <box flexDirection="row" justifyContent="space-between">
+                      <text
+                        fg={{
+                          green: theme.success,
+                          yellow: theme.warning,
+                          red: theme.error,
+                        }[quota.warningColor]}
+                      >
+                        Daily: {quota.dailyPercent}%
+                      </text>
+                    </box>
+                    <box width="100%" height={1} backgroundColor={theme.backgroundElement}>
+                      <box
+                        width={Math.max(1, Math.round((quota.dailyPercent / 100) * 36))}
+                        height={1}
+                        backgroundColor={{
+                          green: theme.success,
+                          yellow: theme.warning,
+                          red: theme.error,
+                        }[quota.warningColor === "green" ? "green" : quota.warningColor === "yellow" ? "yellow" : "red"]}
+                      />
+                    </box>
                     <text fg={theme.textMuted}>{quota.dailyTokens.toLocaleString()} / {quota.dailyLimit.toLocaleString()} tokens</text>
                   </box>
                 </Show>
                 <Show when={quota.monthlyLimit > 0}>
-                  <box>
-                    <text
-                      fg={{
-                        green: theme.success,
-                        yellow: theme.warning,
-                        red: theme.error,
-                      }[quota.warningColor]}
-                    >
-                      Monthly: {quota.monthlyPercent}% used
-                    </text>
+                  <box gap={1}>
+                    <box flexDirection="row" justifyContent="space-between">
+                      <text
+                        fg={{
+                          green: theme.success,
+                          yellow: theme.warning,
+                          red: theme.error,
+                        }[quota.warningColor]}
+                      >
+                        Monthly: {quota.monthlyPercent}%
+                      </text>
+                    </box>
+                    <box width="100%" height={1} backgroundColor={theme.backgroundElement}>
+                      <box
+                        width={Math.max(1, Math.round((quota.monthlyPercent / 100) * 36))}
+                        height={1}
+                        backgroundColor={{
+                          green: theme.success,
+                          yellow: theme.warning,
+                          red: theme.error,
+                        }[quota.warningColor === "green" ? "green" : quota.warningColor === "yellow" ? "yellow" : "red"]}
+                      />
+                    </box>
                     <text fg={theme.textMuted}>{quota.monthlyTokens.toLocaleString()} / {quota.monthlyLimit.toLocaleString()} tokens</text>
                   </box>
                 </Show>

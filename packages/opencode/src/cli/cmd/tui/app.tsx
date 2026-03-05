@@ -103,6 +103,7 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
 }
 
 import type { EventSource } from "./context/sdk"
+import type { QuotaInfo } from "./context/quota"
 
 export function tui(input: {
   url: string
@@ -112,6 +113,7 @@ export function tui(input: {
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
+  quotaInfo?: QuotaInfo
   onExit?: () => Promise<void>
 }) {
   // promise to prevent immediate exit
@@ -140,7 +142,7 @@ export function tui(input: {
             <ArgsProvider {...input.args}>
               <ExitProvider onExit={onExit}>
                 <KVProvider>
-                  <QuotaProvider>
+                  <QuotaProvider quotaInfo={input.quotaInfo}>
                     <ToastProvider>
                     <RouteProvider>
                       <TuiConfigProvider config={input.config}>

@@ -10,6 +10,12 @@ import { GlobalBus } from "@/bus/global"
 import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
 import type { BunWebSocketData } from "hono/bun"
 import { Flag } from "@/flag/flag"
+import {
+  loadANRConfig,
+  initializeOTEL,
+  shutdownOTEL,
+  reconstructTelemetryContextFromEnv,
+} from "@opencode-ai/anr-core"
 
 await Log.init({
   print: process.argv.includes("--print-logs"),
@@ -31,6 +37,17 @@ process.on("uncaughtException", (e) => {
     e: e instanceof Error ? e.message : e,
   })
 })
+
+// Initialize OTEL in the worker so token metrics from session processing
+// are recorded via a real MeterProvider (not the no-op default).
+// The main thread's MeterProvider is not shared with Bun Workers.
+if (process.env.OPENCODE_FLAVOR === "anr" && process.env.OPENCODE_ENABLE_TELEMETRY === "1") {
+  const workerContext = reconstructTelemetryContextFromEnv()
+  if (workerContext) {
+    const config = await loadANRConfig(undefined, true)
+    initializeOTEL(config, workerContext)
+  }
+}
 
 // Subscribe to global events and forward them via RPC
 GlobalBus.on("event", (event) => {
@@ -137,6 +154,8 @@ export const rpc = {
   async shutdown() {
     Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
+    // Flush any pending OTEL metrics before shutting down
+    await shutdownOTEL().catch(() => {})
     await Promise.race([
       Instance.disposeAll(),
       new Promise((resolve) => {

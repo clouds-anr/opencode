@@ -287,8 +287,26 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     const metricExporter: PushMetricExporter = {
       export(resourceMetrics: ResourceMetrics, cb: (result: ExportResult) => void) {
         const metricCount = resourceMetrics.scopeMetrics?.length || 0
-        diagnostics.exportsAttempted++
         logToFile(`[FetchExporter.export] called with ${metricCount} scope metrics`)
+
+        // Skip empty exports — with DELTA temporality, most periodic cycles have
+        // no new data. Avoids wasted HTTP round-trips to the collector.
+        const hasData = resourceMetrics.scopeMetrics?.some(
+          sm => sm.metrics?.some(m => (m.dataPoints?.length ?? 0) > 0)
+        )
+        if (!hasData) {
+          cb({ code: ExportResultCode.SUCCESS })
+          return
+        }
+
+        diagnostics.exportsAttempted++
+
+        // Log metric names and data point counts for debugging
+        for (const sm of resourceMetrics.scopeMetrics || []) {
+          for (const m of sm.metrics || []) {
+            logToFile(`[FetchExporter] metric: ${m.descriptor?.name}, dataPoints: ${m.dataPoints?.length ?? 0}`)
+          }
+        }
 
         // Serialize SDK internal objects → proper OTLP JSON using the official transformer
         let body: string
@@ -296,6 +314,8 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
           const otlp = createExportMetricsServiceRequest([resourceMetrics], { useLongBits: false })
           body = JSON.stringify(otlp)
           logToFile(`[FetchExporter] serialized ${body.length} bytes`)
+          // Log full payload for debugging collector issues
+          logToFile(`[FetchExporter] OTLP payload:\n${body}`)
         } catch (e) {
           logToFile(`❌ Serialization failed: ${e}`)
           cb({ code: ExportResultCode.FAILED, error: e instanceof Error ? e : new Error(String(e)) })
@@ -465,8 +485,8 @@ export function trackCommand(commandName: string, duration: number): void {
  * Track a model invocation with token usage and context attributes
  * Context can be passed explicitly or will use stored context
  */
-export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, context?: TelemetryContext): void {
-  const totalTokens = inputTokens + outputTokens
+export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, reasoningTokens: number = 0, cacheReadTokens: number = 0, cacheWriteTokens: number = 0, context?: TelemetryContext): void {
+  const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
   
   try {
     // Use provided context, stored context, or global context (handles module instance issues)
@@ -487,6 +507,9 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
     logToFile(`Tracking model call: ${modelId}`, {
       inputTokens,
       outputTokens,
+      reasoningTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       totalTokens,
       providedContextUserId: context?.userId,
       storedContextUserId: telemetryContext?.userId,
@@ -520,6 +543,15 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
     tokenCounter.add(totalTokens, { ...modelAttr, type: "total" })
     tokenCounter.add(inputTokens, { ...modelAttr, type: "input" })
     tokenCounter.add(outputTokens, { ...modelAttr, type: "output" })
+    if (reasoningTokens > 0) {
+      tokenCounter.add(reasoningTokens, { ...modelAttr, type: "reasoning" })
+    }
+    if (cacheReadTokens > 0) {
+      tokenCounter.add(cacheReadTokens, { ...modelAttr, type: "cache_read" })
+    }
+    if (cacheWriteTokens > 0) {
+      tokenCounter.add(cacheWriteTokens, { ...modelAttr, type: "cache_write" })
+    }
     
     // Record model call count
     modelCallCounter.add(1, modelAttr)

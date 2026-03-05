@@ -61,6 +61,19 @@ let anrContext: {
   commandName: string
 } | null = null
 
+// Export quota info for TUI access
+export let quotaInfo: {
+  dailyTokens: number
+  monthlyTokens: number
+  dailyLimit: number
+  monthlyLimit: number
+  dailyPercent: number
+  monthlyPercent: number
+  warningLevel: "normal" | "warning" | "critical"
+  warningColor: "green" | "yellow" | "red"
+  allowed: boolean
+} | null = null
+
 /**
  * Detect terminal type based on environment variables
  */
@@ -172,6 +185,24 @@ async function initializeANR(): Promise<void> {
   })
   await logAuthEvent(config, telemetryContext.userId, "success", telemetryContext)
   
+  // Set telemetry context env vars so the Bun Worker (which has a separate global scope)
+  // can reconstruct the context via reconstructTelemetryContextFromEnv()
+  process.env.OPENCODE_ANR_USER_ID = telemetryContext.userId
+  if (telemetryContext.userEmail) process.env.OPENCODE_ANR_USER_EMAIL = telemetryContext.userEmail
+  if (telemetryContext.userName) process.env.OPENCODE_ANR_USER_NAME = telemetryContext.userName
+  if (telemetryContext.osType) process.env.OPENCODE_ANR_OS_TYPE = telemetryContext.osType
+  if (telemetryContext.osVersion) process.env.OPENCODE_ANR_OS_VERSION = telemetryContext.osVersion
+  if (telemetryContext.terminalType) process.env.OPENCODE_ANR_TERMINAL_TYPE = telemetryContext.terminalType
+  if (telemetryContext.sessionId) process.env.OPENCODE_ANR_SESSION_ID = telemetryContext.sessionId
+  if (telemetryContext.department) process.env.OPENCODE_ANR_DEPARTMENT = telemetryContext.department
+  if (telemetryContext.teamId) process.env.OPENCODE_ANR_TEAM_ID = telemetryContext.teamId
+  if (telemetryContext.costCenter) process.env.OPENCODE_ANR_COST_CENTER = telemetryContext.costCenter
+  if (telemetryContext.manager) process.env.OPENCODE_ANR_MANAGER = telemetryContext.manager
+  if (telemetryContext.role) process.env.OPENCODE_ANR_ROLE = telemetryContext.role
+  if (telemetryContext.location) process.env.OPENCODE_ANR_LOCATION = telemetryContext.location
+  if (telemetryContext.organization) process.env.OPENCODE_ANR_ORGANIZATION = telemetryContext.organization
+  if (telemetryContext.accountId) process.env.OPENCODE_ANR_ACCOUNT_ID = telemetryContext.accountId
+
   // Initialize telemetry
   if (config.enableTelemetry) {
     console.log("📊 Initializing telemetry...")
@@ -205,9 +236,54 @@ async function initializeANR(): Promise<void> {
   }
   
   console.log("✅ Quota check passed")
+  console.log("📊 QuotaResult:", JSON.stringify(quotaResult, null, 2))
   if (quotaResult?.usage) {
     console.log(`   Daily: ${Math.round(quotaResult.usage.dailyUsagePercent)}% (${quotaResult.usage.dailyTokens.toLocaleString()} tokens)`)
     console.log(`   Monthly: ${Math.round(quotaResult.usage.monthlyUsagePercent)}% (${quotaResult.usage.monthlyTokens.toLocaleString()} tokens)`)
+    
+    // Determine warning level
+    const maxPercent = Math.max(quotaResult.usage.dailyUsagePercent, quotaResult.usage.monthlyUsagePercent)
+    let warningLevel: "normal" | "warning" | "critical" = "normal"
+    if (maxPercent >= 90) warningLevel = "critical"
+    else if (maxPercent >= 80) warningLevel = "warning"
+
+    // Determine color
+    let warningColor: "green" | "yellow" | "red" = "green"
+    if (warningLevel === "critical") warningColor = "red"
+    else if (warningLevel === "warning") warningColor = "yellow"
+    
+    // Store quota info for TUI access
+    quotaInfo = {
+      dailyTokens: quotaResult.usage.dailyTokens,
+      monthlyTokens: quotaResult.usage.monthlyTokens,
+      dailyLimit: quotaResult.policy.dailyTokenLimit,
+      monthlyLimit: quotaResult.policy.monthlyTokenLimit,
+      dailyPercent: quotaResult.usage.dailyUsagePercent,
+      monthlyPercent: quotaResult.usage.monthlyUsagePercent,
+      warningLevel,
+      warningColor,
+      allowed: quotaResult.usage.allowed,
+    }
+    
+    // Set environment variables for TUI to display quota (for backward compatibility)
+    process.env.OPENCODE_ANR_QUOTA_DAILY_TOKENS = String(quotaResult.usage.dailyTokens)
+    process.env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS = String(quotaResult.usage.monthlyTokens)
+    process.env.OPENCODE_ANR_QUOTA_DAILY_LIMIT = String(quotaResult.policy.dailyTokenLimit)
+    process.env.OPENCODE_ANR_QUOTA_MONTHLY_LIMIT = String(quotaResult.policy.monthlyTokenLimit)
+    process.env.OPENCODE_ANR_QUOTA_DAILY_PERCENT = String(quotaResult.usage.dailyUsagePercent)
+    process.env.OPENCODE_ANR_QUOTA_MONTHLY_PERCENT = String(quotaResult.usage.monthlyUsagePercent)
+    process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL = quotaResult.usage.warningLevel
+    process.env.OPENCODE_ANR_QUOTA_ALLOWED = String(quotaResult.usage.allowed)
+    
+    // Set API endpoint and credentials for TUI's periodic refresh
+    process.env.OPENCODE_ANR_QUOTA_API_ENDPOINT = config.quotaApiEndpoint
+    process.env.OPENCODE_ANR_ID_TOKEN = tokens.idToken
+    process.env.OPENCODE_ANR_USER_EMAIL = telemetryContext.userEmail || telemetryContext.userId
+    
+    console.log("✅ Quota info set for TUI")
+  } else {
+    console.warn("⚠️ No quotaResult or usage data received from API")
+    console.warn("   quotaResult:", quotaResult)
   }
   console.log()
   

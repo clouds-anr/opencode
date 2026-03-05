@@ -1,5 +1,6 @@
 import { cmd } from "@/cli/cmd/cmd"
 import { tui } from "./app"
+import { quotaInfo } from "@/index"
 import { Rpc } from "@/util/rpc"
 import { type rpc } from "./worker"
 import path from "path"
@@ -173,6 +174,7 @@ export const TuiThreadCommand = cmd({
         directory: cwd,
         fetch: customFetch,
         events,
+        quotaInfo: quotaInfo || undefined,
         args: {
           continue: args.continue,
           sessionID: args.session,

@@ -273,6 +273,9 @@ export namespace SessionProcessor {
                         input.model.name || input.model.id,
                         usage.tokens.input,
                         usage.tokens.output,
+                        usage.tokens.reasoning,
+                        usage.tokens.cache.read,
+                        usage.tokens.cache.write,
                         context || undefined  // Pass context explicitly
                       )
                       
