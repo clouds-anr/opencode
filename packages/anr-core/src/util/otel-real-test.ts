@@ -81,7 +81,7 @@ async function realTest() {
     // Manually collect and export
     log("⏳ Collecting and exporting metrics...")
     
-    const reader = provider.metricReader
+    const reader = (provider as any).metricReader
     if (reader) {
       await reader.collect()
       log("✅ Manual collection completed")

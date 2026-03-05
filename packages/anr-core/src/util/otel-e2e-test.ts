@@ -54,7 +54,7 @@ async function main() {
     if (fullConfig) {
       const auth = await authenticateWithOIDC(fullConfig)
       try {
-        const payload = JSON.parse(Buffer.from(auth.idToken.split(".")[1], "base64url").toString())
+        const payload = JSON.parse(Buffer.from(auth.idToken.split(".")[1]!, "base64url").toString())
         userId = payload.sub || userId
         userEmail = payload.email || userEmail
       } catch { /* use defaults */ }

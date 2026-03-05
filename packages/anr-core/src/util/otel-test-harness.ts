@@ -65,7 +65,7 @@ export async function runOTELTestHarness(): Promise<TestHarnessResult> {
 
     // Step 2: Perform OIDC Authentication
     log("\n🔐 Step 2: Performing OIDC authentication...")
-    log(`📍 OIDC Domain: ${config.cognitoDomain}`)
+    log(`📍 OIDC Domain: ${config.providerDomain}`)
 
     let oidcToken: string
     try {
@@ -74,11 +74,9 @@ export async function runOTELTestHarness(): Promise<TestHarnessResult> {
       result.auth = {
         oidcToken: oidcToken.substring(0, 50) + "...",
         tokenType: "Bearer",
-        expiresIn: oidcResult.expiresIn,
       }
       log("✅ OIDC authentication successful", {
         tokenLength: oidcToken.length,
-        expiresIn: oidcResult.expiresIn,
       })
     } catch (error) {
       throw new Error(`OIDC auth failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -88,7 +86,7 @@ export async function runOTELTestHarness(): Promise<TestHarnessResult> {
     log("\n☁️  Step 3: Exchanging Cognito token for AWS credentials...")
     let awsCredentials: any
     try {
-      awsCredentials = await exchangeTokenForAWSCredentials(config, oidcToken)
+      awsCredentials = await exchangeTokenForAWSCredentials(oidcToken, config)
       result.aws = {
         accessKeyId: awsCredentials.accessKeyId?.substring(0, 10) + "...",
         sessionToken: awsCredentials.sessionToken?.substring(0, 30) + "...",
@@ -126,8 +124,8 @@ export async function runOTELTestHarness(): Promise<TestHarnessResult> {
       "x-aws-session-token": awsCredentials.sessionToken,
     }
 
-    if (context.userEmail) headers["x-user-email"] = context.userEmail
-    if (context.userId) headers["x-user-id"] = context.userId
+    if (context?.userEmail) headers["x-user-email"] = context.userEmail
+    if (context?.userId) headers["x-user-id"] = context.userId
 
     result.otel.headers = {
       ...headers,

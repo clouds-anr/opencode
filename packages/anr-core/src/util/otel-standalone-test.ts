@@ -86,7 +86,7 @@ async function main() {
   // ========================================
   header("Test 2: JsonMetricsSerializer")
 
-  let serializedData: Uint8Array | null = null
+  let serializedData: Uint8Array | null | undefined = null
   try {
     const { JsonMetricsSerializer } = await import("@opentelemetry/otlp-transformer")
     info("JsonMetricsSerializer imported OK")

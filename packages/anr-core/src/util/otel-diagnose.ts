@@ -30,7 +30,7 @@ let lastFailure: any = null
 let lastPayload: any = null
 
 for (let i = 0; i < lines.length; i++) {
-  const line = lines[i]
+  const line = lines[i]!
   
   if (line.includes("[OTLPExporter.export] called")) {
     attempts++
@@ -45,8 +45,8 @@ for (let i = 0; i < lines.length; i++) {
     // Try to parse the next few lines for error details
     try {
       for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
-        if (lines[j].trim().startsWith("{")) {
-          lastFailure = JSON.parse(lines[j].trim())
+        if (lines[j]!.trim().startsWith("{")) {
+          lastFailure = JSON.parse(lines[j]!.trim())
           break
         }
       }
@@ -57,11 +57,11 @@ for (let i = 0; i < lines.length; i++) {
     // Capture last payload
     try {
       for (let j = i + 1; j < Math.min(i + 50, lines.length); j++) {
-        if (lines[j].trim().startsWith("{")) {
+        if (lines[j]!.trim().startsWith("{")) {
           const payloadLines = []
           for (let k = j; k < lines.length; k++) {
             payloadLines.push(lines[k])
-            if (lines[k].includes("}") && lines[k].trim() === "}") {
+            if (lines[k]!.includes("}") && lines[k]!.trim() === "}") {
               break
             }
           }

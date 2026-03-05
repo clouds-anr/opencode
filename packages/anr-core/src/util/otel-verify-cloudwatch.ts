@@ -21,10 +21,10 @@ import { tmpdir } from "os"
 
 const C = { r: "\x1b[0m", g: "\x1b[32m", rd: "\x1b[31m", y: "\x1b[33m", c: "\x1b[36m", d: "\x1b[2m", b: "\x1b[1m" }
 
-function arg(name: string, fallback: string) {
+function arg(name: string, fallback: string): string {
   const idx = process.argv.indexOf(`--${name}`)
   if (idx === -1 || idx + 1 >= process.argv.length) return fallback
-  return process.argv[idx + 1]
+  return process.argv[idx + 1]!
 }
 
 const NAMESPACE = arg("namespace", "ClaudeCode")
@@ -113,7 +113,7 @@ async function listMetricNames(): Promise<string[]> {
   const result = await $`aws cloudwatch list-metrics --namespace ${NAMESPACE} --region ${REGION} --profile ${PROFILE} --output json`.quiet().nothrow()
   if (result.exitCode !== 0) return []
   const parsed = JSON.parse(result.stdout.toString())
-  return [...new Set((parsed.Metrics || []).map((m: any) => m.MetricName as string))].sort()
+  return [...new Set<string>((parsed.Metrics || []).map((m: any) => m.MetricName as string))].sort()
 }
 
 async function main() {
@@ -177,7 +177,7 @@ async function main() {
 
       found++
       const latest = result.values[0]
-      const latestTs = new Date(result.timestamps[0]).toLocaleTimeString()
+      const latestTs = new Date(result.timestamps[0]!).toLocaleTimeString()
 
       console.log(`  ${C.g}✅ ${m.name}${C.r}`)
       console.log(`     ${C.d}${m.label}${C.r}`)

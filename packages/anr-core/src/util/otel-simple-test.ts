@@ -93,7 +93,7 @@ export async function runSimpleOTELTest() {
       resource,
     })
 
-    meterProvider.addMetricReader(new PeriodicExportingMetricReader(exporter, { intervalMillis: 1000 }))
+    meterProvider.addMetricReader(new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 1000 }))
 
     log("✅ Meter provider configured")
 
