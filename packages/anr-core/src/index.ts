@@ -23,10 +23,23 @@ export {
   trackSessionStart,
   trackSessionEnd,
   getTelemetryContext,
+  getOTELLogFilePath,
+  clearOTELLogs,
+  getOTELDiagnostics,
+  printOTELDiagnostics,
+  resetOTELDiagnostics,
+  getMetricsPreview,
+  printMetricsPreview,
+  getContextFlowDiagram,
+  printContextFlowDiagram,
+  getContextTraceEvents,
   type TelemetryContext,
 } from "./integrations/otel"
 
 export { reconstructTelemetryContextFromEnv, isUnderANRWrapper } from "./integrations/env-telemetry"
+
+// Telemetry Testing
+export { runOTELTestHarness, type TestHarnessResult } from "./util/otel-test-harness"
 
 // Quota
 export { checkQuota, getWarningColor, type QuotaPolicy, type QuotaUsage, type QuotaCheckRequest, type QuotaCheckResponse } from "./integrations/quota"

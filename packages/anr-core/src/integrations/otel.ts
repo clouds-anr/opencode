@@ -4,17 +4,65 @@
  */
 
 import { NodeSDK } from "@opentelemetry/sdk-node"
-import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics"
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http"
+import { MeterProvider, PeriodicExportingMetricReader, AggregationTemporality } from "@opentelemetry/sdk-metrics"
+import type { PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics"
 import { Resource } from "@opentelemetry/resources"
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions"
 import type { ANRConfig } from "../config/types"
 import { metrics } from "@opentelemetry/api"
+import { ExportResultCode } from "@opentelemetry/core"
+import type { ExportResult } from "@opentelemetry/core"
 import { resolve } from "path"
-import { appendFileSync, mkdirSync, existsSync } from "fs"
+import { appendFileSync, mkdirSync, existsSync, writeFileSync } from "fs"
+import { debugLogger } from "../util/debug-logger"
+import { validateContext, printContextReport } from "../util/metrics-validator"
+import { contextTracer } from "../util/context-tracer"
+import { createExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer"
 
 const logDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr", "logs")
 const logFile = resolve(logDir, "otel-metrics.log")
+const debugMode = process.env.OPENCODE_DEBUG_OTEL === "1" || process.env.OPENCODE_DEBUG === "1"
+
+/**
+ * Per-token cost lookup (USD per 1K tokens)
+ * Used to derive claude_code.cost.usage from token counts.
+ */
+const MODEL_COST_PER_1K: Record<string, { input: number; output: number }> = {
+  "claude-sonnet-4-20250514":           { input: 0.003,  output: 0.015  },
+  "claude-opus-4-20250514":             { input: 0.015,  output: 0.075  },
+  "claude-3-5-sonnet-20241022":         { input: 0.003,  output: 0.015  },
+  "claude-3-5-haiku-20241022":          { input: 0.0008, output: 0.004  },
+  "claude-3-opus-20240229":             { input: 0.015,  output: 0.075  },
+}
+
+function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
+  const key = Object.keys(MODEL_COST_PER_1K).find(k => model.includes(k))
+  if (!key) return 0
+  const rate = MODEL_COST_PER_1K[key]!
+  return (inputTokens / 1000) * rate.input + (outputTokens / 1000) * rate.output
+}
+
+/**
+ * Get the log file path for debugging
+ */
+export function getOTELLogFilePath(): string {
+  return logFile
+}
+
+/**
+ * Clear/reset the OTEL log file
+ */
+export function clearOTELLogs(): void {
+  try {
+    if (!existsSync(logDir)) {
+      mkdirSync(logDir, { recursive: true })
+    }
+    writeFileSync(logFile, "")
+    debugLogger.info("OTEL logs cleared")
+  } catch {
+    // Silently fail if clearing fails
+  }
+}
 
 /**
  * Log to file with timestamp
@@ -27,6 +75,11 @@ function logToFile(message: string, data?: Record<string, any>): void {
     const timestamp = new Date().toISOString()
     const line = data ? `${timestamp} ${message}\n  ${JSON.stringify(data, null, 2)}\n` : `${timestamp} ${message}\n`
     appendFileSync(logFile, line)
+    
+    // Also log to debug logger if debug mode enabled
+    if (debugMode) {
+      debugLogger.debug(message, data)
+    }
   } catch {
     // Silently fail if logging fails
   }
@@ -91,6 +144,16 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     logToFile("═══════════════════════════════════════════════════════════════════════════════")
     // Store context for use in metric recording
     telemetryContext = context || { userId: "unknown" }
+    
+    // Trace context creation if debug mode
+    if (debugMode && context) {
+      const fieldCount = Object.values(context).filter((v) => !!v).length
+      contextTracer.created("otel.ts", fieldCount, {
+        userId: context.userId,
+        sessionId: context.sessionId,
+      })
+    }
+    
     logToFile("📊 Telemetry context stored:", {
       userId: telemetryContext.userId,
       userEmail: telemetryContext.userEmail,
@@ -98,6 +161,17 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
       department: telemetryContext.department,
       teamId: telemetryContext.teamId,
     })
+    
+    // Validate context in debug mode
+    if (debugMode) {
+      const contextValidation = validateContext(telemetryContext)
+      contextTracer.validated("otel.ts", contextValidation.complete, contextValidation.score, contextValidation.missing)
+      logToFile("📋 Context Validation Score:", {
+        score: (contextValidation.score * 100).toFixed(0) + "%",
+        provided: Object.keys(contextValidation.provided).filter((k) => contextValidation.provided[k]).length,
+        missing: contextValidation.missing.length,
+      })
+    }
     
     // Also set global for cross-module access
     ;(global as any).__ANR_TELEMETRY_CONTEXT__ = telemetryContext
@@ -204,66 +278,55 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     // Log all headers being sent
     logToFile(`OTEL exporter initialized with headers:`, exporterHeaders)
 
-    // Custom fetch wrapper to log outgoing requests
-    const originalFetch = global.fetch
-    const loggedFetch = async (url: string | URL, init?: RequestInit): Promise<Response> => {
-      const urlStr = String(url)
-      if (urlStr.includes("/v1/metrics") || urlStr.includes("otel")) {
-        const body = init?.body ? (typeof init.body === "string" ? init.body.length : "unknown") : 0
-        logToFile(`📤 OTEL metric export`, {
-          url: urlStr,
-          method: init?.method || "POST",
-          bodyBytes: body,
-          headerCount: Object.keys(init?.headers || {}).length,
-        })
-      }
-      
-      const response = await originalFetch(url, init)
-      
-      if (urlStr.includes("/v1/metrics") || urlStr.includes("otel")) {
-        if (response.ok) {
-          logToFile(`📥 OTEL response: ${response.status} ${response.statusText}`)
-        } else {
-          logToFile(`❌ OTEL error: ${response.status} ${response.statusText}`, {
-            url: urlStr,
-            status: response.status,
-          })
-        }
-      }
-      
-      return response
-    }
-    
-    // Temporarily override global fetch for OTEL requests
-    if (typeof global !== "undefined") {
-      global.fetch = loggedFetch as any
-    }
+    // Build a fetch-based metric exporter.
+    // The stock OTLPMetricExporter uses Node's http.request + stream piping,
+    // which times out under Bun. Using fetch() works correctly in Bun.
+    const exportUrl = `${config.otelEndpoint}/v1/metrics`
+    logToFile(`📋 OTEL fetch-based exporter targeting: ${exportUrl}`)
 
-    const metricExporter = new OTLPMetricExporter({
-      url: `${config.otelEndpoint}/v1/metrics`,
-      headers: exporterHeaders,
-    })
-    
-    // Wrap exporter export method to log calls and track diagnostics
-    const originalExport = metricExporter.export.bind(metricExporter)
-    metricExporter.export = function(metrics, callback) {
-      const metricCount = (metrics as any).scopeMetrics?.length || 0
-      diagnostics.exportsAttempted++
-      logToFile(`[OTLPExporter.export] called with ${metricCount} scope metrics`)
-      
-      // Log full payload for debugging
-      try {
-        logToFile(`[OTLPExporter.payload] Full metrics payload:`, JSON.parse(JSON.stringify(metrics)))
-      } catch (e) {
-        logToFile(`[OTLPExporter.payload] Could not serialize metrics: ${e}`)
-      }
-      
-      return originalExport(metrics, (error) => {
-        if (!error) {
-          diagnostics.exportsSuccessful++
+    const metricExporter: PushMetricExporter = {
+      export(resourceMetrics: ResourceMetrics, cb: (result: ExportResult) => void) {
+        const metricCount = resourceMetrics.scopeMetrics?.length || 0
+        diagnostics.exportsAttempted++
+        logToFile(`[FetchExporter.export] called with ${metricCount} scope metrics`)
+
+        // Serialize SDK internal objects → proper OTLP JSON using the official transformer
+        let body: string
+        try {
+          const otlp = createExportMetricsServiceRequest([resourceMetrics], { useLongBits: false })
+          body = JSON.stringify(otlp)
+          logToFile(`[FetchExporter] serialized ${body.length} bytes`)
+        } catch (e) {
+          logToFile(`❌ Serialization failed: ${e}`)
+          cb({ code: ExportResultCode.FAILED, error: e instanceof Error ? e : new Error(String(e)) })
+          return
         }
-        callback?.(error)
-      })
+
+        fetch(exportUrl, {
+          method: "POST",
+          headers: exporterHeaders,
+          body,
+        }).then(async (resp) => {
+          const respBody = await resp.text().catch(() => "")
+          if (resp.ok) {
+            diagnostics.exportsSuccessful++
+            logToFile(`✅ Export successful (${resp.status}) - ${metricCount} scope metrics`, { response: respBody })
+            cb({ code: ExportResultCode.SUCCESS })
+          } else {
+            logToFile(`❌ Export HTTP error: ${resp.status} ${resp.statusText}`, { body: respBody })
+            cb({ code: ExportResultCode.FAILED, error: new Error(`HTTP ${resp.status}: ${respBody}`) })
+          }
+        }).catch((err) => {
+          logToFile(`❌ Export fetch error: ${err}`)
+          cb({ code: ExportResultCode.FAILED, error: err instanceof Error ? err : new Error(String(err)) })
+        })
+      },
+
+      async forceFlush() { /* no buffering, each export sends immediately */ },
+      async shutdown() { logToFile("FetchExporter shutdown") },
+      selectAggregationTemporality() {
+        return AggregationTemporality.DELTA
+      },
     }
 
     // Create metric reader with periodic export (using configured interval)
@@ -319,14 +382,41 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     meter.createCounter("claude_code.command.count", {
       description: "Number of CLI commands executed",
     })
+    meter.createCounter("claude_code.cost.usage", {
+      description: "Estimated cost in USD",
+      unit: "USD",
+    })
+    meter.createCounter("claude_code.lines_of_code.count", {
+      description: "Lines of code (from CLI hook)",
+      unit: "1",
+    })
+    meter.createCounter("claude_code.code_edit_tool.applied", {
+      description: "Code edit tool applications (from CLI hook)",
+    })
+    meter.createCounter("claude_code.code_edit_tool.decision", {
+      description: "Code edit tool decisions (from CLI hook)",
+    })
     
-    logToFile(`[Instruments] Pre-registered 6 instruments with MeterProvider`)
+    logToFile(`[Instruments] Pre-registered 10 instruments with MeterProvider`)
 
     logToFile(`OpenTelemetry initialized`, { endpoint: config.otelEndpoint })
   } catch (error) {
-    // Silently fail if telemetry setup has issues
-    if (error instanceof Error) {
-      logToFile("Telemetry setup error", { error: error instanceof Error ? error.message : error })
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    const errorLine = error instanceof Error ? error.stack?.split("\n")[1] : "unknown"
+    
+    logToFile("❌ Telemetry setup error", { 
+      error: errorMsg,
+      stack: errorLine,
+    })
+    
+    debugLogger.warn("OTEL initialization failed", {
+      error: errorMsg,
+      endpoint: config.otelEndpoint,
+      type: error instanceof Error ? error.constructor.name : typeof error,
+    })
+    
+    if (debugMode) {
+      console.warn(`⚠️  OTEL initialization warning: ${errorMsg}`)
     }
   }
 }
@@ -358,19 +448,16 @@ export function trackCommand(commandName: string, duration: number): void {
       description: "Number of CLI commands executed",
     })
 
-    const attrs = telemetryContext ? {
-      command: commandName,
-      user_id: telemetryContext.userId,
-      session_id: telemetryContext.sessionId,
-      department: telemetryContext.department,
-      team_id: telemetryContext.teamId,
-    } : { command: commandName }
-
-    commandDurationHistogram.record(duration, attrs)
-    commandCounter.add(1, attrs)
+    // No per-datapoint dimensions needed for command metrics.
+    // department, team.id, organization etc. come from HTTP headers
+    // via the collector's attributes processor.
+    commandDurationHistogram.record(duration)
+    commandCounter.add(1)
     logToFile(`Command tracked successfully`)
   } catch (error) {
-    // Silently fail if metric recording fails
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logToFile(`⚠️  Command tracking failed: ${errorMsg}`)
+    debugLogger.warn(`Failed to track command: ${commandName}`, { error: errorMsg })
   }
 }
 
@@ -379,12 +466,13 @@ export function trackCommand(commandName: string, duration: number): void {
  * Context can be passed explicitly or will use stored context
  */
 export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, context?: TelemetryContext): void {
+  const totalTokens = inputTokens + outputTokens
+  
   try {
     // Use provided context, stored context, or global context (handles module instance issues)
     const globalCtx = (global as any).__ANR_TELEMETRY_CONTEXT__
     const ctx = context || telemetryContext || globalCtx
     
-    const totalTokens = inputTokens + outputTokens
     const hasContext = !!ctx
     
     // Track diagnostics
@@ -420,27 +508,37 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
       description: "Number of model API calls",
     })
 
-    const attrs = ctx ? {
-      model: modelId,
-      user_id: ctx.userId,
-      user_email: ctx.userEmail,
-      department: ctx.department,
-      session_id: ctx.sessionId,
-      team_id: ctx.teamId,
-    } : { model: modelId }
+    // Only attach dimensions declared in collector metric_declarations.
+    // department, team.id, organization, cost_center, user.* come from
+    // HTTP headers via the collector's attributes processor +
+    // resource_to_telemetry_conversion.
+    const modelAttr = { model: modelId }
 
-    logToFile(`Recording metrics with attributes:`, attrs)
+    logToFile(`Recording metrics with model attr:`, modelAttr)
 
-    // Record token usage with type dimensions
-    tokenCounter.add(totalTokens, { ...attrs, type: "total" })
-    tokenCounter.add(inputTokens, { ...attrs, type: "input" })
-    tokenCounter.add(outputTokens, { ...attrs, type: "output" })
+    // Record token usage with type + model dimensions
+    tokenCounter.add(totalTokens, { ...modelAttr, type: "total" })
+    tokenCounter.add(inputTokens, { ...modelAttr, type: "input" })
+    tokenCounter.add(outputTokens, { ...modelAttr, type: "output" })
     
     // Record model call count
-    modelCallCounter.add(1, attrs)
+    modelCallCounter.add(1, modelAttr)
+
+    // Record estimated cost
+    const cost = estimateCost(modelId, inputTokens, outputTokens)
+    if (cost > 0) {
+      const costCounter = meter.createCounter("claude_code.cost.usage", {
+        description: "Estimated cost in USD",
+        unit: "USD",
+      })
+      costCounter.add(cost, modelAttr)
+      logToFile(`Cost tracked: $${cost.toFixed(6)} for ${modelId}`)
+    }
     logToFile(`Model call tracked successfully - recorded ${totalTokens} tokens`)
   } catch (error) {
-    // Silently fail if metric recording fails
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logToFile(`⚠️  Model call tracking failed: ${errorMsg}`)
+    debugLogger.warn(`Failed to track model call: ${modelId}`, { error: errorMsg, tokens: totalTokens })
   }
 }
 
@@ -457,18 +555,14 @@ export function trackSessionStart(userId: string): void {
       description: "Number of sessions started",
     })
 
-    const attrs = telemetryContext ? {
-      user_id: userId,
-      session_id: telemetryContext.sessionId,
-      department: telemetryContext.department,
-      team_id: telemetryContext.teamId,
-      organization: telemetryContext.organization,
-    } : { user_id: userId }
-
-    sessionStartCounter.add(1, attrs)
+    // No per-datapoint dimensions — department, organization etc.
+    // come from headers via collector attributes processor.
+    sessionStartCounter.add(1)
     logToFile(`Session start tracked successfully`)
   } catch (error) {
-    // Silently fail if metric recording fails
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logToFile(`⚠️  Session start tracking failed: ${errorMsg}`)
+    debugLogger.warn(`Failed to track session start: ${userId}`, { error: errorMsg })
   }
 }
 
@@ -486,18 +580,68 @@ export function trackSessionEnd(userId: string, duration: number): void {
       unit: "s",
     })
 
-    const attrs = telemetryContext ? {
-      user_id: userId,
-      session_id: telemetryContext.sessionId,
-      department: telemetryContext.department,
-      team_id: telemetryContext.teamId,
-      organization: telemetryContext.organization,
-    } : { user_id: userId }
-
-    sessionEndHistogram.record(duration, attrs)
+    // No per-datapoint dimensions — department, organization etc.
+    // come from headers via collector attributes processor.
+    sessionEndHistogram.record(duration)
     logToFile(`Session end tracked successfully`)
   } catch (error) {
-    // Silently fail if metric recording fails
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logToFile(`⚠️  Session end tracking failed: ${errorMsg}`)
+    debugLogger.warn(`Failed to track session end: ${userId}`, { error: errorMsg, duration })
+  }
+}
+
+/**
+ * Track lines-of-code metric (typically fired by CLI hook)
+ */
+export function trackLinesOfCode(count: number, type: string, language?: string): void {
+  try {
+    const meter = metrics.getMeter("opencode-anr")
+    const counter = meter.createCounter("claude_code.lines_of_code.count", {
+      description: "Lines of code",
+      unit: "1",
+    })
+    // Only type + language are declared dimensions for this metric.
+    const attrs: Record<string, string> = { type }
+    if (language) attrs.language = language
+    counter.add(count, attrs)
+    logToFile(`Lines of code tracked: ${count} (${type}, ${language || "unknown"})`)
+  } catch (error) {
+    logToFile(`⚠️  Lines of code tracking failed: ${error}`)
+  }
+}
+
+/**
+ * Track code-edit-tool usage (typically fired by CLI hook)
+ */
+export function trackCodeEditTool(toolName: string, language: string, applied: boolean): void {
+  try {
+    const meter = metrics.getMeter("opencode-anr")
+    const counter = meter.createCounter("claude_code.code_edit_tool.applied", {
+      description: "Code edit tool applications",
+    })
+    // Only tool_name + language are declared dimensions for this metric.
+    counter.add(1, { tool_name: toolName, language })
+    logToFile(`Code edit tool tracked: ${toolName} (${language}, applied=${applied})`)
+  } catch (error) {
+    logToFile(`⚠️  Code edit tool tracking failed: ${error}`)
+  }
+}
+
+/**
+ * Track code-edit-tool decision (accepted/rejected by user)
+ */
+export function trackCodeEditDecision(decision: string): void {
+  try {
+    const meter = metrics.getMeter("opencode-anr")
+    const counter = meter.createCounter("claude_code.code_edit_tool.decision", {
+      description: "Code edit tool decisions",
+    })
+    // Only decision is a declared dimension for this metric.
+    counter.add(1, { decision })
+    logToFile(`Code edit decision tracked: ${decision}`)
+  } catch (error) {
+    logToFile(`⚠️  Code edit decision tracking failed: ${error}`)
   }
 }
 
@@ -534,8 +678,14 @@ export async function shutdownOTEL(): Promise<void> {
       // Print diagnostic summary AFTER exports complete so counts are accurate
       printDiagnosticSummary()
       logToFile("═══════════════════════════════════════════════════════════════════════════════")
+      
+      if (debugMode) {
+        debugLogger.info("OTEL shutdown completed successfully")
+      }
     } catch (error) {
-      logToFile("Error shutting down OpenTelemetry", { error: error instanceof Error ? error.message : error })
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      logToFile("❌ Error shutting down OpenTelemetry", { error: errorMsg })
+      debugLogger.error("OTEL shutdown error", { error: errorMsg })
     }
   }
 }
@@ -554,3 +704,205 @@ export function registerOTELShutdownHandlers(): void {
     process.exit(0)
   })
 }
+
+/**
+ * Get diagnostic information for debugging
+ */
+export function getOTELDiagnostics() {
+  const ctx = getTelemetryContext()
+  const contextValidation = validateContext(ctx)
+
+  return {
+    initialized: !!meterProvider,
+    debugMode,
+    telemetryContext: ctx ? {
+      userId: ctx.userId,
+      sessionId: ctx.sessionId,
+      userEmail: ctx.userEmail,
+      department: ctx.department,
+      teamId: ctx.teamId,
+      organization: ctx.organization,
+    } : null,
+    contextValidation: {
+      complete: contextValidation.complete,
+      score: (contextValidation.score * 100).toFixed(0) + "%",
+      providedCount: Object.values(contextValidation.provided).filter((v) => v).length,
+      missingCount: contextValidation.missing.length,
+    },
+    metrics: diagnostics,
+    logFile,
+  }
+}
+
+/**
+ * Print OTEL diagnostics to console
+ */
+export function printOTELDiagnostics(): void {
+  const diags = getOTELDiagnostics()
+
+  console.log("\n📊 OpenTelemetry Diagnostics")
+  console.log("═".repeat(60))
+
+  console.log("\n🔧 Configuration:")
+  console.log(`  Initialized: ${diags.initialized ? "✓" : "✗"}`)
+  console.log(`  Debug Mode: ${diags.debugMode ? "✓" : "✗"}`)
+
+  if (diags.telemetryContext) {
+    console.log("\n👤 Context:")
+    console.log(`  User ID: ${diags.telemetryContext.userId}`)
+    console.log(`  Session ID: ${diags.telemetryContext.sessionId}`)
+    console.log(`  Email: ${diags.telemetryContext.userEmail || "(not set)"}`)
+    console.log(`  Department: ${diags.telemetryContext.department || "(not set)"}`)
+    console.log(`  Team: ${diags.telemetryContext.teamId || "(not set)"}`)
+    console.log(`  Organization: ${diags.telemetryContext.organization || "(not set)"}`)
+  }
+
+  console.log("\n✅ Context Validation:")
+  console.log(`  complete: ${diags.contextValidation.complete ? "✓" : "✗"}`)
+  console.log(`  Score: ${diags.contextValidation.score} (${diags.contextValidation.providedCount} provided, ${diags.contextValidation.missingCount} missing)`)
+
+  console.log("\n📈 Metrics:")
+  console.log(`  Model Calls Tracked: ${diags.metrics.modelCallsTracked}`)
+  console.log(`  Tokens Tracked: ${diags.metrics.tokensTracked}`)
+  console.log(`  Context Available: ${diags.metrics.contextAvailableCalls}/${diags.metrics.modelCallsTracked}`)
+  console.log(`  Context Missing: ${diags.metrics.contextMissingCalls}`)
+  console.log(`  Export Attempts: ${diags.metrics.exportsAttempted}`)
+  console.log(`  Export Successes: ${diags.metrics.exportsSuccessful}`)
+
+  console.log(`\n📄 Log File: ${diags.logFile}`)
+  console.log("═".repeat(60) + "\n")
+}
+
+/**
+ * Reset diagnostic counters (useful for testing)
+ */
+export function resetOTELDiagnostics(): void {
+  diagnostics.modelCallsTracked = 0
+  diagnostics.tokensTracked = 0
+  diagnostics.exportsAttempted = 0
+  diagnostics.exportsSuccessful = 0
+  diagnostics.contextAvailableCalls = 0
+  diagnostics.contextMissingCalls = 0
+  logToFile("🔄 Diagnostic counters reset")
+}
+
+/**
+ * Get context flow trace diagram
+ */
+export function getContextFlowDiagram(): string {
+  return contextTracer.getFlowDiagram()
+}
+
+/**
+ * Print context flow trace to console
+ */
+export function printContextFlowDiagram(): void {
+  contextTracer.printFlowDiagram()
+}
+
+/**
+ * Get context trace events
+ */
+export function getContextTraceEvents() {
+  return contextTracer.getEvents()
+}
+export function getMetricsPreview() {
+  const ctx = getTelemetryContext()
+  
+  return {
+    exampleModelCallMetric: {
+      name: "claude_code.model.calls.count",
+      value: 1,
+      attributes: ctx ? {
+        model: "claude-3-5-sonnet",
+        user_id: ctx.userId,
+        session_id: ctx.sessionId,
+        department: ctx.department || "(not set)",
+        team_id: ctx.teamId || "(not set)",
+      } : {
+        model: "claude-3-5-sonnet",
+        user_id: "(no context)",
+      },
+    },
+    exampleTokenMetric: {
+      name: "claude_code.token.usage",
+      value: 5000,
+      unit: "tokens",
+      attributes: ctx ? {
+        model: "claude-3-5-sonnet",
+        user_id: ctx.userId,
+        session_id: ctx.sessionId,
+      } : {
+        model: "claude-3-5-sonnet",
+        user_id: "(no context)",
+      },
+    },
+    exampleCommandMetric: {
+      name: "claude_code.command.duration_ms",
+      value: 2456,
+      unit: "ms",
+      attributes: ctx ? {
+        command: "run",
+        user_id: ctx.userId,
+        session_id: ctx.sessionId,
+        department: ctx.department || "(not set)",
+        team_id: ctx.teamId || "(not set)",
+      } : {
+        command: "run",
+        user_id: "(no context)",
+      },
+    },
+  }
+}
+
+/**
+ * Print example metrics that would be sent
+ */
+export function printMetricsPreview(): void {
+  const preview = getMetricsPreview()
+  const validation = validateContext(getTelemetryContext())
+
+  console.log("\n📊 Metrics Preview")
+  console.log("═".repeat(70))
+  console.log(`\n⚠️  Context Validation: ${validation.score > 0.5 ? "✓" : "✗"} (${(validation.score * 100).toFixed(0)}% complete)`)
+
+  if (validation.missing.length > 0) {
+    console.log(`\n⚠️  Missing context fields will result in incomplete metrics:`)
+    validation.missing.slice(0, 5).forEach((field) => {
+      console.log(`    • ${field}`)
+    })
+  }
+
+  console.log("\n\n📈 Example Metrics:")
+  console.log("─".repeat(70))
+
+  // Model call metric
+  console.log(`\n1. Model Call Counter`)
+  console.log(`   Name: ${preview.exampleModelCallMetric.name}`)
+  console.log(`   Value: ${preview.exampleModelCallMetric.value}`)
+  console.log(`   Attributes:`)
+  Object.entries(preview.exampleModelCallMetric.attributes).forEach(([key, value]) => {
+    console.log(`     • ${key}: ${value}`)
+  })
+
+  // Token metric
+  console.log(`\n2. Token Usage Counter`)
+  console.log(`   Name: ${preview.exampleTokenMetric.name}`)
+  console.log(`   Value: ${preview.exampleTokenMetric.value} ${preview.exampleTokenMetric.unit}`)
+  console.log(`   Attributes:`)
+  Object.entries(preview.exampleTokenMetric.attributes).forEach(([key, value]) => {
+    console.log(`     • ${key}: ${value}`)
+  })
+
+  // Command metric
+  console.log(`\n3. Command Duration Histogram`)
+  console.log(`   Name: ${preview.exampleCommandMetric.name}`)
+  console.log(`   Value: ${preview.exampleCommandMetric.value} ${preview.exampleCommandMetric.unit}`)
+  console.log(`   Attributes:`)
+  Object.entries(preview.exampleCommandMetric.attributes).forEach(([key, value]) => {
+    console.log(`     • ${key}: ${value}`)
+  })
+
+  console.log("\n═".repeat(70) + "\n")
+}
+

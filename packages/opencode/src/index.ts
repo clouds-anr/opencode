@@ -42,6 +42,7 @@ import {
   trackSessionStart, 
   trackSessionEnd,
   trackCommand,
+  clearOTELLogs,
   initializeAuditLogger,
   logAuthEvent,
   logSessionStart,
@@ -128,6 +129,9 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
  * Initialize ANR mode: authentication, quota, telemetry
  */
 async function initializeANR(): Promise<void> {
+  // Clear OTEL logs from previous session for clean debugging
+  clearOTELLogs()
+  
   console.log("\n🚀 OpenCode ANR - Alaska Northstar Resources Edition\n")
   
   // Load configuration
