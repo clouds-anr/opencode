@@ -50,6 +50,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     }).format(total)
   })
 
+  // Helper to get color for individual quota percentages
+  const getQuotaColor = (percent: number): "green" | "yellow" | "red" => {
+    if (percent >= 90) return "red"
+    if (percent >= 80) return "yellow"
+    return "green"
+  }
+
   const context = createMemo(() => {
     const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as AssistantMessage
     if (!last) return
@@ -114,55 +121,55 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   <b>Quota</b>
                 </text>
                 <Show when={quota.dailyLimit > 0}>
-                  <box gap={1}>
-                    <box flexDirection="row" justifyContent="space-between">
+                  <box gap={0.25}>
+                    <box flexDirection="row" alignItems="center" gap={1}>
                       <text
                         fg={{
                           green: theme.success,
                           yellow: theme.warning,
                           red: theme.error,
-                        }[quota.warningColor]}
+                        }[getQuotaColor(quota.dailyPercent)]}
                       >
                         Daily: {quota.dailyPercent}%
                       </text>
-                    </box>
-                    <box width="100%" height={1} backgroundColor={theme.backgroundElement}>
-                      <box
-                        width={Math.max(1, Math.round((quota.dailyPercent / 100) * 36))}
-                        height={1}
-                        backgroundColor={{
-                          green: theme.success,
-                          yellow: theme.warning,
-                          red: theme.error,
-                        }[quota.warningColor === "green" ? "green" : quota.warningColor === "yellow" ? "yellow" : "red"]}
-                      />
+                      <box width={20} height={1} backgroundColor={theme.backgroundElement}>
+                        <box
+                          width={Math.max(1, Math.round((quota.dailyPercent / 100) * 20))}
+                          height={1}
+                          backgroundColor={{
+                            green: theme.success,
+                            yellow: theme.warning,
+                            red: theme.error,
+                          }[getQuotaColor(quota.dailyPercent)]}
+                        />
+                      </box>
                     </box>
                     <text fg={theme.textMuted}>{quota.dailyTokens.toLocaleString()} / {quota.dailyLimit.toLocaleString()} tokens</text>
                   </box>
                 </Show>
                 <Show when={quota.monthlyLimit > 0}>
-                  <box gap={1}>
-                    <box flexDirection="row" justifyContent="space-between">
+                  <box gap={0.25} marginTop={0.5}>
+                    <box flexDirection="row" alignItems="center" gap={1}>
                       <text
                         fg={{
                           green: theme.success,
                           yellow: theme.warning,
                           red: theme.error,
-                        }[quota.warningColor]}
+                        }[getQuotaColor(quota.monthlyPercent)]}
                       >
                         Monthly: {quota.monthlyPercent}%
                       </text>
-                    </box>
-                    <box width="100%" height={1} backgroundColor={theme.backgroundElement}>
-                      <box
-                        width={Math.max(1, Math.round((quota.monthlyPercent / 100) * 36))}
-                        height={1}
-                        backgroundColor={{
-                          green: theme.success,
-                          yellow: theme.warning,
-                          red: theme.error,
-                        }[quota.warningColor === "green" ? "green" : quota.warningColor === "yellow" ? "yellow" : "red"]}
-                      />
+                      <box width={20} height={1} backgroundColor={theme.backgroundElement}>
+                        <box
+                          width={Math.max(1, Math.round((quota.monthlyPercent / 100) * 20))}
+                          height={1}
+                          backgroundColor={{
+                            green: theme.success,
+                            yellow: theme.warning,
+                            red: theme.error,
+                          }[getQuotaColor(quota.monthlyPercent)]}
+                        />
+                      </box>
                     </box>
                     <text fg={theme.textMuted}>{quota.monthlyTokens.toLocaleString()} / {quota.monthlyLimit.toLocaleString()} tokens</text>
                   </box>

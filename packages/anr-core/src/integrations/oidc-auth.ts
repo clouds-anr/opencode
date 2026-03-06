@@ -33,16 +33,8 @@ async function openBrowser(url: string): Promise<void> {
     if (os === "darwin") {
       await execAsync(`open "${url}"`)
     } else if (os === "win32") {
-      // Try multiple approaches for Windows
-      try {
-        await execAsync(`powershell -NoProfile -Command "Start-Process '${url}'"`)
-      } catch {
-        try {
-          await execAsync(`rundll32 url.dll,FileProtocolHandler "${url}"`)
-        } catch {
-          console.error(`Failed to open browser. Please visit: ${url}`)
-        }
-      }
+      // Use cmd's built-in 'start' — instant, no PowerShell/.NET startup overhead
+      await execAsync(`start "" "${url}"`)
     } else {
       await execAsync(`xdg-open "${url}"`)
     }
