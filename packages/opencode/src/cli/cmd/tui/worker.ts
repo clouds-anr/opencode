@@ -15,6 +15,7 @@ import {
   initializeOTEL,
   shutdownOTEL,
   reconstructTelemetryContextFromEnv,
+  initializeAuditLogger,
 } from "@opencode-ai/anr-core"
 
 await Log.init({
@@ -38,14 +39,29 @@ process.on("uncaughtException", (e) => {
   })
 })
 
-// Initialize OTEL in the worker so token metrics from session processing
-// are recorded via a real MeterProvider (not the no-op default).
-// The main thread's MeterProvider is not shared with Bun Workers.
-if (process.env.OPENCODE_FLAVOR === "anr" && process.env.OPENCODE_ENABLE_TELEMETRY === "1") {
-  const workerContext = reconstructTelemetryContextFromEnv()
-  if (workerContext) {
-    const config = await loadANRConfig(undefined, true)
-    initializeOTEL(config, workerContext)
+// Initialize OTEL and audit logger in the worker. The main thread's
+// MeterProvider and dynamoClient are not shared with Bun Workers.
+if (process.env.OPENCODE_FLAVOR === "anr") {
+  const config = await loadANRConfig(undefined, true)
+
+  // OTEL: so token metrics from session processing are recorded
+  if (process.env.OPENCODE_ENABLE_TELEMETRY === "1") {
+    const workerContext = reconstructTelemetryContextFromEnv()
+    if (workerContext) {
+      initializeOTEL(config, workerContext)
+    }
+  }
+
+  // Audit logger: so logTokenUsage calls from processor.ts write to DynamoDB
+  if (process.env.OPENCODE_ENABLE_AUDIT !== "0" &&
+      process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY &&
+      process.env.AWS_SESSION_TOKEN) {
+    initializeAuditLogger(config, {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      sessionToken: process.env.AWS_SESSION_TOKEN,
+    })
   }
 }
 
