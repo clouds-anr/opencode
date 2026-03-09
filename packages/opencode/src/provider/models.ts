@@ -85,7 +85,54 @@ export namespace ModelsDev {
     return Flag.OPENCODE_MODELS_URL || "https://models.dev"
   }
 
+  function fromDynamoDBValue(value: Record<string, unknown>): unknown {
+    if ("S" in value) return value.S
+    if ("N" in value) return Number(value.N)
+    if ("BOOL" in value) return value.BOOL
+    if ("M" in value) {
+      const map = value.M as Record<string, Record<string, unknown>>
+      return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, fromDynamoDBValue(v)]))
+    }
+    if ("L" in value) {
+      const list = value.L as Record<string, unknown>[]
+      return list.map((item) => fromDynamoDBValue(item))
+    }
+    return undefined
+  }
+
+  export function parsePolicyModels(policy: Record<string, unknown>): Record<string, Provider> {
+    const modelsAttr = policy.models as { M?: Record<string, Record<string, unknown>> } | undefined
+    if (!modelsAttr?.M) return {}
+    return Object.fromEntries(
+      Object.entries(modelsAttr.M).map(([providerID, providerDDB]) => [
+        providerID,
+        fromDynamoDBValue(providerDDB) as Provider,
+      ]),
+    )
+  }
+
+  async function fetchFromApiEndpoint(): Promise<Record<string, unknown> | undefined> {
+    const result = await fetch(`${Flag.OPENCODE_API_ENDPOINT}/model`, {
+      headers: {
+        "User-Agent": Installation.USER_AGENT,
+      },
+      signal: AbortSignal.timeout(10 * 1000),
+    }).catch((e) => {
+      log.error("Failed to fetch from API endpoint", { error: e, url: `${Flag.OPENCODE_API_ENDPOINT}/model` })
+    })
+    if (result && result.ok) return result.json()
+    if (result) log.error("API endpoint returned non-ok response", { status: result.status, url: `${Flag.OPENCODE_API_ENDPOINT}/model` })
+    return undefined
+  }
+
   export const Data = lazy(async () => {
+    if (Flag.OPENCODE_API_ENDPOINT) {
+      const cached = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
+      if (cached) return cached
+      const policy = await fetchFromApiEndpoint()
+      if (policy) return parsePolicyModels(policy)
+      return {}
+    }
     const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
     if (result) return result
     // @ts-ignore
@@ -104,6 +151,14 @@ export namespace ModelsDev {
   }
 
   export async function refresh() {
+    if (Flag.OPENCODE_API_ENDPOINT) {
+      const policy = await fetchFromApiEndpoint()
+      if (policy) {
+        await Filesystem.write(filepath, JSON.stringify(parsePolicyModels(policy)))
+        ModelsDev.Data.reset()
+      }
+      return
+    }
     const result = await fetch(`${url()}/api.json`, {
       headers: {
         "User-Agent": Installation.USER_AGENT,
