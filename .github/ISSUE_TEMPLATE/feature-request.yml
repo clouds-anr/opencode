@@ -40,25 +40,9 @@ body:
     id: description
     attributes:
       label: Feature Description
-      description: >
-        Provide a detailed description including purpose, user impact, business or technical requirements, and deliverables. For example:
-        - [ ] Admin screen with tab interface (Users, Bedrock, Chat, Logging, Application)
-        - [ ] Accessible visual cues for selected tab
-        - [ ] New adminBedrock component with grid (sortable/filterable, add/edit/delete/detail)
-        - [ ] Modal for add/edit (fields: name, description, agentId, agentAliasId)
-        - [ ] Confirmation dialog before delete
-        - [ ] Integration of agent component into main admin tab view
-        - [ ] Unit tests for full coverage, screenshots of UI changes, compliance with build and test
-        - [ ] AWS Amplify Gen 2 architectural guidelines
+      description: Provide a detailed description including purpose, user impact, business or technical requirements, and deliverables.
     validations:
       required: true
-
-  - type: textarea
-    id: edge-cases
-    attributes:
-      label: Edge Cases & Accessibility
-      description: >
-        Describe how you will handle empty/missing/invalid data, loading/error/offline states, or extreme values (e.g., large data sets, unusual strings). All UI must meet WCAG 2.1 AA and Lighthouse ≥90.
 
   - type: textarea
     id: additional-requirements
@@ -82,19 +66,7 @@ body:
         - Update relevant docs; capture implementation details in `doco/` folder
         - Cognitive Complexity <15 for all code
 
-  - type: checkboxes
-    id: biome-compliance
-    attributes:
-      label: Biome Lint Compliance Checklist
-      description: All code, tests, and docs must pass Biome checks before PR submission.
-      options:
-        - label: Run `npm run biome:check` locally
-        - label: Do NOT use `any` type anywhere
-        - label: Remove unused imports, variables, functions, parameters
-        - label: Maintain proper import order and grouping
-        - label: Never disable or bypass Biome rules
-        - label: Only use Biome for code formatting
-        - label: Address all Biome suggestions/errors
+
 
   - type: textarea
     id: acceptance-criteria
