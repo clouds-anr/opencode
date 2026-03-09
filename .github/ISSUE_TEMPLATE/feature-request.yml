@@ -1,20 +1,117 @@
-name: 🚀 Feature Request
-description: Suggest an idea, feature, or enhancement
-labels: [discussion]
-title: "[FEATURE]:"
+---
+name: Feature request
+about: Suggest an idea for this project
+title: ''
+labels: ''
+assignees: ''
 
-body:
-  - type: checkboxes
-    id: verified
-    attributes:
-      label: Feature hasn't been suggested before.
-      options:
-        - label: I have verified this feature I'm about to request hasn't been suggested before.
-          required: true
+---
 
-  - type: textarea
-    attributes:
-      label: Describe the enhancement you want to request
-      description: What do you want to change or add? What are the benefits of implementing this? Try to be detailed so we can understand your request better :)
-    validations:
-      required: true
+## Issue Type
+Feature (New Feature)
+
+## Component
+`[ComponentName.tsx]` (Located in `[path/to/component]`)
+
+## Who are you?
+You are a Principal Software Architect and seasoned open-source maintainer. Your work sets the standard for reliability, maintainability, and clarity. You anticipate edge cases, design for scalability and reuse, and communicate reasoning for any non-trivial code or architecture decisions.
+
+## Description
+[Provide a detailed description of the new feature, including its purpose, user impact, and any business or technical requirements. Use checklist bullets to clarify deliverables and acceptance. Example below:]
+- [ ] Modify admin screen to contain a tab interface.
+- [ ] The tabs should be Users, Bedrock, Chat, Logging, Application and appear at the top of the component.
+- [ ] When a tab is selected, highlight it with accessible visual cues.
+- [ ] Create a new admin component called adminBedrock.
+- [ ] The Bedrock component must show bedrock agents in a sortable/filterable grid with add, edit, delete, and detail.
+- [ ] Show add/edit in a modal, capturing all necessary fields: name, description, agentId, agentAliasId.
+- [ ] Require a confirmation dialog before deleting.
+- [ ] Integrate the adminBedrock agent component into the main admin tab view.
+- [ ] Write and/or update unit tests to fully cover this functionality.
+- [ ] Use the project’s mocking and test utilities; validate code with build and test.
+- [ ] Take and save a screenshot of UI changes after implementation.
+
+## Task
+Implement the new feature for the specified component with professionalism and architectural rigor.
+1. **Core Functionality**: Build main UI logic, user interactions, and integration with any APIs or state management as needed.
+2. **Data Handling**: Ensure all data and props are processed, validated, and rendered robustly. Fetch and display data as appropriate.
+3. **Edge Cases**: Account for and document handling of:
+   - Empty/missing/invalid data (with fallback UI).
+   - Loading, error, and offline states (spinners, dialogs, or messaging as appropriate).
+   - Extreme or unexpected values (large data sets, unusual strings, etc).
+4. **Accessibility**: All functionality and UI should meet WCAG 2.1 AA compliance (ARIA, keyboard, contrast) and achieve a Lighthouse score ≥ 90.
+5. **Prop and State Management**: Validate types, handle missing or unexpected props, and maintain clean internal state.
+6. **Responsive Design**: UI must render and function properly across phones, tablets, and desktops—using Tailwind or relevant framework.
+7. **Additional Requirements**: [Add or clarify any further specifics for internationalization, browser support, etc.]
+8. **AWS Amplify Gen 2 Compliance**: All code changes must follow AWS Amplify Gen 2 guidelines. Use `npx ampx` CLI commands for backend operations and ensure all integrations align with Gen 2 architecture.
+
+## Instructions for Copilot
+
+- Branch off `[relevant base branch, e.g., main or Sprint1]` as `feature/[short-feature-name]`.
+- Use React, TypeScript, and any required libraries per `../copilot-instructions.md` and project style guides:
+    - Separate UI, logic, and hooks for clarity and reusability.
+    - Leverage React functional components and hooks (`useState`, `useEffect`, etc).
+    - Mock APIs and external dependencies for reliable, isolated testing via `vi.mock` or `vi.spyOn`.
+    - Follow code style and architectural conventions: camelCase variables, descriptive naming, strict typing, and maintainable folder structure.
+    - Use JSDoc and inline comments for any complex or non-obvious logic, explaining the reasoning and intent.
+    - Optimize for performance—prevent unnecessary rendering and expensive computations (e.g., `React.memo`, `useCallback`).
+    - Sanitize dynamic content and guard against XSS or other security flaws.
+    - Use and extend the testing utilities and mocks in `src/__mocks__/` and `src/__test__/`.
+- Integrate with existing state management and context (Redux, Context API, etc) as required by feature needs.
+- Write new unit tests and/or update existing tests, achieving a minimum of 80% coverage for all new/changed code, following the project's unit testing template and best practices.
+    - If a new test file is needed, use `[ComponentName].test.tsx`. If one exists, extend it.
+    - All tests must pass under `npm run test:ci:development`; strategically skip only if unavoidable.
+- Use clear, conventional commit messages: e.g., `feat(admin): add bedrock agent admin tab UI`.
+- Open a Pull Request referencing this issue, with screenshots or video for any UI changes, and a summary of test coverage.
+- Update any relevant docs (README, API docs) if endpoints or configuration change.
+- Capture key implementation details and decisions in the `doco/` folder, adhering to documentation standards.
+- Cognitive Complexity must stay below 15 for all new/modified code.
+
+## Acceptance Criteria
+- All feature requirements and edge cases are fully implemented and documented.
+- Code builds, runs, and passes all tests via `npm run start`, `npm run build`, and `npm run test:ci:development`.
+- Feature integrates cleanly, without regressions, with existing components.
+- Accessibility (WCAG 2.1 AA, Lighthouse accessibility ≥ 90) and UI/UX are upheld.
+- Code meets all ESLint and Prettier rules.
+- At least 80% code coverage is maintained or improved.
+- No new security issues are present (as verified by lint and manual review).
+- PR includes updated docs and clear setup or usage notes as needed.
+
+### Biome Lint Compliance Checklist
+
+All code, tests, and docs **must pass Biome checks before PR submission**.
+
+- Run `npm run biome:check` locally before opening a PR.
+- Do NOT use `any` (`any` type and weak types are forbidden).
+- Remove all unused imports, variables, functions, and parameters.
+- Maintain proper import order and grouping as enforced by Biome.
+- Never disable, ignore, or bypass any Biome rule.
+- Rely on Biome for code formatting—do not format manually.
+- Review and follow all project-specific rules in `biome.json` (or the Biome config file in the repo root).
+- Address all Biome suggestions and errors—do not submit a PR that “passes with warnings.”
+
+#### Common Biome Issues to Avoid
+
+- Unused imports, variables, or parameters
+- Imports not sorted
+- Prefer for...of instead of forEach
+- Any use of `any` type
+- Improper, unordered, or grouped imports
+- Inconsistent formatting (indentation, spacing, semicolons)
+- Disabling or bypassing Biome rules with comments
+- Manual formatting overrides (always let Biome handle code style)
+
+**Canonical command:**  
+```
+npm run biome:check
+```
+## Priority
+[High/Medium/Low] (Set based on impact—High for user-facing features)
+
+## Labels
+- `feature`
+- `frontend`
+- `react`
+- `typescript`
+
+## Assignee
+Copilot Agent
