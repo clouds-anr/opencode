@@ -25,9 +25,11 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
     const cwd = process.cwd()
     const configHome = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr")
     const npmPkgJson = process.env.npm_package_json
-    const rootPath = npmPkgJson ? resolve(npmPkgJson, "..") : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
+    const rootPath = npmPkgJson
+      ? resolve(npmPkgJson, "..")
+      : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
     const packageDir = resolve(rootPath || process.cwd())
-    
+
     // Search for .env or .env.* files in multiple locations
     const searchPaths = [cwd, packageDir, configHome]
     let loaded = false
@@ -37,10 +39,10 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
 
       const { readdirSync } = await import("fs")
       const files = readdirSync(dir)
-      
+
       // Look for .env or .env.* files
-      const envFiles = files.filter(f => f === ".env" || f.startsWith(".env."))
-      
+      const envFiles = files.filter((f) => f === ".env" || f.startsWith(".env."))
+
       if (envFiles.length > 0 && envFiles[0]) {
         // Use the first match
         const envFile = resolve(dir, envFiles[0])
@@ -67,7 +69,7 @@ async function loadEnvFile(path: string): Promise<void> {
   try {
     const file = Bun.file(path)
     const text = await file.text()
-    
+
     const lines = text.split("\n")
     for (const line of lines) {
       const trimmed = line.trim()
@@ -106,7 +108,10 @@ function parseEnvConfig(quiet = false): ANRConfig {
     otelProtocol: env.OTEL_EXPORTER_OTLP_PROTOCOL || defaultConfig.otelProtocol!,
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || "",
     metricsBatchSize: parseInt(env.OPENCODE_METRICS_BATCH_SIZE || String(defaultConfig.metricsBatchSize), 10),
-    metricsIntervalSeconds: parseInt(env.OPENCODE_METRICS_INTERVAL_SECONDS || String(defaultConfig.metricsIntervalSeconds), 10),
+    metricsIntervalSeconds: parseInt(
+      env.OPENCODE_METRICS_INTERVAL_SECONDS || String(defaultConfig.metricsIntervalSeconds),
+      10,
+    ),
 
     // Audit & Compliance
     auditTableName: env.AUDIT_TABLE_NAME || "",
@@ -114,9 +119,13 @@ function parseEnvConfig(quiet = false): ANRConfig {
     // Quota & Policy
     quotaApiEndpoint: env.QUOTA_API_ENDPOINT || "",
     quotaFailMode: (env.QUOTA_FAIL_MODE as "open" | "closed") || defaultConfig.quotaFailMode!,
-    quotaCheckInterval: env.OPENCODE_QUOTA_CHECK_INTERVAL === "PROMPT" 
-      ? "PROMPT" 
-      : parseInt(env.OPENCODE_QUOTA_CHECK_INTERVAL || String(defaultConfig.quotaCheckInterval), 10),
+    quotaCheckInterval:
+      env.OPENCODE_QUOTA_CHECK_INTERVAL === "PROMPT"
+        ? "PROMPT"
+        : parseInt(env.OPENCODE_QUOTA_CHECK_INTERVAL || String(defaultConfig.quotaCheckInterval), 10),
+
+    // Models API
+    modelsApiEndpoint: env.OPENCODE_API_ENDPOINT || "",
 
     // AWS Cognito SSO
     providerDomain: env.PROVIDER_DOMAIN || "",

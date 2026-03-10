@@ -55,7 +55,7 @@ export namespace Flag {
   export const OPENCODE_EXPERIMENTAL_MARKDOWN = truthy("OPENCODE_EXPERIMENTAL_MARKDOWN")
   export const OPENCODE_MODELS_URL = process.env["OPENCODE_MODELS_URL"]
   export const OPENCODE_MODELS_PATH = process.env["OPENCODE_MODELS_PATH"]
-  export const OPENCODE_API_ENDPOINT = process.env["OPENCODE_API_ENDPOINT"]
+  export declare const OPENCODE_API_ENDPOINT: string | undefined
 
   function number(key: string) {
     const value = process.env[key]
@@ -64,6 +64,17 @@ export namespace Flag {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
   }
 }
+
+// Dynamic getter for OPENCODE_API_ENDPOINT
+// This must be evaluated at access time, not module load time,
+// because ANR initialization may set this env var at runtime
+Object.defineProperty(Flag, "OPENCODE_API_ENDPOINT", {
+  get() {
+    return process.env["OPENCODE_API_ENDPOINT"]
+  },
+  enumerable: true,
+  configurable: false,
+})
 
 // Dynamic getter for OPENCODE_DISABLE_PROJECT_CONFIG
 // This must be evaluated at access time, not module load time,

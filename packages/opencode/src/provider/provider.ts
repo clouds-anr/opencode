@@ -225,6 +225,17 @@ export namespace Provider {
       const profile = configProfile ?? envProfile
 
       const awsAccessKeyId = Env.get("AWS_ACCESS_KEY_ID")
+      const awsSessionToken = Env.get("AWS_SESSION_TOKEN")
+      const isANR = process.env.OPENCODE_FLAVOR === "anr"
+
+      log.info("Bedrock: Initializing provider", {
+        isANR,
+        hasAccessKeyId: !!awsAccessKeyId,
+        hasSessionToken: !!awsSessionToken,
+        profile: profile || "(none)",
+        region: defaultRegion,
+        accessKeyIdPrefix: awsAccessKeyId ? awsAccessKeyId.substring(0, 8) + "..." : "(none)"
+      })
 
       // TODO: Using process.env directly because Env.set only updates a process.env shallow copy,
       // until the scope of the Env API is clarified (test only or runtime?)
@@ -259,17 +270,39 @@ export namespace Provider {
         // over environment credentials, causing "Multiple credential sources" + expiry errors
         const isANR = process.env.OPENCODE_FLAVOR === "anr"
         if (isANR && awsAccessKeyId && Env.get("AWS_SESSION_TOKEN")) {
+          log.info("Bedrock: Using fromEnv() credential provider (ANR mode)", {
+            hasAccessKeyId: !!awsAccessKeyId,
+            hasSessionToken: !!Env.get("AWS_SESSION_TOKEN"),
+            region: defaultRegion
+          })
           providerOptions.credentialProvider = fromEnv()
         } else {
           const credentialProviderOptions = profile ? { profile } : {}
+          log.info("Bedrock: Using fromNodeProviderChain() credential provider", {
+            profile: profile || "(none)",
+            region: defaultRegion
+          })
           providerOptions.credentialProvider = fromNodeProviderChain(credentialProviderOptions)
         }
+      } else {
+        log.info("Bedrock: Using bearer token authentication", {
+          region: defaultRegion
+        })
       }
 
       // Add custom endpoint if specified (endpoint takes precedence over baseURL)
       const endpoint = providerConfig?.options?.endpoint ?? providerConfig?.options?.baseURL
       if (endpoint) {
         providerOptions.baseURL = endpoint
+      }
+
+      // WORKAROUND: Explicitly set the Bedrock runtime endpoint to prevent SDK from using doc URLs
+      // See: https://github.com/anomalyco/opencode/issues/XXX
+      if (!providerOptions.baseURL) {
+        providerOptions.baseURL = `https://bedrock-runtime.${defaultRegion}.amazonaws.com`
+        log.info("Bedrock: Setting explicit runtime endpoint", {
+          baseURL: providerOptions.baseURL
+        })
       }
 
       return {

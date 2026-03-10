@@ -86,8 +86,6 @@ function buildTelemetryContext(
  */
 async function performQuotaCheck(config: any, telemetryContext: TelemetryContext, idToken: string): Promise<Record<string, string>> {
   try {
-    console.log(`📊 Checking quota for: ${telemetryContext.userEmail || telemetryContext.userId}`)
-    
     const response = await checkQuota(
       {
         userEmail: telemetryContext.userEmail || telemetryContext.userId,
@@ -107,11 +105,6 @@ async function performQuotaCheck(config: any, telemetryContext: TelemetryContext
     const { usage, policy } = response
     const warningColor = getWarningColor(usage.warningLevel)
 
-    // Log quota details
-    console.log(`   Daily: ${Math.round(usage.dailyUsagePercent)}% (${usage.dailyTokens.toLocaleString()} / ${policy.dailyTokenLimit.toLocaleString()} tokens)`)
-    console.log(`   Monthly: ${Math.round(usage.monthlyUsagePercent)}% (${usage.monthlyTokens.toLocaleString()} / ${policy.monthlyTokenLimit.toLocaleString()} tokens)`)
-    console.log(`   Warning Level: ${usage.warningLevel}`)
-
     // Log quota check event
     await logQuotaCheck(config, telemetryContext.userId, usage.allowed, telemetryContext, {
       dailyUsagePercent: usage.dailyUsagePercent,
@@ -130,7 +123,7 @@ async function performQuotaCheck(config: any, telemetryContext: TelemetryContext
     if (!usage.allowed) {
       console.warn(`⚠️  Quota check failed (fail mode: ${config.quotaFailMode}): ${usage.reason}`)
     } else {
-      console.log(`✅ Quota check passed`)
+      console.log(`✅ Quota: ${Math.round(usage.monthlyUsagePercent)}% monthly usage`)
     }
 
     return {
@@ -145,7 +138,7 @@ async function performQuotaCheck(config: any, telemetryContext: TelemetryContext
       OPENCODE_ANR_QUOTA_ALLOWED: String(usage.allowed),
     }
   } catch (error) {
-    console.error("❌ Quota check failed:", error instanceof Error ? error.message : error)
+    console.warn("⚠️  Quota check failed:", error instanceof Error ? error.message : error)
     return {}
   }
 }
@@ -162,11 +155,7 @@ function setupQuotaInterval(
 ): NodeJS.Timeout | null {
   if (intervalSeconds <= 0) return null
 
-  console.log(`⏱️  Quota background refresh: every ${intervalSeconds} seconds`)
-
   return setInterval(async () => {
-    console.log(`🔄 Refreshing quota (background check)...`)
-    const quotaEnv = await performQuotaCheck(config, telemetryContext, idToken)
     // Update env vars with latest quota info
     Object.assign(env, quotaEnv)
   }, intervalSeconds * 1000)
@@ -244,34 +233,18 @@ async function main() {
       return
     }
     
-    // Try to load ANR configuration
-    console.log("🔍 Checking for ANR configuration...")
+    // Load configuration and authenticate
     const config = await getValidatedANRConfig(undefined, false)
-    
-    console.log("✅ ANR configuration found")
-    console.log(`   Domain: ${config.providerDomain}`)
-    console.log(`   Client: ${config.clientId.substring(0, 10)}...`)
-    console.log()
-    
-    // Generate session ID for this session
     const sessionId = randomUUID()
     
-    // Authenticate with OIDC (will open browser for login)
     console.log("🔐 Authenticating with Cognito OIDC...")
     const tokens = await authenticateWithOIDC(config)
     
-    console.log("✅ OIDC authentication successful")
-    console.log()
-    
-    // Build comprehensive telemetry context (all 3 phases)
     const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
-    
-    // Exchange Cognito token for AWS credentials FIRST (before audit logging)
-    console.log("🔄 Exchanging token for AWS credentials...")
-    const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
-    
-    console.log("✅ AWS credentials obtained")
+    console.log("✅ Authentication & credentials obtained")
     console.log()
+    
+    const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
     
     // NOW initialize audit logging (with AWS credentials available)
     initializeAuditLogger(config, {
@@ -285,10 +258,7 @@ async function main() {
     
     // Set up OpenTelemetry with enriched context
     if (config.enableTelemetry) {
-      console.log("📊 Initializing telemetry...")
       initializeOTEL(config, telemetryContext)
-      console.log("✅ Telemetry initialized")
-      console.log()
     }
     
     // Track and log session start
@@ -298,7 +268,6 @@ async function main() {
     await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
 
     // Perform quota check based on interval setting
-    console.log("🎯 Checking quota...")
     const quotaEnv = await performQuotaCheck(config, telemetryContext, tokens.idToken)
     
     // If PROMPT mode, check before allowing execution
@@ -308,31 +277,13 @@ async function main() {
       process.exit(1)
     }
     
-    console.log("✅ Quota check passed")
-    console.log()
-    
     // Setup interval-based quota checking if configured
     let quotaTimer: NodeJS.Timeout | null = null
     if (config.quotaCheckInterval !== "PROMPT" && typeof config.quotaCheckInterval === "number") {
       quotaTimer = setupQuotaInterval(config.quotaCheckInterval, config, telemetryContext, tokens.idToken, {})
     }
     
-    // Determine what's being launched
     const hasCommand = args.length > 0 && args[0] && !args[0].startsWith("-")
-    
-    // Only show TUI startup message for actual commands
-    if (!hasCommand) {
-      console.log("🚀 Starting OpenCode TUI (Terminal User Interface)...")
-      console.log("   The TUI will take over your terminal in 3 seconds.")
-      console.log()
-      console.log("   💡 Tip: Use these commands instead for better experience:")
-      console.log("      bun dev:anr run \"your message here\"")
-      console.log("      bun dev:anr models")
-      console.log("      bun dev:anr serve")
-      console.log("      bun dev:anr --help")
-      console.log()
-      await new Promise(resolve => setTimeout(resolve, 3000))
-    }
     
     // Build environment with AWS credentials from Cognito token exchange
     const env = {
@@ -376,28 +327,6 @@ async function main() {
     // Remove AWS_PROFILE to avoid credential source conflicts
     delete env.AWS_PROFILE
     
-    // ========== VALIDATE CLEAN STARTUP ==========
-    console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    console.log("✅ ANR Startup Complete - All Systems Ready")
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-    
-    // Validation checklist
-    const validations = {
-      "Authentication": !!tokens.idToken,
-      "Telemetry": config.enableTelemetry,
-      "Quota": Object.keys(quotaEnv).length > 0,
-      "AWS Credentials": !!(env.AWS_ACCESS_KEY_ID && env.AWS_SESSION_TOKEN),
-    }
-    
-    const allValid = Object.values(validations).every(v => v)
-    if (!allValid) {
-      console.warn("⚠️  Some systems not fully initialized:")
-      Object.entries(validations).forEach(([name, valid]) => {
-        console.log(`   ${valid ? "✅" : "⚠️"} ${name}`)
-      })
-      console.log()
-    }
-    
     // Required checks
     if (!tokens.idToken) {
       console.error("❌ FATAL: No authentication token. Cannot continue.")
@@ -407,8 +336,6 @@ async function main() {
       console.error("❌ FATAL: AWS credentials not obtained. Cannot continue.")
       process.exit(1)
     }
-    
-    console.log("🚀 Forwarding to OpenCode process...\n")
     
     // Track command execution
     const commandStartTime = Date.now()

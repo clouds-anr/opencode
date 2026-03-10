@@ -13,10 +13,7 @@ export interface AWSCredentials {
   expiration?: Date
 }
 
-export async function exchangeTokenForAWSCredentials(
-  idToken: string,
-  config: ANRConfig
-): Promise<AWSCredentials> {
+export async function exchangeTokenForAWSCredentials(idToken: string, config: ANRConfig): Promise<AWSCredentials> {
   if (!config.identityPoolId) {
     throw new Error("Identity pool ID not configured")
   }
@@ -25,27 +22,21 @@ export async function exchangeTokenForAWSCredentials(
   const client = new CognitoIdentityClient({ region })
 
   try {
-    console.log("🔄 Exchanging Cognito token for AWS credentials...")
-    console.log(`   Identity Pool: ${config.identityPoolId}`)
-    console.log(`   User Pool: ${config.cognitoUserPoolId}`)
-
     // Step 1: Get identity ID using the ID token
     const providerName = `cognito-idp.${region}.amazonaws.com/${config.cognitoUserPoolId}`
-    
+
     const idResponse = await client.send(
       new GetIdCommand({
         IdentityPoolId: config.identityPoolId,
         Logins: {
           [providerName]: idToken,
         },
-      })
+      }),
     )
 
     if (!idResponse.IdentityId) {
       throw new Error("Failed to get identity ID from Cognito Identity Pool")
     }
-
-    console.log(`   Identity ID: ${idResponse.IdentityId.substring(0, 20)}...`)
 
     // Step 2: Get credentials for the identity
     const credsResponse = await client.send(
@@ -54,14 +45,12 @@ export async function exchangeTokenForAWSCredentials(
         Logins: {
           [providerName]: idToken,
         },
-      })
+      }),
     )
 
     if (!credsResponse.Credentials) {
       throw new Error("Failed to get credentials from Cognito Identity Pool")
     }
-
-    console.log("✅ AWS credentials obtained from Cognito Identity Pool")
 
     return {
       accessKeyId: credsResponse.Credentials.AccessKeyId || "",

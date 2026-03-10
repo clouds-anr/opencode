@@ -23,10 +23,7 @@ export interface QuotaCheckResponse {
 /**
  * Check quota with the ANR Quota API
  */
-export async function checkQuota(
-  config: ANRConfig,
-  request: QuotaCheckRequest
-): Promise<QuotaCheckResponse> {
+export async function checkQuota(config: ANRConfig, request: QuotaCheckRequest): Promise<QuotaCheckResponse> {
   try {
     const response = await fetch(`${config.quotaApiEndpoint}/check`, {
       method: "POST",
@@ -40,9 +37,9 @@ export async function checkQuota(
       throw new Error(`Quota API returned ${response.status}: ${response.statusText}`)
     }
 
-    return await response.json() as QuotaCheckResponse
+    return (await response.json()) as QuotaCheckResponse
   } catch (error) {
-    console.error("❌ Quota check failed:", error)
+    // Quota check failed (silent to avoid TUI pollution)
 
     // Handle fail mode
     if (config.quotaFailMode === "closed") {
@@ -52,8 +49,7 @@ export async function checkQuota(
         reason: "Quota API unavailable (fail-closed mode)",
       }
     } else {
-      // Fail open - allow access on error
-      console.warn("⚠️  Quota API unavailable, allowing access (fail-open mode)")
+      // Fail open - allow access on error (silent)
       return {
         allowed: true,
         reason: "Quota API unavailable (fail-open mode)",
@@ -70,7 +66,7 @@ export function createQuotaMiddleware(config: ANRConfig) {
     userId: string,
     action: string,
     resourceType: QuotaCheckRequest["resourceType"],
-    amount: number = 1
+    amount: number = 1,
   ): Promise<void> {
     const result = await checkQuota(config, {
       userId,
@@ -84,16 +80,10 @@ export function createQuotaMiddleware(config: ANRConfig) {
     })
 
     if (!result.allowed) {
-      throw new QuotaExceededError(
-        result.reason || "Quota exceeded",
-        result.remainingQuota,
-        result.resetAt
-      )
+      throw new QuotaExceededError(result.reason || "Quota exceeded", result.remainingQuota, result.resetAt)
     }
 
-    if (result.remainingQuota !== undefined) {
-      console.log(`📊 Quota remaining: ${result.remainingQuota}`)
-    }
+    // Quota remaining info is available in result.remainingQuota if needed
   }
 }
 
@@ -104,7 +94,7 @@ export class QuotaExceededError extends Error {
   constructor(
     message: string,
     public remainingQuota?: number,
-    public resetAt?: string
+    public resetAt?: string,
   ) {
     super(message)
     this.name = "QuotaExceededError"
@@ -116,7 +106,7 @@ export class QuotaExceededError extends Error {
  */
 export async function trackUsage(
   config: ANRConfig,
-  request: Omit<QuotaCheckRequest, "metadata"> & { metadata?: Record<string, unknown> }
+  request: Omit<QuotaCheckRequest, "metadata"> & { metadata?: Record<string, unknown> },
 ): Promise<void> {
   try {
     await fetch(`${config.quotaApiEndpoint}/track`, {
@@ -134,7 +124,6 @@ export async function trackUsage(
       }),
     })
   } catch (error) {
-    // Don't throw - this is best-effort tracking
-    console.warn("⚠️  Failed to track usage:", error)
+    // Failed to track usage (silent - this is best-effort tracking)
   }
 }

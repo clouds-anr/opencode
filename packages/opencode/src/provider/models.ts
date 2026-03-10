@@ -112,25 +112,71 @@ export namespace ModelsDev {
   }
 
   async function fetchFromApiEndpoint(): Promise<Record<string, unknown> | undefined> {
+    const headers: Record<string, string> = {
+      "User-Agent": Installation.USER_AGENT,
+    }
+    const idToken = process.env.OPENCODE_ANR_ID_TOKEN
+    if (idToken) {
+      headers.Authorization = `Bearer ${idToken}`
+    }
     const result = await fetch(`${Flag.OPENCODE_API_ENDPOINT}/model`, {
-      headers: {
-        "User-Agent": Installation.USER_AGENT,
-      },
+      headers,
       signal: AbortSignal.timeout(10 * 1000),
     }).catch((e) => {
       log.error("Failed to fetch from API endpoint", { error: e, url: `${Flag.OPENCODE_API_ENDPOINT}/model` })
     })
     if (result && result.ok) return result.json()
-    if (result) log.error("API endpoint returned non-ok response", { status: result.status, url: `${Flag.OPENCODE_API_ENDPOINT}/model` })
+    if (result)
+      log.error("API endpoint returned non-ok response", {
+        status: result.status,
+        url: `${Flag.OPENCODE_API_ENDPOINT}/model`,
+      })
     return undefined
   }
 
   export const Data = lazy(async () => {
     if (Flag.OPENCODE_API_ENDPOINT) {
+      // When API endpoint is configured, ONLY use that endpoint
       const cached = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
-      if (cached) return cached
+      if (cached) {
+        // Validate cache is from API endpoint (should have amazon-bedrock provider for ANR)
+        // If cache looks like models.dev format (has many providers), invalidate it
+        const providerCount = Object.keys(cached).length
+        if (providerCount > 5) {
+          // Likely models.dev cache (has 20+ providers), invalidate it
+          log.warn("Invalidating stale models.dev cache, will fetch from API endpoint", {
+            providerCount,
+          })
+        } else {
+          log.info("Using cached models from API endpoint")
+          return cached
+        }
+      }
       const policy = await fetchFromApiEndpoint()
-      if (policy) return parsePolicyModels(policy)
+      if (policy) {
+        // Check if response has models in DynamoDB format (with .M) or direct format
+        const modelsAttr = policy.models as { M?: Record<string, Record<string, unknown>> } | undefined
+        if (modelsAttr?.M) {
+          // DynamoDB format - parse it
+          const models = parsePolicyModels(policy)
+          log.info("Loaded models from API endpoint (DynamoDB format)", {
+            providerCount: Object.keys(models).length,
+          })
+          // Cache the result
+          await Filesystem.write(filepath, JSON.stringify(models))
+          return models
+        } else if (policy.models && typeof policy.models === "object") {
+          // Direct format - use it as-is
+          const models = policy.models as Record<string, Provider>
+          log.info("Loaded models from API endpoint (direct format)", {
+            providerCount: Object.keys(models).length,
+          })
+          // Cache the result
+          await Filesystem.write(filepath, JSON.stringify(models))
+          return models
+        }
+      }
+      log.warn("API endpoint configured but no models returned, using empty set")
       return {}
     }
     const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
@@ -152,13 +198,36 @@ export namespace ModelsDev {
 
   export async function refresh() {
     if (Flag.OPENCODE_API_ENDPOINT) {
+      log.info("Refreshing models from API endpoint")
       const policy = await fetchFromApiEndpoint()
       if (policy) {
-        await Filesystem.write(filepath, JSON.stringify(parsePolicyModels(policy)))
+        // Check if response has models in DynamoDB format (with .M) or direct format
+        const modelsAttr = policy.models as { M?: Record<string, Record<string, unknown>> } | undefined
+        let modelsData: Record<string, Provider>
+        if (modelsAttr?.M) {
+          // DynamoDB format - parse it
+          modelsData = parsePolicyModels(policy)
+          log.info("Refreshed models from API endpoint (DynamoDB format)", {
+            providerCount: Object.keys(modelsData).length,
+          })
+        } else if (policy.models && typeof policy.models === "object") {
+          // Direct format - use it as-is
+          modelsData = policy.models as Record<string, Provider>
+          log.info("Refreshed models from API endpoint (direct format)", {
+            providerCount: Object.keys(modelsData).length,
+          })
+        } else {
+          log.warn("API endpoint returned policy without models field")
+          return
+        }
+        await Filesystem.write(filepath, JSON.stringify(modelsData))
         ModelsDev.Data.reset()
+      } else {
+        log.warn("API endpoint refresh returned no data")
       }
       return
     }
+    log.info("Refreshing models from models.dev")
     const result = await fetch(`${url()}/api.json`, {
       headers: {
         "User-Agent": Installation.USER_AGENT,
@@ -172,12 +241,25 @@ export namespace ModelsDev {
     if (result && result.ok) {
       await Filesystem.write(filepath, await result.text())
       ModelsDev.Data.reset()
+      log.info("Successfully refreshed models from models.dev")
     }
   }
 }
 
+// Auto-refresh models periodically, but NOT immediately on module load when using API endpoint
+// because ANR initialization needs to complete first to set authentication token
 if (!Flag.OPENCODE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
-  ModelsDev.refresh()
+  const isANRMode = process.env.OPENCODE_FLAVOR === "anr"
+
+  if (!isANRMode || !process.env.OPENCODE_API_ENDPOINT) {
+    // For non-ANR mode or when not using API endpoint, refresh immediately
+    ModelsDev.refresh()
+  }
+  // For ANR mode with API endpoint, skip initial refresh - it will happen:
+  // 1. On first Data() call (via lazy loader)
+  // 2. Or via the periodic refresh below after ANR has initialized
+
+  // Periodic refresh every 60 minutes
   setInterval(
     async () => {
       await ModelsDev.refresh()

@@ -13,7 +13,7 @@ export interface AuditEvent {
   // Primary keys
   pk: string // userId#timestamp for sorting
   sk: string // eventId for uniqueness
-  
+
   // Event tracking
   eventId: string
   userId: string
@@ -21,7 +21,7 @@ export interface AuditEvent {
   action: string
   resource?: string
   result: "success" | "failure" | "denied"
-  
+
   // Telemetry context (enriched from OIDC + system detection)
   userEmail?: string
   userName?: string
@@ -33,7 +33,7 @@ export interface AuditEvent {
   location?: string
   manager?: string
   sessionId?: string
-  
+
   // Metadata and timestamps
   metadata?: Record<string, unknown>
   timestamp: string
@@ -67,14 +67,14 @@ export function initializeAuditLogger(config: ANRConfig, credentials?: AuditLogg
   })
 
   dynamoClient = DynamoDBDocumentClient.from(client)
-  console.log("✅ Audit logger initialized")
+  // Audit logger initialized (silent to avoid TUI pollution)
 }
 
 /**
  * Convert camelCase to snake_case
  */
 function toSnakeCase(str: string): string {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
 }
 
 /**
@@ -94,10 +94,10 @@ function convertToSnakeCase(obj: Record<string, unknown>): Record<string, unknow
 export async function logAuditEvent(
   config: ANRConfig,
   event: Omit<AuditEvent, "pk" | "sk" | "eventId" | "timestamp" | "ttl">,
-  context?: TelemetryContext
+  context?: TelemetryContext,
 ): Promise<void> {
   if (!dynamoClient) {
-    console.warn("⚠️  Audit logger not initialized, skipping event")
+    // Audit logger not initialized, skipping event (silent)
     return
   }
 
@@ -111,13 +111,13 @@ export async function logAuditEvent(
       // DynamoDB keys
       pk: `USER#${event.userId}#${now.getTime()}`,
       sk: `EVENT#${eventId}`,
-      
+
       // Event data
       eventId,
       timestamp,
       ttl,
       ...event,
-      
+
       // Enrich with telemetry context if provided
       ...(context && {
         userEmail: context.userEmail,
@@ -140,16 +140,15 @@ export async function logAuditEvent(
       new PutCommand({
         TableName: config.auditTableName,
         Item: dbItem,
-      })
+      }),
     )
 
-    console.log(`📝 Audit: ${event.eventType}/${event.action} for ${event.userId.substring(0, 8)}... - ${event.result}`)
+    // Audit event logged to DynamoDB (silent to avoid TUI pollution)
   } catch (error) {
-    // Don't fail the operation if audit logging fails
-    console.error("❌ Failed to write audit log:", error)
+    // Failed to write audit log (silent to avoid TUI pollution)
+    // Error is swallowed as audit logging should not fail the operation
   }
 }
-
 
 /**
  * Helper to log authentication event
@@ -159,7 +158,7 @@ export async function logAuthEvent(
   userId: string,
   result: "success" | "failure",
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -174,7 +173,7 @@ export async function logAuthEvent(
         domain: config.providerDomain,
       },
     },
-    context
+    context,
   )
 }
 
@@ -185,7 +184,7 @@ export async function logSessionStart(
   config: ANRConfig,
   userId: string,
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -200,7 +199,7 @@ export async function logSessionStart(
         region: config.awsRegion,
       },
     },
-    context
+    context,
   )
 }
 
@@ -212,7 +211,7 @@ export async function logSessionEnd(
   userId: string,
   duration: number,
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -226,7 +225,7 @@ export async function logSessionEnd(
         durationSeconds: duration,
       },
     },
-    context
+    context,
   )
 }
 
@@ -239,7 +238,7 @@ export async function logCommandExecution(
   command: string,
   duration: number,
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -253,7 +252,7 @@ export async function logCommandExecution(
         durationMs: duration,
       },
     },
-    context
+    context,
   )
 }
 
@@ -267,7 +266,7 @@ export async function logTokenUsage(
   inputTokens: number,
   outputTokens: number,
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -284,7 +283,7 @@ export async function logTokenUsage(
         totalTokens: inputTokens + outputTokens,
       },
     },
-    context
+    context,
   )
 }
 
@@ -297,7 +296,7 @@ export async function logAPICall(
   action: string,
   result: AuditEvent["result"],
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -308,7 +307,7 @@ export async function logAPICall(
       result,
       metadata,
     },
-    context
+    context,
   )
 }
 
@@ -320,7 +319,7 @@ export async function logQuotaCheck(
   userId: string,
   allowed: boolean,
   context?: TelemetryContext,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   await logAuditEvent(
     config,
@@ -331,6 +330,6 @@ export async function logQuotaCheck(
       result: allowed ? "success" : "denied",
       metadata,
     },
-    context
+    context,
   )
 }

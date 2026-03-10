@@ -71,7 +71,6 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
   const authURL = `${baseURL}/login?${params.toString()}`
 
   console.log(`🌐 Opening browser for authentication...`)
-  console.log(`   Callback: ${redirectURI}`)
 
   // Set up callback server
   let callbackCode: string | null = null
@@ -101,7 +100,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
             <h1>Authentication Failed</h1>
             <p>${callbackError}</p>
             <p>Return to your terminal to continue.</p>
-          </body></html>`
+          </body></html>`,
         )
         return
       }
@@ -114,7 +113,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
             <h1>Authentication Failed</h1>
             <p>Invalid response from server</p>
             <p>Return to your terminal to continue.</p>
-          </body></html>`
+          </body></html>`,
         )
         return
       }
@@ -125,7 +124,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
         `<html><body style="font-family: sans-serif; text-align: center; padding: 50px;">
           <h1>Authentication Successful!</h1>
           <p>You can close this window and return to your terminal.</p>
-        </body></html>`
+        </body></html>`,
       )
     }
   })
@@ -133,7 +132,6 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
   return new Promise((resolve, reject) => {
     server.listen(redirectPort, "127.0.0.1", async () => {
       serverReady = true
-      console.log(`   Server ready on http://localhost:${redirectPort}`)
 
       // Open browser
       await openBrowser(authURL)
@@ -189,7 +187,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
           throw new Error(`Token request failed: ${res.statusText}`)
         }
 
-        const data = await res.json() as { id_token?: string; access_token?: string }
+        const data = (await res.json()) as { id_token?: string; access_token?: string }
 
         if (!data.id_token) {
           throw new Error("No ID token in response")

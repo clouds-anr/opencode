@@ -28,6 +28,9 @@ export interface ANRConfig {
   quotaFailMode: "open" | "closed"
   quotaCheckInterval: "PROMPT" | number // "PROMPT" for per-prompt checks, or seconds (default: 300 for 5min)
 
+  // Models API
+  modelsApiEndpoint: string
+
   // AWS Cognito SSO
   providerDomain: string
   clientId: string

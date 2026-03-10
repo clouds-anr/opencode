@@ -33,13 +33,13 @@ import path from "path"
 import { Global } from "./global"
 import { JsonMigration } from "./storage/json-migration"
 import { Database } from "./storage/db"
-import { 
-  getValidatedANRConfig, 
-  authenticateWithOIDC, 
-  exchangeTokenForAWSCredentials, 
-  initializeOTEL, 
-  shutdownOTEL, 
-  trackSessionStart, 
+import {
+  getValidatedANRConfig,
+  authenticateWithOIDC,
+  exchangeTokenForAWSCredentials,
+  initializeOTEL,
+  shutdownOTEL,
+  trackSessionStart,
   trackSessionEnd,
   trackCommand,
   clearOTELLogs,
@@ -48,7 +48,7 @@ import {
   logSessionStart,
   logSessionEnd,
   checkQuota,
-  type TelemetryContext 
+  type TelemetryContext,
 } from "@opencode-ai/anr-core"
 import { randomUUID } from "crypto"
 import { platform, arch, release } from "os"
@@ -144,39 +144,38 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
 async function initializeANR(): Promise<void> {
   // Clear OTEL logs from previous session for clean debugging
   clearOTELLogs()
-  
-  console.log("\n🚀 OpenCode ANR - Alaska Northstar Resources Edition\n")
-  
+
+  console.error("\n🚀 OpenCode ANR\n")
+
   // Load configuration
-  console.log("🔍 Loading ANR configuration...")
   const config = await getValidatedANRConfig(undefined, false)
-  console.log("✅ Configuration loaded")
-  console.log(`   Domain: ${config.providerDomain}`)
-  console.log(`   Region: ${config.awsRegion}\n`)
-  
+
   // Generate session ID
   const sessionId = randomUUID()
-  
+
   // Authenticate with OIDC
-  console.log("🔐 Authenticating with Cognito OIDC...")
+  console.error("🔐 Authenticating...")
   const tokens = await authenticateWithOIDC(config)
-  console.log("✅ Authentication successful\n")
-  
+  console.error("✅ Authenticated\n")
+
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
-  
+
   // Exchange token for AWS credentials
-  console.log("🔄 Exchanging token for AWS credentials...")
   const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
-  console.log("✅ AWS credentials obtained\n")
-  
+
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
   process.env.AWS_SECRET_ACCESS_KEY = awsCredentials.secretAccessKey
   process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
   process.env.AWS_REGION = config.awsRegion
   delete process.env.AWS_PROFILE // Avoid credential conflicts
-  
+
+  // Set models API endpoint if configured
+  if (config.modelsApiEndpoint) {
+    process.env.OPENCODE_API_ENDPOINT = config.modelsApiEndpoint
+  }
+
   // Initialize audit logging
   initializeAuditLogger(config, {
     accessKeyId: awsCredentials.accessKeyId,
@@ -184,7 +183,7 @@ async function initializeANR(): Promise<void> {
     sessionToken: awsCredentials.sessionToken,
   })
   await logAuthEvent(config, telemetryContext.userId, "success", telemetryContext)
-  
+
   // Set telemetry context env vars so the Bun Worker (which has a separate global scope)
   // can reconstruct the context via reconstructTelemetryContextFromEnv()
   process.env.OPENCODE_ANR_USER_ID = telemetryContext.userId
@@ -205,15 +204,12 @@ async function initializeANR(): Promise<void> {
 
   // Initialize telemetry
   if (config.enableTelemetry) {
-    console.log("📊 Initializing telemetry...")
     initializeOTEL(config, telemetryContext)
     trackSessionStart(telemetryContext.userId)
-    console.log("✅ Telemetry initialized\n")
   }
   await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
-  
+
   // Check quota
-  console.log("🎯 Checking quota...")
   const quotaResult = await checkQuota(
     {
       userEmail: telemetryContext.userEmail || telemetryContext.userId,
@@ -222,9 +218,9 @@ async function initializeANR(): Promise<void> {
     },
     config.quotaApiEndpoint,
     config.quotaFailMode,
-    tokens.idToken
+    tokens.idToken,
   )
-  
+
   if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
     await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
@@ -234,13 +230,12 @@ async function initializeANR(): Promise<void> {
     }
     process.exit(1)
   }
-  
-  console.log("✅ Quota check passed")
-  console.log("📊 QuotaResult:", JSON.stringify(quotaResult, null, 2))
+
   if (quotaResult?.usage) {
-    console.log(`   Daily: ${Math.round(quotaResult.usage.dailyUsagePercent)}% (${quotaResult.usage.dailyTokens.toLocaleString()} tokens)`)
-    console.log(`   Monthly: ${Math.round(quotaResult.usage.monthlyUsagePercent)}% (${quotaResult.usage.monthlyTokens.toLocaleString()} tokens)`)
-    
+    console.error(
+      `📊 Quota: ${Math.round(quotaResult.usage.dailyUsagePercent)}% daily, ${Math.round(quotaResult.usage.monthlyUsagePercent)}% monthly`,
+    )
+
     // Determine warning level
     const maxPercent = Math.max(quotaResult.usage.dailyUsagePercent, quotaResult.usage.monthlyUsagePercent)
     let warningLevel: "normal" | "warning" | "critical" = "normal"
@@ -251,7 +246,7 @@ async function initializeANR(): Promise<void> {
     let warningColor: "green" | "yellow" | "red" = "green"
     if (warningLevel === "critical") warningColor = "red"
     else if (warningLevel === "warning") warningColor = "yellow"
-    
+
     // Store quota info for TUI access
     quotaInfo = {
       dailyTokens: quotaResult.usage.dailyTokens,
@@ -264,7 +259,7 @@ async function initializeANR(): Promise<void> {
       warningColor,
       allowed: quotaResult.usage.allowed,
     }
-    
+
     // Set environment variables for TUI to display quota (for backward compatibility)
     process.env.OPENCODE_ANR_QUOTA_DAILY_TOKENS = String(quotaResult.usage.dailyTokens)
     process.env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS = String(quotaResult.usage.monthlyTokens)
@@ -274,23 +269,16 @@ async function initializeANR(): Promise<void> {
     process.env.OPENCODE_ANR_QUOTA_MONTHLY_PERCENT = String(quotaResult.usage.monthlyUsagePercent)
     process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL = quotaResult.usage.warningLevel
     process.env.OPENCODE_ANR_QUOTA_ALLOWED = String(quotaResult.usage.allowed)
-    
+
     // Set API endpoint and credentials for TUI's periodic refresh
     process.env.OPENCODE_ANR_QUOTA_API_ENDPOINT = config.quotaApiEndpoint
     process.env.OPENCODE_ANR_ID_TOKEN = tokens.idToken
     process.env.OPENCODE_ANR_USER_EMAIL = telemetryContext.userEmail || telemetryContext.userId
-    
-    console.log("✅ Quota info set for TUI")
   } else {
-    console.warn("⚠️ No quotaResult or usage data received from API")
-    console.warn("   quotaResult:", quotaResult)
+    console.warn("⚠️ No quota data received")
   }
-  console.log()
-  
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-  console.log("✅ ANR Initialization Complete")
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-  
+  console.error()
+
   // Store context for later use
   anrContext = {
     telemetryContext,
@@ -298,10 +286,10 @@ async function initializeANR(): Promise<void> {
     sessionStartTime: Date.now(),
     commandName: process.argv[2] || "tui",
   }
-  
+
   // Also store in global for cross-module access (logToFile happens in initializeOTEL)
   ;(global as any).__ANR_TELEMETRY_CONTEXT__ = telemetryContext
-  
+
   // Setup exit handlers for telemetry cleanup
   const exitHandler = async () => {
     if (anrContext) {
@@ -313,17 +301,17 @@ async function initializeANR(): Promise<void> {
       await logSessionEnd(anrContext.config, anrContext.telemetryContext.userId, duration, anrContext.telemetryContext)
     }
   }
-  
+
   process.on("SIGINT", async () => {
     await exitHandler()
     process.exit(0)
   })
-  
+
   process.on("SIGTERM", async () => {
     await exitHandler()
     process.exit(0)
   })
-  
+
   process.on("exit", () => {
     // Synchronous cleanup only
   })
@@ -347,8 +335,9 @@ process.on("uncaughtException", (e) => {
  */
 export async function main(argv?: string[]) {
   // Check if running in ANR mode
-  const anrMode = process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
-  
+  const anrMode =
+    process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
+
   if (anrMode) {
     await initializeANR()
   }
@@ -518,7 +507,7 @@ export async function main(argv?: string[]) {
     } catch {
       // Silently fail if shutdown has issues, don't block exit
     }
-    
+
     // Some subprocesses don't react properly to SIGTERM and similar signals.
     // Most notably, some docker-container-based MCP servers don't handle such signals unless
     // run using `docker run --init`.
