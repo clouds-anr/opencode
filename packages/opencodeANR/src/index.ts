@@ -157,7 +157,8 @@ function setupQuotaInterval(
 
   return setInterval(async () => {
     // Update env vars with latest quota info
-    Object.assign(env, quotaEnv)
+    const freshQuotaEnv = await performQuotaCheck(config, telemetryContext, idToken)
+    Object.assign(env, freshQuotaEnv)
   }, intervalSeconds * 1000)
 }
 
