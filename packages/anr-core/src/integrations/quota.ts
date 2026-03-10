@@ -60,7 +60,7 @@ export async function checkQuota(
   idToken?: string,
 ): Promise<QuotaCheckResponse | null> {
   if (!endpoint) {
-    console.warn("❌ QUOTA_API_ENDPOINT not configured")
+    console.warn("❌ OPENCODE_API_ENDPOINT not configured for quota")
     return failMode === "open" ? mockQuotaResponse() : null
   }
 
@@ -84,8 +84,8 @@ export async function checkQuota(
       console.warn("⚠️  No JWT token provided - API will return 401")
     }
 
-    // Construct endpoint with /check path for Lambda function
-    const url = `${endpoint.replace(/\/$/, "")}/check`
+    // Construct endpoint with /quota path
+    const url = `${endpoint.replace(/\/$/, "")}/quota`
 
     const response = await fetch(url, {
       method: "GET",

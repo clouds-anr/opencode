@@ -3,12 +3,10 @@ import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 import { Config } from "../../config/config"
 import { Provider } from "../../provider/provider"
-import { ModelsDev } from "../../provider/models"
 import { mapValues } from "remeda"
 import { errors } from "../error"
 import { Log } from "../../util/log"
 import { lazy } from "../../util/lazy"
-import { Flag } from "../../flag/flag"
 
 const log = Log.create({ service: "server" })
 
@@ -85,19 +83,6 @@ export const ConfigRoutes = lazy(() =>
       async (c) => {
         using _ = log.time("providers")
         const providers = await Provider.list().then((x) => mapValues(x, (item) => item))
-
-        // When OPENCODE_API_ENDPOINT is set, ONLY show providers from that endpoint
-        // Filter out any providers not in the API response
-        if (Flag.OPENCODE_API_ENDPOINT) {
-          const apiProviders = await ModelsDev.get()
-          const apiProviderIDs = new Set(Object.keys(apiProviders))
-
-          for (const providerID of Object.keys(providers)) {
-            if (!apiProviderIDs.has(providerID)) {
-              delete providers[providerID]
-            }
-          }
-        }
 
         return c.json({
           providers: Object.values(providers),

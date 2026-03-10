@@ -116,8 +116,7 @@ function parseEnvConfig(quiet = false): ANRConfig {
     // Audit & Compliance
     auditTableName: env.AUDIT_TABLE_NAME || "",
 
-    // Quota & Policy
-    quotaApiEndpoint: env.QUOTA_API_ENDPOINT || "",
+    // Quota & Policy (uses modelsApiEndpoint + /quota routes)
     quotaFailMode: (env.QUOTA_FAIL_MODE as "open" | "closed") || defaultConfig.quotaFailMode!,
     quotaCheckInterval:
       env.OPENCODE_QUOTA_CHECK_INTERVAL === "PROMPT"

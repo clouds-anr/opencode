@@ -496,11 +496,19 @@ async fn initialize(app: AppHandle) {
                     url,
                     username,
                     password,
+                    anr_mode,
                 } => {
                     let app = app.clone();
+                    // ANR mode requires OIDC browser auth which can take up to 5 minutes.
+                    // Use a longer timeout to give the user time to complete authentication.
+                    let health_timeout = if anr_mode {
+                        Duration::from_secs(5 * 60)
+                    } else {
+                        Duration::from_secs(30)
+                    };
                     Some(
                         async move {
-                            let res = timeout(Duration::from_secs(30), health_check.0).await;
+                            let res = timeout(health_timeout, health_check.0).await;
                             let err = match res {
                                 Ok(Ok(Ok(()))) => None,
                                 Ok(Ok(Err(e))) => Some(e),
@@ -620,6 +628,7 @@ enum ServerConnection {
         password: Option<String>,
         child: CommandChild,
         health_check: server::HealthCheck,
+        anr_mode: bool,
     },
 }
 
@@ -652,7 +661,7 @@ async fn setup_server_connection(app: AppHandle) -> ServerConnection {
     let password = uuid::Uuid::new_v4().to_string();
 
     tracing::info!("Spawning new local server");
-    let (child, health_check) =
+    let (child, health_check, anr_mode) =
         server::spawn_local_server(app, hostname.to_string(), local_port, password.clone());
 
     ServerConnection::CLI {
@@ -661,6 +670,7 @@ async fn setup_server_connection(app: AppHandle) -> ServerConnection {
         password: Some(password),
         child,
         health_check,
+        anr_mode,
     }
 }
 

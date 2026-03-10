@@ -23,8 +23,7 @@ export interface ANRConfig {
   // Audit & Compliance
   auditTableName: string
 
-  // Quota & Policy
-  quotaApiEndpoint: string
+  // Quota & Policy (uses modelsApiEndpoint + /quota routes)
   quotaFailMode: "open" | "closed"
   quotaCheckInterval: "PROMPT" | number // "PROMPT" for per-prompt checks, or seconds (default: 300 for 5min)
 

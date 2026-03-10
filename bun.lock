@@ -401,22 +401,6 @@
         "zod-to-json-schema": "3.24.5",
       },
     },
-    "packages/opencodeANR": {
-      "name": "@opencode-ai/opencode-anr",
-      "version": "1.0.0",
-      "bin": {
-        "opencode-anr": "./bin/opencode-anr",
-      },
-      "dependencies": {
-        "@opencode-ai/anr-core": "workspace:*",
-        "opencode": "workspace:*",
-      },
-      "devDependencies": {
-        "@tsconfig/bun": "catalog:",
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
     "packages/plugin": {
       "name": "@opencode-ai/plugin",
       "version": "1.2.15",
@@ -1382,8 +1366,6 @@
     "@opencode-ai/enterprise": ["@opencode-ai/enterprise@workspace:packages/enterprise"],
 
     "@opencode-ai/function": ["@opencode-ai/function@workspace:packages/function"],
-
-    "@opencode-ai/opencode-anr": ["@opencode-ai/opencode-anr@workspace:packages/opencodeANR"],
 
     "@opencode-ai/plugin": ["@opencode-ai/plugin@workspace:packages/plugin"],
 

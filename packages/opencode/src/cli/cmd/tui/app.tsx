@@ -33,7 +33,7 @@ import { ExitProvider, useExit } from "./context/exit"
 import { Session as SessionApi } from "@/session"
 import { TuiEvent } from "./event"
 import { KVProvider, useKV } from "./context/kv"
-import { QuotaProvider } from "./context/quota"
+import { QuotaProvider, useQuota } from "./context/quota"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
@@ -144,41 +144,41 @@ export function tui(input: {
                 <KVProvider>
                   <QuotaProvider quotaInfo={input.quotaInfo}>
                     <ToastProvider>
-                    <RouteProvider>
-                      <TuiConfigProvider config={input.config}>
-                        <SDKProvider
-                          url={input.url}
-                          directory={input.directory}
-                          fetch={input.fetch}
-                          headers={input.headers}
-                          events={input.events}
-                        >
-                          <SyncProvider>
-                            <ThemeProvider mode={mode}>
-                              <LocalProvider>
-                                <KeybindProvider>
-                                  <PromptStashProvider>
-                                    <DialogProvider>
-                                      <CommandProvider>
-                                        <FrecencyProvider>
-                                          <PromptHistoryProvider>
-                                            <PromptRefProvider>
-                                              <App />
-                                            </PromptRefProvider>
-                                          </PromptHistoryProvider>
-                                        </FrecencyProvider>
-                                      </CommandProvider>
-                                    </DialogProvider>
-                                  </PromptStashProvider>
-                                </KeybindProvider>
-                              </LocalProvider>
-                            </ThemeProvider>
-                          </SyncProvider>
-                        </SDKProvider>
-                      </TuiConfigProvider>
-                    </RouteProvider>
-                  </ToastProvider>
-                </QuotaProvider>
+                      <RouteProvider>
+                        <TuiConfigProvider config={input.config}>
+                          <SDKProvider
+                            url={input.url}
+                            directory={input.directory}
+                            fetch={input.fetch}
+                            headers={input.headers}
+                            events={input.events}
+                          >
+                            <SyncProvider>
+                              <ThemeProvider mode={mode}>
+                                <LocalProvider>
+                                  <KeybindProvider>
+                                    <PromptStashProvider>
+                                      <DialogProvider>
+                                        <CommandProvider>
+                                          <FrecencyProvider>
+                                            <PromptHistoryProvider>
+                                              <PromptRefProvider>
+                                                <App />
+                                              </PromptRefProvider>
+                                            </PromptHistoryProvider>
+                                          </FrecencyProvider>
+                                        </CommandProvider>
+                                      </DialogProvider>
+                                    </PromptStashProvider>
+                                  </KeybindProvider>
+                                </LocalProvider>
+                              </ThemeProvider>
+                            </SyncProvider>
+                          </SDKProvider>
+                        </TuiConfigProvider>
+                      </RouteProvider>
+                    </ToastProvider>
+                  </QuotaProvider>
                 </KVProvider>
               </ExitProvider>
             </ArgsProvider>
@@ -220,6 +220,7 @@ function App() {
   const sync = useSync()
   const exit = useExit()
   const promptRef = usePromptRef()
+  const quota = useQuota()
 
   useKeyboard((evt) => {
     if (!Flag.OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
@@ -723,11 +724,23 @@ function App() {
       return String(error)
     })()
 
+    const isAuthError =
+      error &&
+      typeof error === "object" &&
+      (error.name === "ProviderAuthError" ||
+        (error.name === "APIError" &&
+          "statusCode" in error.data &&
+          (error.data.statusCode === 401 || error.data.statusCode === 403)))
+
     toast.show({
       variant: "error",
       message,
-      duration: 5000,
+      duration: isAuthError ? 10000 : 5000,
     })
+
+    if (isAuthError) {
+      dialog.replace(() => <DialogProviderList />)
+    }
   })
 
   sdk.event.on(Installation.Event.UpdateAvailable.type, (evt) => {
@@ -737,6 +750,18 @@ function App() {
       message: `OpenCode v${evt.properties.version} is available. Run 'opencode upgrade' to update manually.`,
       duration: 10000,
     })
+  })
+
+  // Bridge: accumulate tokens from step-finish parts into quota local delta
+  sdk.event.on("message.part.updated", (evt) => {
+    const part = evt.properties.part
+    if (part.type !== "step-finish") return
+    const tokens = part.tokens
+    const total = tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write
+    if (total > 0) {
+      quota.addTokens(total)
+      quota.scheduleRefresh()
+    }
   })
 
   return (

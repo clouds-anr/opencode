@@ -1,3 +1,5 @@
+// DANGER ZONE: Shared across CLI + ANR + Desktop sidecar surfaces.
+// Changes here must be tested with all flavors. See /AGENTS.md#surface-flavor-rules
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
@@ -157,12 +159,21 @@ async function initializeANR(): Promise<void> {
   console.error("🔐 Authenticating...")
   const tokens = await authenticateWithOIDC(config)
   console.error("✅ Authenticated\n")
+  console.error("📍 Debug: Received tokens from OIDC")
+  console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
+  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}\n`)
 
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
 
   // Exchange token for AWS credentials
+  console.error("💱 Exchanging token for AWS credentials...")
   const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  console.error("✅ AWS credentials obtained\n")
+  console.error("📍 Debug: AWS credentials exchanged")
+  console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
+  console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
+  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}\n`)
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -170,6 +181,12 @@ async function initializeANR(): Promise<void> {
   process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
   process.env.AWS_REGION = config.awsRegion
   delete process.env.AWS_PROFILE // Avoid credential conflicts
+
+  console.error("📍 Debug: Credentials set in environment")
+  console.error(`   - AWS_ACCESS_KEY_ID set: ${!!process.env.AWS_ACCESS_KEY_ID}`)
+  console.error(`   - AWS_SECRET_ACCESS_KEY set: ${!!process.env.AWS_SECRET_ACCESS_KEY}`)
+  console.error(`   - AWS_SESSION_TOKEN set: ${!!process.env.AWS_SESSION_TOKEN}`)
+  console.error(`   - AWS_REGION: ${process.env.AWS_REGION}\n`)
 
   // Set models API endpoint if configured
   if (config.modelsApiEndpoint) {
@@ -187,6 +204,7 @@ async function initializeANR(): Promise<void> {
   // Set telemetry context env vars so the Bun Worker (which has a separate global scope)
   // can reconstruct the context via reconstructTelemetryContextFromEnv()
   process.env.OPENCODE_ANR_USER_ID = telemetryContext.userId
+  process.env.OPENCODE_ANR_ID_TOKEN = tokens.idToken // Set ID token early for API calls
   if (telemetryContext.userEmail) process.env.OPENCODE_ANR_USER_EMAIL = telemetryContext.userEmail
   if (telemetryContext.userName) process.env.OPENCODE_ANR_USER_NAME = telemetryContext.userName
   if (telemetryContext.osType) process.env.OPENCODE_ANR_OS_TYPE = telemetryContext.osType
@@ -216,7 +234,7 @@ async function initializeANR(): Promise<void> {
       organization: telemetryContext.organization,
       teamId: telemetryContext.teamId,
     },
-    config.quotaApiEndpoint,
+    config.modelsApiEndpoint,
     config.quotaFailMode,
     tokens.idToken,
   )
@@ -270,9 +288,7 @@ async function initializeANR(): Promise<void> {
     process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL = quotaResult.usage.warningLevel
     process.env.OPENCODE_ANR_QUOTA_ALLOWED = String(quotaResult.usage.allowed)
 
-    // Set API endpoint and credentials for TUI's periodic refresh
-    process.env.OPENCODE_ANR_QUOTA_API_ENDPOINT = config.quotaApiEndpoint
-    process.env.OPENCODE_ANR_ID_TOKEN = tokens.idToken
+    // OPENCODE_API_ENDPOINT is already set above (line 176) for TUI's periodic quota refresh
     process.env.OPENCODE_ANR_USER_EMAIL = telemetryContext.userEmail || telemetryContext.userId
   } else {
     console.warn("⚠️ No quota data received")
@@ -518,5 +534,8 @@ export async function main(argv?: string[]) {
 
 // If run directly (not imported), execute main
 if (import.meta.main) {
-  main()
+  main().catch((error) => {
+    console.error("❌ Fatal error:", error)
+    process.exit(1)
+  })
 }

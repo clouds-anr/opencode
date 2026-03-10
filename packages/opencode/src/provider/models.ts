@@ -1,3 +1,5 @@
+// DANGER ZONE: Shared across CLI + ANR surfaces.
+// ANR sets OPENCODE_API_ENDPOINT at runtime, not module load time. See /AGENTS.md#surface-flavor-rules
 import { Global } from "../global"
 import { Log } from "../util/log"
 import path from "path"
@@ -251,8 +253,9 @@ export namespace ModelsDev {
 if (!Flag.OPENCODE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
   const isANRMode = process.env.OPENCODE_FLAVOR === "anr"
 
-  if (!isANRMode || !process.env.OPENCODE_API_ENDPOINT) {
-    // For non-ANR mode or when not using API endpoint, refresh immediately
+  if (!isANRMode) {
+    // For non-ANR mode, refresh immediately from models.dev
+    // ANR mode skips this - OPENCODE_API_ENDPOINT isn't set until initializeANR() runs
     ModelsDev.refresh()
   }
   // For ANR mode with API endpoint, skip initial refresh - it will happen:

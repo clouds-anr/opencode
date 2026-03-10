@@ -1,4 +1,4 @@
-import { createMemo, createEffect, onCleanup } from "solid-js"
+import { createMemo, createEffect, onCleanup, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import * as fs from "fs"
@@ -30,14 +30,14 @@ export interface QuotaInfo {
 
 function readQuotaEnv(): QuotaInfo {
   const env = process.env
-  
+
   logQuota("🔍 Checking process.env for quota vars:", {
-    "OPENCODE_ANR_QUOTA_DAILY_LIMIT": env.OPENCODE_ANR_QUOTA_DAILY_LIMIT,
-    "OPENCODE_ANR_QUOTA_MONTHLY_LIMIT": env.OPENCODE_ANR_QUOTA_MONTHLY_LIMIT,
-    "OPENCODE_ANR_QUOTA_DAILY_TOKENS": env.OPENCODE_ANR_QUOTA_DAILY_TOKENS,
-    "OPENCODE_ANR_QUOTA_MONTHLY_TOKENS": env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS,
+    OPENCODE_ANR_QUOTA_DAILY_LIMIT: env.OPENCODE_ANR_QUOTA_DAILY_LIMIT,
+    OPENCODE_ANR_QUOTA_MONTHLY_LIMIT: env.OPENCODE_ANR_QUOTA_MONTHLY_LIMIT,
+    OPENCODE_ANR_QUOTA_DAILY_TOKENS: env.OPENCODE_ANR_QUOTA_DAILY_TOKENS,
+    OPENCODE_ANR_QUOTA_MONTHLY_TOKENS: env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS,
   })
-  
+
   const info = {
     dailyTokens: parseInt(env.OPENCODE_ANR_QUOTA_DAILY_TOKENS || "0"),
     monthlyTokens: parseInt(env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS || "0"),
@@ -49,14 +49,14 @@ function readQuotaEnv(): QuotaInfo {
     warningColor: (env.OPENCODE_ANR_QUOTA_WARNING_COLOR || "green") as "green" | "yellow" | "red",
     allowed: env.OPENCODE_ANR_QUOTA_ALLOWED !== "false",
   }
-  
+
   logQuota("📋 Quota env vars loaded:", {
     dailyLimit: info.dailyLimit,
     monthlyLimit: info.monthlyLimit,
     dailyTokens: info.dailyTokens,
     monthlyTokens: info.monthlyTokens,
   })
-  
+
   return info
 }
 
@@ -66,7 +66,7 @@ function readQuotaEnv(): QuotaInfo {
  */
 async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
   try {
-    const endpoint = process.env.OPENCODE_ANR_QUOTA_API_ENDPOINT
+    const endpoint = process.env.OPENCODE_API_ENDPOINT
     const idToken = process.env.OPENCODE_ANR_ID_TOKEN
     const userEmail = process.env.OPENCODE_ANR_USER_EMAIL
 
@@ -75,7 +75,7 @@ async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
       return null
     }
 
-    const url = `${endpoint.replace(/\/$/, "")}/check`
+    const url = `${endpoint.replace(/\/$/, "")}/quota/check`
     logQuota(`📡 Quota API: Calling ${url.split("/").slice(0, 3).join("/")}...`)
 
     const response = await fetch(url, {
@@ -94,10 +94,10 @@ async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
     const data = (await response.json()) as Record<string, unknown>
     const responseBody = typeof data?.body === "string" ? JSON.parse(data.body) : data
 
-    logQuota("✅ Quota API: Response received", { 
+    logQuota("✅ Quota API: Response received", {
       usage: responseBody.usage,
       allowed: responseBody.allowed,
-      hasPolicy: !!responseBody.policy
+      hasPolicy: !!responseBody.policy,
     })
 
     const usage = (responseBody.usage as Record<string, unknown>) || {}
@@ -141,28 +141,123 @@ async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
 
 const initialQuota = readQuotaEnv()
 
-export const { use: useQuota, provider: QuotaProvider } = createSimpleContext<QuotaInfo, { quotaInfo?: QuotaInfo }>({
+export interface QuotaContext extends QuotaInfo {
+  /** Local token delta accumulated since last API refresh */
+  localDelta: number
+  /** Effective daily tokens (API + local delta) */
+  effectiveDailyTokens: number
+  /** Effective monthly tokens (API + local delta) */
+  effectiveMonthlyTokens: number
+  /** Effective daily usage percent */
+  effectiveDailyPercent: number
+  /** Effective monthly usage percent */
+  effectiveMonthlyPercent: number
+  /** Effective warning level based on effective percentages */
+  effectiveWarningLevel: "normal" | "warning" | "critical"
+  /** Effective warning color based on effective percentages */
+  effectiveWarningColor: "green" | "yellow" | "red"
+  /** Add tokens to the local delta (call after each model step) */
+  addTokens: (count: number) => void
+  /** Schedule an API refresh after model activity */
+  scheduleRefresh: () => void
+}
+
+const POST_ACTIVITY_REFRESH_DELAY = 30_000
+
+export const { use: useQuota, provider: QuotaProvider } = createSimpleContext<QuotaContext, { quotaInfo?: QuotaInfo }>({
   name: "Quota",
   init: (props?: { quotaInfo?: QuotaInfo }) => {
     const passedQuotaInfo = props?.quotaInfo
     const [quota, setQuota] = createStore(passedQuotaInfo || initialQuota)
+    const [localDelta, setLocalDelta] = createSignal(0)
+
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined
+
+    const doRefresh = async () => {
+      const updated = await refreshQuotaFromAPI()
+      if (updated) {
+        setLocalDelta(0)
+        setQuota(updated)
+        logQuota("API refresh completed, localDelta reset to 0", {
+          dailyTokens: updated.dailyTokens,
+          monthlyTokens: updated.monthlyTokens,
+        })
+      }
+    }
 
     // Set up periodic refresh from API
     const interval = parseInt(process.env.OPENCODE_QUOTA_CHECK_INTERVAL || "300")
-    
-    if (interval > 0) {
-      const timerId = setInterval(async () => {
-        const updated = await refreshQuotaFromAPI()
-        if (updated) {
-          setQuota(updated)
-        }
-      }, interval * 1000)
 
-      onCleanup(() => {
-        clearInterval(timerId)
-      })
+    if (interval > 0) {
+      const timerId = setInterval(doRefresh, interval * 1000)
+      onCleanup(() => clearInterval(timerId))
     }
 
-    return quota
+    const addTokens = (count: number) => {
+      setLocalDelta((prev) => prev + count)
+      logQuota("localDelta updated", { added: count, newDelta: localDelta() + count })
+    }
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(doRefresh, POST_ACTIVITY_REFRESH_DELAY)
+    }
+
+    onCleanup(() => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+    })
+
+    const effectiveDailyTokens = createMemo(() => quota.dailyTokens + localDelta())
+    const effectiveMonthlyTokens = createMemo(() => quota.monthlyTokens + localDelta())
+    const effectiveDailyPercent = createMemo(() =>
+      quota.dailyLimit > 0 ? Math.round((effectiveDailyTokens() / quota.dailyLimit) * 100) : 0,
+    )
+    const effectiveMonthlyPercent = createMemo(() =>
+      quota.monthlyLimit > 0 ? Math.round((effectiveMonthlyTokens() / quota.monthlyLimit) * 100) : 0,
+    )
+    const effectiveWarningLevel = createMemo(() => {
+      const max = Math.max(effectiveDailyPercent(), effectiveMonthlyPercent())
+      if (max >= 90) return "critical" as const
+      if (max >= 80) return "warning" as const
+      return "normal" as const
+    })
+    const effectiveWarningColor = createMemo(() => {
+      const level = effectiveWarningLevel()
+      if (level === "critical") return "red" as const
+      if (level === "warning") return "yellow" as const
+      return "green" as const
+    })
+
+    // Return a reactive object that merges the API store with computed effective values
+    const [result, setResult] = createStore<QuotaContext>({
+      ...quota,
+      localDelta: localDelta(),
+      effectiveDailyTokens: effectiveDailyTokens(),
+      effectiveMonthlyTokens: effectiveMonthlyTokens(),
+      effectiveDailyPercent: effectiveDailyPercent(),
+      effectiveMonthlyPercent: effectiveMonthlyPercent(),
+      effectiveWarningLevel: effectiveWarningLevel(),
+      effectiveWarningColor: effectiveWarningColor(),
+      addTokens,
+      scheduleRefresh,
+    })
+
+    // Keep result in sync with quota store changes
+    createEffect(() => {
+      setResult({
+        ...quota,
+        localDelta: localDelta(),
+        effectiveDailyTokens: effectiveDailyTokens(),
+        effectiveMonthlyTokens: effectiveMonthlyTokens(),
+        effectiveDailyPercent: effectiveDailyPercent(),
+        effectiveMonthlyPercent: effectiveMonthlyPercent(),
+        effectiveWarningLevel: effectiveWarningLevel(),
+        effectiveWarningColor: effectiveWarningColor(),
+        addTokens,
+        scheduleRefresh,
+      })
+    })
+
+    return result
   },
 })

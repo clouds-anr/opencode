@@ -1,3 +1,5 @@
+// DANGER ZONE: Shared across CLI + ANR surfaces.
+// Bedrock has separate credential paths per flavor. See /AGENTS.md#surface-flavor-rules
 import z from "zod"
 import os from "os"
 import fuzzysort from "fuzzysort"

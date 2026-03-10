@@ -44,6 +44,69 @@ const CLI_INSTALL_DIR: &str = ".opencode/bin";
 const CLI_BINARY_NAME: &str = "opencode";
 const SHELL_ENV_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// ANR-specific keys that indicate an ANR configuration file.
+const ANR_ENV_MARKERS: &[&str] = &["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "IDENTITY_POOL_ID"];
+
+/// Detect ANR configuration by scanning standard locations for .env files
+/// containing ANR-specific keys. Mirrors the search logic in anr-core's
+/// `loadANRConfig()`: CWD, then `~/.config/opencode-anr/`.
+fn detect_anr_config() -> bool {
+    let home = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+        Ok(h) => h,
+        Err(_) => return false,
+    };
+
+    let search_dirs: Vec<std::path::PathBuf> = vec![
+        std::env::current_dir().unwrap_or_default(),
+        std::path::PathBuf::from(&home)
+            .join(".config")
+            .join("opencode-anr"),
+    ];
+
+    for dir in search_dirs {
+        if !dir.is_dir() {
+            continue;
+        }
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name == ".env" || name.starts_with(".env.") {
+                if let Ok(contents) = std::fs::read_to_string(entry.path()) {
+                    let has_marker = contents.lines().any(|line| {
+                        let trimmed = line.trim();
+                        ANR_ENV_MARKERS
+                            .iter()
+                            .any(|marker| trimmed.starts_with(marker))
+                    });
+                    if has_marker {
+                        tracing::info!(
+                            path = %entry.path().display(),
+                            "Detected ANR configuration"
+                        );
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Also check if OPENCODE_FLAVOR is already set in the environment
+    // (e.g., from the user's shell profile)
+    if std::env::var("OPENCODE_FLAVOR")
+        .map(|v| v == "anr")
+        .unwrap_or(false)
+    {
+        tracing::info!("OPENCODE_FLAVOR=anr detected in environment");
+        return true;
+    }
+
+    false
+}
+
 #[derive(serde::Deserialize, Debug)]
 pub struct ServerConfig {
     pub hostname: Option<String>,
@@ -549,20 +612,29 @@ fn signal_from_status(status: std::process::ExitStatus) -> Option<i32> {
     }
 }
 
+/// Spawn the sidecar in `serve` mode.
+/// Returns `(child, exit_rx, anr_mode)` where `anr_mode` is true when an
+/// ANR configuration was detected and `OPENCODE_FLAVOR=anr` was injected.
 pub fn serve(
     app: &AppHandle,
     hostname: &str,
     port: u32,
     password: &str,
-) -> (CommandChild, oneshot::Receiver<TerminatedPayload>) {
+) -> (CommandChild, oneshot::Receiver<TerminatedPayload>, bool) {
     let (exit_tx, exit_rx) = oneshot::channel::<TerminatedPayload>();
 
     tracing::info!(port, "Spawning sidecar");
 
-    let envs = [
+    let mut envs: Vec<(&str, String)> = vec![
         ("OPENCODE_SERVER_USERNAME", "opencode".to_string()),
         ("OPENCODE_SERVER_PASSWORD", password.to_string()),
     ];
+
+    let anr_mode = detect_anr_config();
+    if anr_mode {
+        tracing::info!("ANR mode enabled for sidecar");
+        envs.push(("OPENCODE_FLAVOR", "anr".to_string()));
+    }
 
     let (events, child) = spawn_command(
         app,
@@ -603,7 +675,7 @@ pub fn serve(
             .instrument(tracing::info_span!("sidecar")),
     );
 
-    (child, exit_rx)
+    (child, exit_rx, anr_mode)
 }
 
 pub mod sqlite_migration {

@@ -8,7 +8,6 @@ import { ProviderAuth } from "../../provider/auth"
 import { mapValues } from "remeda"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
-import { Flag } from "../../flag/flag"
 
 export const ProviderRoutes = lazy(() =>
   new Hono()
@@ -50,14 +49,10 @@ export const ProviderRoutes = lazy(() =>
 
         const connected = await Provider.list()
 
-        // When OPENCODE_API_ENDPOINT is set, ONLY show models from that endpoint
-        // Do not merge with connected providers that have their own authentication
-        const providers = Flag.OPENCODE_API_ENDPOINT
-          ? mapValues(filteredProviders, (x) => Provider.fromModelsDevProvider(x))
-          : Object.assign(
-              mapValues(filteredProviders, (x) => Provider.fromModelsDevProvider(x)),
-              connected,
-            )
+        const providers = Object.assign(
+          mapValues(filteredProviders, (x) => Provider.fromModelsDevProvider(x)),
+          connected,
+        )
 
         return c.json({
           all: Object.values(providers),

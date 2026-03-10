@@ -25,7 +25,7 @@ export interface QuotaCheckResponse {
  */
 export async function checkQuota(config: ANRConfig, request: QuotaCheckRequest): Promise<QuotaCheckResponse> {
   try {
-    const response = await fetch(`${config.quotaApiEndpoint}/check`, {
+    const response = await fetch(`${config.modelsApiEndpoint}/quota/check`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -109,7 +109,7 @@ export async function trackUsage(
   request: Omit<QuotaCheckRequest, "metadata"> & { metadata?: Record<string, unknown> },
 ): Promise<void> {
   try {
-    await fetch(`${config.quotaApiEndpoint}/track`, {
+    await fetch(`${config.modelsApiEndpoint}/quota/track`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
