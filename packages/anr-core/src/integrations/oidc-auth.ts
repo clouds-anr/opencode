@@ -71,6 +71,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
   const authURL = `${baseURL}/login?${params.toString()}`
 
   console.log(`🌐 Opening browser for authentication...`)
+  const isDesktop = process.env.OPENCODE_CLIENT === "desktop"
 
   // Set up callback server
   let callbackCode: string | null = null
@@ -133,8 +134,12 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
     server.listen(redirectPort, "127.0.0.1", async () => {
       serverReady = true
 
-      // Open browser
-      await openBrowser(authURL)
+      // Open browser or signal desktop to open auth window
+      if (isDesktop) {
+        process.stderr.write(`auth-url:${authURL}\n`)
+      } else {
+        await openBrowser(authURL)
+      }
 
       // Wait for callback
       const timeout = 5 * 60 * 1000 // 5 minutes

@@ -454,6 +454,7 @@ async fn initialize(app: AppHandle) {
     // Then in the loading task, we wait for sqlite migration to complete before
     // starting our health check against the server, otherwise long migrations could result in a timeout.
     let needs_sqlite_migration = !sqlite_file_exists();
+    let anr_mode = cli::detect_anr_config();
     let sqlite_done = needs_sqlite_migration.then(|| {
         tracing::info!(
             path = %opencode_db_path().expect("failed to get db path").display(),
@@ -518,6 +519,7 @@ async fn initialize(app: AppHandle) {
 
                             if let Some(err) = err {
                                 let _ = child.kill();
+                                cli::auth_url::close_auth_window(&app);
 
                                 return Err(format!(
                                     "Failed to spawn OpenCode Server ({err}). Logs:\n{}",
@@ -526,6 +528,8 @@ async fn initialize(app: AppHandle) {
                             }
 
                             tracing::info!("CLI health check OK");
+
+                            cli::auth_url::close_auth_window(&app);
 
                             app.state::<ServerState>().set_child(Some(child));
 
@@ -569,15 +573,27 @@ async fn initialize(app: AppHandle) {
     .map_err(|_| ())
     .shared();
 
-    let loading_window = if needs_sqlite_migration
+    // Defer the main window when the loading task will take a while:
+    // - SQLite migration needs to complete first
+    // - ANR mode requires OIDC browser auth before the server starts
+    let defer_main_window = needs_sqlite_migration || anr_mode;
+
+    let loading_window = if defer_main_window
         && timeout(Duration::from_secs(1), loading_task.clone())
             .await
             .is_err()
     {
-        tracing::debug!("Loading task timed out, showing loading window");
-        let loading_window = LoadingWindow::create(&app).expect("Failed to create loading window");
-        sleep(Duration::from_secs(1)).await;
-        Some(loading_window)
+        if needs_sqlite_migration {
+            tracing::debug!("Loading task timed out, showing loading window");
+            let loading_window =
+                LoadingWindow::create(&app).expect("Failed to create loading window");
+            sleep(Duration::from_secs(1)).await;
+            Some(loading_window)
+        } else {
+            // ANR auth: don't show loading window, the auth window is already visible
+            tracing::debug!("ANR auth in progress, deferring main window");
+            None
+        }
     } else {
         tracing::debug!("Showing main window without loading window");
         MainWindow::create(&app).expect("Failed to create main window");

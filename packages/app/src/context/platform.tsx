@@ -86,6 +86,10 @@ export type Platform = {
 
   /** Read image from clipboard (desktop only) */
   readClipboardImage?(): Promise<File | null>
+
+  /** Open a URL in an embedded auth window instead of the system browser (desktop only).
+   *  Returns a function to close the window when auth completes. */
+  openAuthWindow?(url: string): Promise<() => void>
 }
 
 export type DisplayBackend = "auto" | "wayland"

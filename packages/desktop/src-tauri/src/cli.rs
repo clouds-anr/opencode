@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, path::BaseDirectory};
+use tauri::{AppHandle, Manager, WebviewWindowBuilder, path::BaseDirectory};
 use tauri_specta::Event;
 use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, BufReader},
@@ -50,7 +50,7 @@ const ANR_ENV_MARKERS: &[&str] = &["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "
 /// Detect ANR configuration by scanning standard locations for .env files
 /// containing ANR-specific keys. Mirrors the search logic in anr-core's
 /// `loadANRConfig()`: CWD, then `~/.config/opencode-anr/`.
-fn detect_anr_config() -> bool {
+pub fn detect_anr_config() -> bool {
     let home = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         Ok(h) => h,
         Err(_) => return false,
@@ -146,7 +146,9 @@ impl CommandChild {
 }
 
 pub async fn get_config(app: &AppHandle) -> Option<Config> {
-    let (events, _) = spawn_command(app, "debug config", &[]).ok()?;
+    // Explicitly unset OPENCODE_FLAVOR so debug config doesn't trigger ANR auth,
+    // which would try to bind port 8400 and conflict with the serve sidecar.
+    let (events, _) = spawn_command(app, "debug config", &[("OPENCODE_FLAVOR", String::new())]).ok()?;
 
     events
         .fold(String::new(), async |mut config_str, event| {
@@ -597,6 +599,7 @@ pub fn spawn_command(
 
     let event_stream = ReceiverStream::new(rx);
     let event_stream = sqlite_migration::logs_middleware(app.clone(), event_stream);
+    let event_stream = auth_url::logs_middleware(app.clone(), event_stream);
 
     Ok((event_stream, CommandChild { kill: kill_tx }))
 }
@@ -720,6 +723,74 @@ pub mod sqlite_migration {
                 _ => Some(event),
             })
         })
+    }
+}
+
+pub mod auth_url {
+    use super::*;
+
+    pub const WINDOW_LABEL: &str = "auth";
+
+    pub(super) fn logs_middleware(
+        app: AppHandle,
+        stream: impl Stream<Item = CommandEvent>,
+    ) -> impl Stream<Item = CommandEvent> {
+        stream.filter_map(move |event| {
+            future::ready(match &event {
+                CommandEvent::Stderr(s) => {
+                    if let Some(url) = s.strip_prefix("auth-url:").map(|s| s.trim()) {
+                        tracing::info!(%url, "Intercepted auth URL from sidecar");
+                        open_auth_window(&app, url);
+                        None
+                    } else {
+                        Some(event)
+                    }
+                }
+                _ => Some(event),
+            })
+        })
+    }
+
+    fn open_auth_window(app: &AppHandle, url: &str) {
+        if app.get_webview_window(WINDOW_LABEL).is_some() {
+            tracing::warn!("Auth window already exists, skipping");
+            return;
+        }
+
+        let parsed = match tauri::Url::parse(url) {
+            Ok(u) => u,
+            Err(e) => {
+                tracing::error!(%e, "Failed to parse auth URL");
+                return;
+            }
+        };
+
+        match WebviewWindowBuilder::new(
+            app,
+            WINDOW_LABEL,
+            tauri::WebviewUrl::External(parsed),
+        )
+        .title("OpenCode — Sign In")
+        .inner_size(500.0, 700.0)
+        .center()
+        .visible(true)
+        .build()
+        {
+            Ok(window) => {
+                tracing::info!("Auth window created");
+                let _ = window.set_focus();
+            }
+            Err(e) => {
+                tracing::error!(%e, "Failed to create auth window");
+            }
+        }
+    }
+
+    pub fn close_auth_window(app: &AppHandle) {
+        if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
+            tracing::info!("Closing auth window");
+            let _ = window.close();
+        }
     }
 }
 

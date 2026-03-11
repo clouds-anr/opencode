@@ -313,11 +313,27 @@ export function DialogConnectProvider(props: { provider: string }) {
       value: "",
       error: undefined as string | undefined,
     })
+    let closeAuthWindow: (() => void) | undefined
 
     onMount(() => {
       if (store.authorization?.method === "code" && store.authorization?.url) {
-        platform.openLink(store.authorization.url)
+        if (platform.openAuthWindow) {
+          platform
+            .openAuthWindow(store.authorization.url)
+            .then((close) => {
+              closeAuthWindow = close
+            })
+            .catch(() => {
+              platform.openLink(store.authorization!.url!)
+            })
+        } else {
+          platform.openLink(store.authorization.url)
+        }
       }
+    })
+
+    onCleanup(() => {
+      closeAuthWindow?.()
     })
 
     async function handleSubmit(e: SubmitEvent) {
@@ -342,6 +358,7 @@ export function DialogConnectProvider(props: { provider: string }) {
         .then((value) => (value.error ? { ok: false as const, error: value.error } : { ok: true as const }))
         .catch((error) => ({ ok: false as const, error }))
       if (result.ok) {
+        closeAuthWindow?.()
         await complete()
         return
       }
@@ -383,11 +400,23 @@ export function DialogConnectProvider(props: { provider: string }) {
       }
       return instructions
     })
+    let closeAuthWindow: (() => void) | undefined
+
+    onCleanup(() => {
+      closeAuthWindow?.()
+    })
 
     onMount(() => {
       void (async () => {
         if (store.authorization?.url) {
-          platform.openLink(store.authorization.url)
+          if (platform.openAuthWindow) {
+            closeAuthWindow = await platform.openAuthWindow(store.authorization.url).catch(() => {
+              platform.openLink(store.authorization!.url!)
+              return undefined
+            })
+          } else {
+            platform.openLink(store.authorization.url)
+          }
         }
 
         const result = await globalSDK.client.provider.oauth
@@ -401,11 +430,13 @@ export function DialogConnectProvider(props: { provider: string }) {
         if (!alive.value) return
 
         if (!result.ok) {
+          closeAuthWindow?.()
           const message = formatError(result.error, language.t("common.requestFailed"))
           dispatch({ type: "auth.error", error: message })
           return
         }
 
+        closeAuthWindow?.()
         await complete()
       })()
     })

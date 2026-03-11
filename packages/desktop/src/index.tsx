@@ -32,6 +32,7 @@ import "./styles.css"
 import { Channel } from "@tauri-apps/api/core"
 import { commands, ServerReadyData, type InitStep } from "./bindings"
 import { createMenu } from "./menu"
+import { openAuthWindow } from "./auth-window"
 
 const root = document.getElementById("root")
 if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
@@ -400,6 +401,8 @@ const createPlatform = (): Platform => {
         }, "image/png")
       })
     },
+
+    openAuthWindow,
   }
 }
 
