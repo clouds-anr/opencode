@@ -31,7 +31,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYzMjhDQzhBQzc5RkIyRTcKUldUbnNwL0hpc3dvWTUxL0grWDFZR0oxTWdzT2NKakxNQk54aXV2dWVKRmlNbWlzcThVS3RKRHkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzQURCQkZDOEQ2M0Q2OApSV1JvUGRiSXY5czZEYU1saCtDbW5kVWZ0b3dMaVpaRGhUMmwvT3RlUWN5d1ZpblZMRmpuZXp5MQo=",
       "endpoints": ["https://github.com/anomalyco/opencode/releases/latest/download/latest.json"]
     }
   }
