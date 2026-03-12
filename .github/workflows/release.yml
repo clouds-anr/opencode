@@ -2,12 +2,6 @@ name: release
 run-name: "${{ inputs.bump && format('release {0}', inputs.bump) || format('release {0}', github.ref_name) }}"
 
 on:
-  push:
-    branches:
-      - ci
-      - dev
-      - beta
-      - snapshot-*
   workflow_dispatch:
     inputs:
       bump:
