@@ -10,13 +10,7 @@ import { GlobalBus } from "@/bus/global"
 import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
 import type { BunWebSocketData } from "hono/bun"
 import { Flag } from "@/flag/flag"
-import {
-  loadANRConfig,
-  initializeOTEL,
-  shutdownOTEL,
-  reconstructTelemetryContextFromEnv,
-  initializeAuditLogger,
-} from "@opencode-ai/anr-core"
+import { setTimeout as sleep } from "node:timers/promises"
 
 await Log.init({
   print: process.argv.includes("--print-logs"),
@@ -78,7 +72,7 @@ const eventStream = {
   abort: undefined as AbortController | undefined,
 }
 
-const startEventStream = (directory: string) => {
+const startEventStream = (input: { directory: string; workspaceID?: string }) => {
   if (eventStream.abort) eventStream.abort.abort()
   const abort = new AbortController()
   eventStream.abort = abort
@@ -88,12 +82,13 @@ const startEventStream = (directory: string) => {
     const request = new Request(input, init)
     const auth = getAuthorizationHeader()
     if (auth) request.headers.set("Authorization", auth)
-    return Server.App().fetch(request)
+    return Server.Default().fetch(request)
   }) as typeof globalThis.fetch
 
   const sdk = createOpencodeClient({
     baseUrl: "http://opencode.internal",
-    directory,
+    directory: input.directory,
+    experimental_workspaceID: input.workspaceID,
     fetch: fetchFn,
     signal,
   })
@@ -110,7 +105,7 @@ const startEventStream = (directory: string) => {
       ).catch(() => undefined)
 
       if (!events) {
-        await Bun.sleep(250)
+        await sleep(250)
         continue
       }
 
@@ -119,7 +114,7 @@ const startEventStream = (directory: string) => {
       }
 
       if (!signal.aborted) {
-        await Bun.sleep(250)
+        await sleep(250)
       }
     }
   })().catch((error) => {
@@ -129,7 +124,7 @@ const startEventStream = (directory: string) => {
   })
 }
 
-startEventStream(process.cwd())
+startEventStream({ directory: process.cwd() })
 
 export const rpc = {
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
@@ -143,7 +138,7 @@ export const rpc = {
       headers,
       body: input.body,
     })
-    const response = await Server.App().fetch(request)
+    const response = await Server.Default().fetch(request)
     const body = await response.text()
     return {
       status: response.status,
@@ -169,29 +164,13 @@ export const rpc = {
     Config.global.reset()
     await Instance.disposeAll()
   },
-  async updateCredentials(input: {
-    accessKeyId: string
-    secretAccessKey: string
-    sessionToken: string
-    idToken?: string
-  }) {
-    process.env.AWS_ACCESS_KEY_ID = input.accessKeyId
-    process.env.AWS_SECRET_ACCESS_KEY = input.secretAccessKey
-    process.env.AWS_SESSION_TOKEN = input.sessionToken
-    if (input.idToken) process.env.OPENCODE_ANR_ID_TOKEN = input.idToken
-    Log.Default.info("worker credentials updated")
+  async setWorkspace(input: { workspaceID?: string }) {
+    startEventStream({ directory: process.cwd(), workspaceID: input.workspaceID })
   },
   async shutdown() {
     Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
-    // Flush any pending OTEL metrics before shutting down
-    await shutdownOTEL().catch(() => {})
-    await Promise.race([
-      Instance.disposeAll(),
-      new Promise((resolve) => {
-        setTimeout(resolve, 5000)
-      }),
-    ])
+    await Instance.disposeAll()
     if (server) server.stop(true)
   },
 }
