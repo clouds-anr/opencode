@@ -110,10 +110,10 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-latest
-            target: x86_64-apple-darwin
-          - host: macos-latest
-            target: aarch64-apple-darwin
+          # - host: macos-latest
+          #   target: x86_64-apple-darwin
+          # - host: macos-latest
+          #   target: aarch64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
           - host: ubuntu-latest
@@ -126,25 +126,25 @@ jobs:
         with:
           fetch-tags: true
 
-      - uses: apple-actions/import-codesign-certs@v2
-        if: runner.os == 'macOS'
-        with:
-          keychain: build
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      # - uses: apple-actions/import-codesign-certs@v2
+      #   if: runner.os == 'macOS'
+      #   with:
+      #     keychain: build
+      #     p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+      #     p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
-      - name: Verify Certificate
-        if: runner.os == 'macOS'
-        run: |
-          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
-          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
-          echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
-          echo "Certificate imported."
+      # - name: Verify Certificate
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
+      #     CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+      #     echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
+      #     echo "Certificate imported."
 
-      - name: Setup Apple API Key
-        if: runner.os == 'macOS'
-        run: |
-          echo "${{ secrets.APPLE_API_KEY_PATH }}" > $RUNNER_TEMP/apple-api-key.p8
+      # - name: Setup Apple API Key
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     echo "${{ secrets.APPLE_API_KEY_PATH }}" > $RUNNER_TEMP/apple-api-key.p8
 
       - uses: ./.github/actions/setup-bun
 
