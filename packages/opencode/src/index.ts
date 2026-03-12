@@ -579,12 +579,22 @@ export async function main(argv?: string[]) {
     // Most notably, some docker-container-based MCP servers don't handle such signals unless
     // run using `docker run --init`.
     // Explicitly exit to avoid any hanging subprocesses.
+    //
+    // Skip forced exit for long-running server commands (serve, web, workspace-serve).
+    // Yargs can resolve cli.parse() before the command handler's promise settles,
+    // causing the finally block to run while the server is still active.
+    const args = argv ?? hideBin(process.argv)
+    const command = args[args.findIndex((a) => !a.startsWith("-"))]
+    if (command === "serve" || command === "web" || command === "workspace-serve") return
     process.exit()
   }
 }
 
-// If run directly (not imported), execute main
-if (import.meta.main) {
+// Run main when executed directly. In compiled binaries built with
+// conditions:["browser"], import.meta.main is false, so also check for
+// the build-time OPENCODE_VERSION constant which is only defined in
+// compiled builds.
+if (import.meta.main || typeof OPENCODE_VERSION === "string") {
   main().catch((error) => {
     console.error("❌ Fatal error:", error)
     process.exit(1)

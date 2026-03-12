@@ -529,7 +529,10 @@ async fn initialize(app: AppHandle) {
 
                             tracing::info!("CLI health check OK");
 
-                            cli::auth_url::close_auth_window(&app);
+                            // Don't close the auth window here — on Windows, closing the
+                            // last window triggers Tauri's RunEvent::Exit before the main
+                            // window is created.  The auth window is closed later, after
+                            // MainWindow::create.
 
                             app.state::<ServerState>().set_child(Some(child));
 
@@ -613,6 +616,10 @@ async fn initialize(app: AppHandle) {
     }
 
     MainWindow::create(&app).expect("Failed to create main window");
+
+    // Close the auth window (if any) now that the main window exists, so there
+    // is never a moment with zero windows (which triggers Tauri exit on Windows).
+    cli::auth_url::close_auth_window(&app);
 
     if let Some(loading_window) = loading_window {
         let _ = loading_window.close();
