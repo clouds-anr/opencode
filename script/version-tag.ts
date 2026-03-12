@@ -68,7 +68,7 @@ const output = [`version=${version}`]
 
 if (!preview) {
   const previous = await getLatestRelease()
-  const notes = await buildNotes(previous, "HEAD")
+  const notes = previous ? await buildNotes(previous, "HEAD") : ["Initial release"]
   const body = notes.join("\n") || "No notable changes"
   const dir = process.env.RUNNER_TEMP ?? "/tmp"
   const file = `${dir}/opencode-release-notes.txt`

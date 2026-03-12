@@ -155,7 +155,7 @@ export function Titlebar() {
 
   return (
     <header
-      class="h-10 shrink-0 bg-background-base relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center"
+      class="h-10 shrink-0 bg-background-base relative z-10 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center"
       style={{ "min-height": minHeight() }}
       onMouseDown={drag}
       onDblClick={maximize}

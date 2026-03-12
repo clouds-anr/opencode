@@ -32,7 +32,7 @@ export async function getLatestRelease(skip?: string) {
     return tag
   }
 
-  throw new Error("No releases found")
+  return null
 }
 
 type Commit = {
@@ -303,7 +303,7 @@ Examples:
   }
 
   const to = values.to!
-  const from = values.from ?? (await getLatestRelease())
+  const from = values.from ?? (await getLatestRelease()) ?? "0.0.0"
 
   console.log(`Generating changelog: v${from} -> ${to}\n`)
 
