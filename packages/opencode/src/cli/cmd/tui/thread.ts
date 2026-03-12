@@ -1,6 +1,7 @@
 import { cmd } from "@/cli/cmd/cmd"
 import { tui } from "./app"
 import { quotaInfo } from "@/index"
+import { onRefresh as onANRCredentialRefresh } from "@/auth/anr-refresh"
 import { Rpc } from "@/util/rpc"
 import { type rpc } from "./worker"
 import path from "path"
@@ -129,6 +130,14 @@ export const TuiThreadCommand = cmd({
       process.on("unhandledRejection", (e) => {
         Log.Default.error(e)
       })
+
+      // Propagate credential refreshes to the worker in ANR mode
+      if (process.env.OPENCODE_FLAVOR === "anr") {
+        onANRCredentialRefresh((creds) => {
+          client.call("updateCredentials", creds).catch(() => {})
+        })
+      }
+
       process.on("SIGUSR2", async () => {
         await client.call("reload", undefined)
       })

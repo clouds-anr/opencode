@@ -38,6 +38,7 @@ import { Database } from "./storage/db"
 import {
   getValidatedANRConfig,
   authenticateWithOIDC,
+  refreshOIDCTokens,
   exchangeTokenForAWSCredentials,
   initializeOTEL,
   shutdownOTEL,
@@ -75,6 +76,9 @@ export let quotaInfo: {
   warningColor: "green" | "yellow" | "red"
   allowed: boolean
 } | null = null
+
+// ANR credential refresh (dedicated module to avoid circular imports)
+import * as ANRRefresh from "./auth/anr-refresh"
 
 /**
  * Detect terminal type based on environment variables
@@ -161,7 +165,9 @@ async function initializeANR(): Promise<void> {
   console.error("✅ Authenticated\n")
   console.error("📍 Debug: Received tokens from OIDC")
   console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
-  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}\n`)
+  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
+  console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
+  console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s\n`)
 
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
@@ -173,7 +179,8 @@ async function initializeANR(): Promise<void> {
   console.error("📍 Debug: AWS credentials exchanged")
   console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
   console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
-  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}\n`)
+  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
+  console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}\n`)
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -181,6 +188,50 @@ async function initializeANR(): Promise<void> {
   process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
   process.env.AWS_REGION = config.awsRegion
   delete process.env.AWS_PROFILE // Avoid credential conflicts
+
+  // Initialize credential refresh state and schedule proactive refresh
+  let currentRefreshToken = tokens.refreshToken
+  ANRRefresh.init({
+    stsExpiration: awsCredentials.expiration?.getTime(),
+    async refresh() {
+      let refreshedTokens
+
+      // Try silent refresh first
+      if (currentRefreshToken) {
+        try {
+          refreshedTokens = await refreshOIDCTokens(config, currentRefreshToken)
+          console.error("🔄 Silently refreshed OIDC tokens")
+        } catch {
+          console.error("🔄 Silent token refresh failed, opening browser for re-authentication...")
+          refreshedTokens = await authenticateWithOIDC(config)
+        }
+      } else {
+        console.error("🔄 No refresh token available, opening browser for re-authentication...")
+        refreshedTokens = await authenticateWithOIDC(config)
+      }
+
+      // Exchange new ID token for AWS credentials
+      const creds = await exchangeTokenForAWSCredentials(refreshedTokens.idToken, config)
+      currentRefreshToken = refreshedTokens.refreshToken ?? currentRefreshToken
+
+      console.error("✅ AWS credentials refreshed successfully")
+      return {
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+        sessionToken: creds.sessionToken,
+        idToken: refreshedTokens.idToken,
+        expiration: creds.expiration,
+        refreshToken: refreshedTokens.refreshToken,
+      }
+    },
+  })
+
+  if (awsCredentials.expiration) {
+    const minutesUntilExpiry = Math.round((awsCredentials.expiration.getTime() - Date.now()) / 60000)
+    console.error(
+      `🔄 Credential refresh scheduled ~${Math.max(0, minutesUntilExpiry - 5)} min from now (credentials expire in ${minutesUntilExpiry} min)`,
+    )
+  }
 
   console.error("📍 Debug: Credentials set in environment")
   console.error(`   - AWS_ACCESS_KEY_ID set: ${!!process.env.AWS_ACCESS_KEY_ID}`)

@@ -53,10 +53,12 @@ if (process.env.OPENCODE_FLAVOR === "anr") {
   }
 
   // Audit logger: so logTokenUsage calls from processor.ts write to DynamoDB
-  if (process.env.OPENCODE_ENABLE_AUDIT !== "0" &&
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY &&
-      process.env.AWS_SESSION_TOKEN) {
+  if (
+    process.env.OPENCODE_ENABLE_AUDIT !== "0" &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY &&
+    process.env.AWS_SESSION_TOKEN
+  ) {
     initializeAuditLogger(config, {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -166,6 +168,18 @@ export const rpc = {
   async reload() {
     Config.global.reset()
     await Instance.disposeAll()
+  },
+  async updateCredentials(input: {
+    accessKeyId: string
+    secretAccessKey: string
+    sessionToken: string
+    idToken?: string
+  }) {
+    process.env.AWS_ACCESS_KEY_ID = input.accessKeyId
+    process.env.AWS_SECRET_ACCESS_KEY = input.secretAccessKey
+    process.env.AWS_SESSION_TOKEN = input.sessionToken
+    if (input.idToken) process.env.OPENCODE_ANR_ID_TOKEN = input.idToken
+    Log.Default.info("worker credentials updated")
   },
   async shutdown() {
     Log.Default.info("worker shutting down")
