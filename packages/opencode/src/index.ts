@@ -5,8 +5,7 @@ import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
 import { GenerateCommand } from "./cli/cmd/generate"
 import { Log } from "./util/log"
-import { LoginCommand, LogoutCommand, SwitchCommand, OrgsCommand } from "./cli/cmd/account"
-import { ProvidersCommand } from "./cli/cmd/providers"
+import { AuthCommand } from "./cli/cmd/auth"
 import { AgentCommand } from "./cli/cmd/agent"
 import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
@@ -397,37 +396,30 @@ process.on("uncaughtException", (e) => {
   })
 })
 
-// Ensure the process exits on terminal hangup (eg. closing the terminal tab).
-// Without this, long-running commands like `serve` block on a never-resolving
-// promise and survive as orphaned processes.
-process.on("SIGHUP", () => process.exit())
+/**
+ * Main CLI function
+ * Pass argv to test/override, or undefined to use process.argv
+ */
+export async function main(argv?: string[]) {
+  // Check if running in ANR mode
+  const anrMode =
+    process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
 
-let cli = yargs(hideBin(process.argv))
-  .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
-  .wrap(100)
-  .help("help", "show help")
-  .alias("help", "h")
-  .version("version", "show version number", Installation.VERSION)
-  .alias("version", "v")
-  .option("print-logs", {
-    describe: "print logs to stderr",
-    type: "boolean",
-  })
-  .option("log-level", {
-    describe: "log level",
-    type: "string",
-    choices: ["DEBUG", "INFO", "WARN", "ERROR"],
-  })
-  .middleware(async (opts) => {
-    await Log.init({
-      print: process.argv.includes("--print-logs"),
-      dev: Installation.isLocal(),
-      level: (() => {
-        if (opts.logLevel) return opts.logLevel as Log.Level
-        if (Installation.isLocal()) return "DEBUG"
-        return "INFO"
-      })(),
+  if (anrMode) {
+    await initializeANR()
+  }
+
+  let cli = yargs(argv ?? hideBin(process.argv))
+    .parserConfiguration({ "populate--": true })
+    .scriptName("opencode")
+    .wrap(100)
+    .help("help", "show help")
+    .alias("help", "h")
+    .version("version", "show version number", Installation.VERSION)
+    .alias("version", "v")
+    .option("print-logs", {
+      describe: "print logs to stderr",
+      type: "boolean",
     })
     .option("log-level", {
       describe: "log level",
@@ -490,36 +482,30 @@ let cli = yargs(hideBin(process.argv))
         }
         process.stderr.write("Database migration complete." + EOL)
       }
-      process.stderr.write("Database migration complete." + EOL)
-    }
-  })
-  .usage("\n" + UI.logo())
-  .completion("completion", "generate shell completion script")
-  .command(AcpCommand)
-  .command(McpCommand)
-  .command(TuiThreadCommand)
-  .command(AttachCommand)
-  .command(RunCommand)
-  .command(GenerateCommand)
-  .command(DebugCommand)
-  .command(LoginCommand)
-  .command(LogoutCommand)
-  .command(SwitchCommand)
-  .command(OrgsCommand)
-  .command(ProvidersCommand)
-  .command(AgentCommand)
-  .command(UpgradeCommand)
-  .command(UninstallCommand)
-  .command(ServeCommand)
-  .command(WebCommand)
-  .command(ModelsCommand)
-  .command(StatsCommand)
-  .command(ExportCommand)
-  .command(ImportCommand)
-  .command(GithubCommand)
-  .command(PrCommand)
-  .command(SessionCommand)
-  .command(DbCommand)
+    })
+    .usage("\n" + UI.logo())
+    .completion("completion", "generate shell completion script")
+    .command(AcpCommand)
+    .command(McpCommand)
+    .command(TuiThreadCommand)
+    .command(AttachCommand)
+    .command(RunCommand)
+    .command(GenerateCommand)
+    .command(DebugCommand)
+    .command(AuthCommand)
+    .command(AgentCommand)
+    .command(UpgradeCommand)
+    .command(UninstallCommand)
+    .command(ServeCommand)
+    .command(WebCommand)
+    .command(ModelsCommand)
+    .command(StatsCommand)
+    .command(ExportCommand)
+    .command(ImportCommand)
+    .command(GithubCommand)
+    .command(PrCommand)
+    .command(SessionCommand)
+    .command(DbCommand)
 
   if (Installation.isLocal()) {
     cli = cli.command(WorkspaceServeCommand)
