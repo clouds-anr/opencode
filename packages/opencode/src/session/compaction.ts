@@ -153,8 +153,8 @@ export namespace SessionCompaction {
         reasoning: 0,
         cache: { read: 0, write: 0 },
       },
-      modelID: model.id,
-      providerID: model.providerID,
+      modelID: ModelID.make(model.id),
+      providerID: ProviderID.make(model.providerID),
       time: {
         created: Date.now(),
       },

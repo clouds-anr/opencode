@@ -194,6 +194,10 @@ export const rpc = {
     ])
     if (server) server.stop(true)
   },
+  async setWorkspace(input: { workspaceID?: string }) {
+    // Restart the event stream for the new workspace
+    startEventStream(input.workspaceID ?? process.cwd())
+  },
 }
 
 Rpc.listen(rpc)
