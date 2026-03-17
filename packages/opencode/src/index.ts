@@ -55,6 +55,7 @@ import {
 } from "@opencode-ai/anr-core"
 import { randomUUID } from "crypto"
 import { platform, arch, release } from "os"
+import { existsSync, readdirSync, readFileSync } from "fs"
 
 // ANR mode state (when running with OPENCODE_FLAVOR=anr)
 let anrContext: {
@@ -396,11 +397,40 @@ process.on("uncaughtException", (e) => {
   })
 })
 
+const ANR_MARKERS = ["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "IDENTITY_POOL_ID"]
+
+function detectANR(): boolean {
+  if (process.env.OPENCODE_FLAVOR === "anr") return true
+  const home = process.env.HOME || process.env.USERPROFILE
+  if (!home) return false
+  const dirs = [process.cwd(), path.join(home, ".config", "opencode-anr")]
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue
+    for (const name of readdirSync(dir)) {
+      if (name !== ".env" && !name.startsWith(".env.")) continue
+      try {
+        const content = readFileSync(path.join(dir, name), "utf-8")
+        const found = content.split("\n").some((line: string) => {
+          const trimmed = line.trim()
+          return ANR_MARKERS.some((m) => trimmed.startsWith(m))
+        })
+        if (found) return true
+      } catch {}
+    }
+  }
+  return false
+}
+
 /**
  * Main CLI function
  * Pass argv to test/override, or undefined to use process.argv
  */
 export async function main(argv?: string[]) {
+  // Auto-detect ANR mode from .env files if not already set
+  if (!process.env.OPENCODE_FLAVOR && detectANR()) {
+    process.env.OPENCODE_FLAVOR = "anr"
+  }
+
   // Check if running in ANR mode
   const anrMode =
     process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")

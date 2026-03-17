@@ -154,6 +154,13 @@ export const TuiThreadCommand = cmd({
       process.on("unhandledRejection", error)
       process.on("SIGUSR2", reload)
 
+      // Propagate credential refreshes to the worker in ANR mode
+      if (process.env.OPENCODE_FLAVOR === "anr") {
+        onANRCredentialRefresh((creds) => {
+          client.call("updateCredentials", creds).catch(() => {})
+        })
+      }
+
       let stopped = false
       const stop = async () => {
         if (stopped) return
@@ -207,6 +214,7 @@ export const TuiThreadCommand = cmd({
           directory: cwd,
           fetch: transport.fetch,
           events: transport.events,
+          quotaInfo: quotaInfo || undefined,
           args: {
             continue: args.continue,
             sessionID: args.session,

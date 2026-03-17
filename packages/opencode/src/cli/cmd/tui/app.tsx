@@ -114,6 +114,7 @@ export function tui(input: {
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
+  quotaInfo?: QuotaInfo
 }) {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {

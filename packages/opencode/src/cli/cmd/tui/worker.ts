@@ -88,7 +88,7 @@ const startEventStream = (directory: string) => {
     const request = new Request(input, init)
     const auth = getAuthorizationHeader()
     if (auth) request.headers.set("Authorization", auth)
-    return Server.App().fetch(request)
+    return Server.Default().fetch(request)
   }) as typeof globalThis.fetch
 
   const sdk = createOpencodeClient({
@@ -143,7 +143,7 @@ export const rpc = {
       headers,
       body: input.body,
     })
-    const response = await Server.App().fetch(request)
+    const response = await Server.Default().fetch(request)
     const body = await response.text()
     return {
       status: response.status,
