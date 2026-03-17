@@ -77,9 +77,10 @@ if (!preview) {
   const release = await $`gh release view v${version} --json tagName,databaseId`.json()
   output.push(`release=${release.databaseId}`)
   output.push(`tag=${release.tagName}`)
-} else if (resolvedChannel === "beta") {
-  await $`gh release create v${version} -d --title "v${version}" --repo ${process.env.GH_REPO}`
-  const release = await $`gh release view v${version} --json tagName,databaseId --repo ${process.env.GH_REPO}`.json()
+} else {
+  const repo = process.env.GH_REPO
+  await $`gh release create v${version} -d --prerelease --title "v${version}" --notes "Preview release ${version}" --repo ${repo}`
+  const release = await $`gh release view v${version} --json tagName,databaseId --repo ${repo}`.json()
   output.push(`release=${release.databaseId}`)
   output.push(`tag=${release.tagName}`)
 }
