@@ -1970,7 +1970,7 @@ export default function Layout(props: ParentProps) {
           data-component="sidebar-nav-desktop"
           classList={{
             "hidden xl:block": true,
-            "relative shrink-0": true,
+            "relative z-[1] shrink-0": true,
           }}
           style={{ width: layout.sidebar.opened() ? `${Math.max(layout.sidebar.width(), 244)}px` : "64px" }}
           ref={(el) => {
