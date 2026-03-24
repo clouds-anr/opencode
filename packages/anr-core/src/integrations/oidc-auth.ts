@@ -15,6 +15,8 @@ const execAsync = promisify(exec)
 export interface OIDCTokens {
   idToken: string
   accessToken: string
+  refreshToken?: string
+  expiresIn?: number
 }
 
 function generateRandomString(bytes: number): string {
@@ -192,7 +194,12 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
           throw new Error(`Token request failed: ${res.statusText}`)
         }
 
-        const data = (await res.json()) as { id_token?: string; access_token?: string }
+        const data = (await res.json()) as {
+          id_token?: string
+          access_token?: string
+          refresh_token?: string
+          expires_in?: number
+        }
 
         if (!data.id_token) {
           throw new Error("No ID token in response")
@@ -202,6 +209,8 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
         resolve({
           idToken: data.id_token,
           accessToken: data.access_token || "",
+          refreshToken: data.refresh_token,
+          expiresIn: data.expires_in,
         })
       } catch (err) {
         server.close()
@@ -213,4 +222,48 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
       reject(err)
     })
   })
+}
+
+/**
+ * Refresh OIDC tokens using a refresh token (no browser needed)
+ */
+export async function refreshOIDCTokens(config: ANRConfig, refreshToken: string): Promise<OIDCTokens> {
+  const baseURL = `https://${config.providerDomain}`
+  const tokenURL = `${baseURL}/oauth2/token`
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: config.clientId,
+    refresh_token: refreshToken,
+  })
+
+  const res = await fetch(tokenURL, {
+    method: "POST",
+    body: body.toString(),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Token refresh failed: ${res.status} ${res.statusText}`)
+  }
+
+  const data = (await res.json()) as {
+    id_token?: string
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+  }
+
+  if (!data.id_token) {
+    throw new Error("No ID token in refresh response")
+  }
+
+  return {
+    idToken: data.id_token,
+    accessToken: data.access_token || "",
+    refreshToken: data.refresh_token ?? refreshToken,
+    expiresIn: data.expires_in,
+  }
 }

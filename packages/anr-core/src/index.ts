@@ -8,14 +8,20 @@ export { type ANRConfig, defaultConfig } from "./config/types"
 export { loadANRConfig, getValidatedANRConfig, validateANRConfig } from "./config/env-loader"
 
 // Authentication
-export { authenticateWithOIDC, type OIDCTokens } from "./integrations/oidc-auth"
+export { authenticateWithOIDC, refreshOIDCTokens, type OIDCTokens } from "./integrations/oidc-auth"
 export { exchangeTokenForAWSCredentials } from "./integrations/aws-federation"
-export { authenticateWithCognito, areCredentialsExpired, ensureValidCredentials, setAWSCredentialsEnv, type CognitoCredentials } from "./integrations/cognito-sso"
+export {
+  authenticateWithCognito,
+  areCredentialsExpired,
+  ensureValidCredentials,
+  setAWSCredentialsEnv,
+  type CognitoCredentials,
+} from "./integrations/cognito-sso"
 
 // Telemetry & Observability
-export { 
-  initializeOTEL, 
-  shutdownOTEL, 
+export {
+  initializeOTEL,
+  shutdownOTEL,
   registerOTELShutdownHandlers,
   getMeter,
   trackCommand,
@@ -42,8 +48,32 @@ export { reconstructTelemetryContextFromEnv, isUnderANRWrapper } from "./integra
 export { runOTELTestHarness, type TestHarnessResult } from "./util/otel-test-harness"
 
 // Quota
-export { checkQuota, getWarningColor, type QuotaPolicy, type QuotaUsage, type QuotaCheckRequest, type QuotaCheckResponse } from "./integrations/quota"
+export {
+  checkQuota,
+  getWarningColor,
+  type QuotaPolicy,
+  type QuotaUsage,
+  type QuotaCheckRequest,
+  type QuotaCheckResponse,
+} from "./integrations/quota"
 
 // Middleware
-export { initializeAuditLogger, logAuditEvent, logAuthEvent, logSessionStart, logSessionEnd, logCommandExecution, logTokenUsage, logAPICall, logQuotaCheck, type AuditEvent } from "./middleware/audit-logger"
-export { detectDependenciesFromCode, checkInstalledDependencies, getMissingDependencies, generateInstallCommand, type Dependency } from "./middleware/dependency-detector"
+export {
+  initializeAuditLogger,
+  logAuditEvent,
+  logAuthEvent,
+  logSessionStart,
+  logSessionEnd,
+  logCommandExecution,
+  logTokenUsage,
+  logAPICall,
+  logQuotaCheck,
+  type AuditEvent,
+} from "./middleware/audit-logger"
+export {
+  detectDependenciesFromCode,
+  checkInstalledDependencies,
+  getMissingDependencies,
+  generateInstallCommand,
+  type Dependency,
+} from "./middleware/dependency-detector"

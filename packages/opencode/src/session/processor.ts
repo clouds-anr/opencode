@@ -2,6 +2,8 @@ import { MessageV2 } from "./message-v2"
 import { Log } from "@/util/log"
 import { Identifier } from "@/id/id"
 import { Session } from "."
+import { SessionID, PartID } from "./schema"
+import { ProviderID } from "@/provider/schema"
 import { Agent } from "@/agent/agent"
 import { Snapshot } from "@/snapshot"
 import { SessionSummary } from "./summary"
@@ -16,17 +18,40 @@ import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
 import { trackModelCall, getTelemetryContext, logTokenUsage } from "@opencode-ai/anr-core"
+import { refresh as refreshANRCredentials } from "@/auth/anr-refresh"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
   const log = Log.create({ service: "session.processor" })
+
+  const EXPIRED_TOKEN_PATTERNS = [
+    /ExpiredToken/i,
+    /expired.*token/i,
+    /token.*expired/i,
+    /security token.*expired/i,
+    /request has expired/i,
+    /credentials have expired/i,
+    /UnrecognizedClientException/i,
+  ]
+
+  function isExpiredTokenError(e: unknown): boolean {
+    const message = e instanceof Error ? e.message : String(e)
+    if (EXPIRED_TOKEN_PATTERNS.some((p) => p.test(message))) return true
+    // Check responseBody for APICallError
+    if (typeof (e as any)?.responseBody === "string") {
+      if (EXPIRED_TOKEN_PATTERNS.some((p) => p.test((e as any).responseBody))) return true
+    }
+    // Check status code — 403 with credential-related errors
+    if ((e as any)?.statusCode === 403 && /credential|token|security/i.test(message)) return true
+    return false
+  }
 
   export type Info = Awaited<ReturnType<typeof create>>
   export type Result = Awaited<ReturnType<Info["process"]>>
 
   export function create(input: {
     assistantMessage: MessageV2.Assistant
-    sessionID: string
+    sessionID: SessionID
     model: Provider.Model
     abort: AbortSignal
   }) {
@@ -77,7 +102,7 @@ export namespace SessionProcessor {
                     continue
                   }
                   const reasoningPart = {
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "reasoning" as const,
@@ -123,7 +148,7 @@ export namespace SessionProcessor {
 
                 case "tool-input-start":
                   const part = await Session.updatePart({
-                    id: toolcalls[value.id]?.id ?? Identifier.ascending("part"),
+                    id: toolcalls[value.id]?.id ?? PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "tool",
@@ -246,7 +271,7 @@ export namespace SessionProcessor {
                 case "start-step":
                   snapshot = await Snapshot.track()
                   await Session.updatePart({
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.sessionID,
                     snapshot,
@@ -306,7 +331,7 @@ export namespace SessionProcessor {
                   }
 
                   await Session.updatePart({
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     reason: value.finishReason,
                     snapshot: await Snapshot.track(),
                     messageID: input.assistantMessage.id,
@@ -320,7 +345,7 @@ export namespace SessionProcessor {
                     const patch = await Snapshot.patch(snapshot)
                     if (patch.files.length) {
                       await Session.updatePart({
-                        id: Identifier.ascending("part"),
+                        id: PartID.ascending(),
                         messageID: input.assistantMessage.id,
                         sessionID: input.sessionID,
                         type: "patch",
@@ -344,7 +369,7 @@ export namespace SessionProcessor {
 
                 case "text-start":
                   currentText = {
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "text",
@@ -410,7 +435,26 @@ export namespace SessionProcessor {
               error: e,
               stack: JSON.stringify(e.stack),
             })
-            const error = MessageV2.fromError(e, { providerID: input.model.providerID })
+
+            // In ANR mode, detect expired STS token errors and attempt credential refresh
+            if (process.env.OPENCODE_FLAVOR === "anr" && isExpiredTokenError(e)) {
+              log.info("detected expired token, attempting credential refresh")
+              SessionStatus.set(input.sessionID, {
+                type: "retry",
+                attempt: attempt + 1,
+                message: "Refreshing expired credentials...",
+                next: Date.now() + 5000,
+              })
+              const refreshed = await refreshANRCredentials()
+              if (refreshed) {
+                attempt++
+                log.info("credentials refreshed, retrying request")
+                continue
+              }
+              log.error("credential refresh failed")
+            }
+
+            const error = MessageV2.fromError(e, { providerID: ProviderID.make(input.model.providerID) })
             if (MessageV2.ContextOverflowError.isInstance(error)) {
               needsCompaction = true
               Bus.publish(Session.Event.Error, {
@@ -443,7 +487,7 @@ export namespace SessionProcessor {
             const patch = await Snapshot.patch(snapshot)
             if (patch.files.length) {
               await Session.updatePart({
-                id: Identifier.ascending("part"),
+                id: PartID.ascending(),
                 messageID: input.assistantMessage.id,
                 sessionID: input.sessionID,
                 type: "patch",

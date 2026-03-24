@@ -10,6 +10,7 @@ import { Log } from "../util/log"
 import { BunProc } from "../bun"
 import { Plugin } from "../plugin"
 import { ModelsDev } from "./models"
+import { ProviderID, ModelID } from "./schema"
 import { NamedError } from "@opencode-ai/util/error"
 import { Auth } from "../auth"
 import { Env } from "../env"
@@ -236,7 +237,7 @@ export namespace Provider {
         hasSessionToken: !!awsSessionToken,
         profile: profile || "(none)",
         region: defaultRegion,
-        accessKeyIdPrefix: awsAccessKeyId ? awsAccessKeyId.substring(0, 8) + "..." : "(none)"
+        accessKeyIdPrefix: awsAccessKeyId ? awsAccessKeyId.substring(0, 8) + "..." : "(none)",
       })
 
       // TODO: Using process.env directly because Env.set only updates a process.env shallow copy,
@@ -275,20 +276,20 @@ export namespace Provider {
           log.info("Bedrock: Using fromEnv() credential provider (ANR mode)", {
             hasAccessKeyId: !!awsAccessKeyId,
             hasSessionToken: !!Env.get("AWS_SESSION_TOKEN"),
-            region: defaultRegion
+            region: defaultRegion,
           })
           providerOptions.credentialProvider = fromEnv()
         } else {
           const credentialProviderOptions = profile ? { profile } : {}
           log.info("Bedrock: Using fromNodeProviderChain() credential provider", {
             profile: profile || "(none)",
-            region: defaultRegion
+            region: defaultRegion,
           })
           providerOptions.credentialProvider = fromNodeProviderChain(credentialProviderOptions)
         }
       } else {
         log.info("Bedrock: Using bearer token authentication", {
-          region: defaultRegion
+          region: defaultRegion,
         })
       }
 
@@ -303,7 +304,7 @@ export namespace Provider {
       if (!providerOptions.baseURL) {
         providerOptions.baseURL = `https://bedrock-runtime.${defaultRegion}.amazonaws.com`
         log.info("Bedrock: Setting explicit runtime endpoint", {
-          baseURL: providerOptions.baseURL
+          baseURL: providerOptions.baseURL,
         })
       }
 
@@ -1317,7 +1318,7 @@ export namespace Provider {
   }
 
   const priority = ["gpt-5", "claude-sonnet-4", "big-pickle", "gemini-3-pro"]
-  export function sort(models: Model[]) {
+  export function sort<T extends { id: string }>(models: T[]) {
     return sortBy(
       models,
       [(model) => priority.findIndex((filter) => model.id.includes(filter)), "desc"],
@@ -1340,7 +1341,7 @@ export namespace Provider {
       const provider = providers[entry.providerID]
       if (!provider) continue
       if (!provider.models[entry.modelID]) continue
-      return { providerID: entry.providerID, modelID: entry.modelID }
+      return { providerID: ProviderID.make(entry.providerID), modelID: ModelID.make(entry.modelID) }
     }
 
     const provider = Object.values(providers).find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id))
@@ -1348,16 +1349,16 @@ export namespace Provider {
     const [model] = sort(Object.values(provider.models))
     if (!model) throw new Error("no models found")
     return {
-      providerID: provider.id,
-      modelID: model.id,
+      providerID: ProviderID.make(provider.id),
+      modelID: ModelID.make(model.id),
     }
   }
 
   export function parseModel(model: string) {
     const [providerID, ...rest] = model.split("/")
     return {
-      providerID: providerID,
-      modelID: rest.join("/"),
+      providerID: ProviderID.make(providerID),
+      modelID: ModelID.make(rest.join("/")),
     }
   }
 

@@ -38,6 +38,7 @@ import { Database } from "./storage/db"
 import {
   getValidatedANRConfig,
   authenticateWithOIDC,
+  refreshOIDCTokens,
   exchangeTokenForAWSCredentials,
   initializeOTEL,
   shutdownOTEL,
@@ -54,6 +55,7 @@ import {
 } from "@opencode-ai/anr-core"
 import { randomUUID } from "crypto"
 import { platform, arch, release } from "os"
+import { existsSync, readdirSync, readFileSync } from "fs"
 
 // ANR mode state (when running with OPENCODE_FLAVOR=anr)
 let anrContext: {
@@ -75,6 +77,9 @@ export let quotaInfo: {
   warningColor: "green" | "yellow" | "red"
   allowed: boolean
 } | null = null
+
+// ANR credential refresh (dedicated module to avoid circular imports)
+import * as ANRRefresh from "./auth/anr-refresh"
 
 /**
  * Detect terminal type based on environment variables
@@ -148,6 +153,7 @@ async function initializeANR(): Promise<void> {
   clearOTELLogs()
 
   console.error("\n🚀 OpenCode ANR\n")
+  process.stderr.write("")
 
   // Load configuration
   const config = await getValidatedANRConfig(undefined, false)
@@ -157,23 +163,44 @@ async function initializeANR(): Promise<void> {
 
   // Authenticate with OIDC
   console.error("🔐 Authenticating...")
-  const tokens = await authenticateWithOIDC(config)
+  process.stderr.write("")
+  let tokens
+  try {
+    tokens = await authenticateWithOIDC(config)
+  } catch (err) {
+    console.error("❌ Authentication failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
   console.error("✅ Authenticated\n")
+  process.stderr.write("")
   console.error("📍 Debug: Received tokens from OIDC")
   console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
-  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}\n`)
+  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
+  console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
+  console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s\n`)
+  process.stderr.write("")
 
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
 
   // Exchange token for AWS credentials
   console.error("💱 Exchanging token for AWS credentials...")
-  const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  process.stderr.write("")
+  let awsCredentials
+  try {
+    awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  } catch (err) {
+    console.error("❌ AWS credential exchange failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
   console.error("✅ AWS credentials obtained\n")
+  process.stderr.write("")
   console.error("📍 Debug: AWS credentials exchanged")
   console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
   console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
-  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}\n`)
+  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
+  console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}\n`)
+  process.stderr.write("")
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -181,6 +208,50 @@ async function initializeANR(): Promise<void> {
   process.env.AWS_SESSION_TOKEN = awsCredentials.sessionToken
   process.env.AWS_REGION = config.awsRegion
   delete process.env.AWS_PROFILE // Avoid credential conflicts
+
+  // Initialize credential refresh state and schedule proactive refresh
+  let currentRefreshToken = tokens.refreshToken
+  ANRRefresh.init({
+    stsExpiration: awsCredentials.expiration?.getTime(),
+    async refresh() {
+      let refreshedTokens
+
+      // Try silent refresh first
+      if (currentRefreshToken) {
+        try {
+          refreshedTokens = await refreshOIDCTokens(config, currentRefreshToken)
+          console.error("🔄 Silently refreshed OIDC tokens")
+        } catch {
+          console.error("🔄 Silent token refresh failed, opening browser for re-authentication...")
+          refreshedTokens = await authenticateWithOIDC(config)
+        }
+      } else {
+        console.error("🔄 No refresh token available, opening browser for re-authentication...")
+        refreshedTokens = await authenticateWithOIDC(config)
+      }
+
+      // Exchange new ID token for AWS credentials
+      const creds = await exchangeTokenForAWSCredentials(refreshedTokens.idToken, config)
+      currentRefreshToken = refreshedTokens.refreshToken ?? currentRefreshToken
+
+      console.error("✅ AWS credentials refreshed successfully")
+      return {
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+        sessionToken: creds.sessionToken,
+        idToken: refreshedTokens.idToken,
+        expiration: creds.expiration,
+        refreshToken: refreshedTokens.refreshToken,
+      }
+    },
+  })
+
+  if (awsCredentials.expiration) {
+    const minutesUntilExpiry = Math.round((awsCredentials.expiration.getTime() - Date.now()) / 60000)
+    console.error(
+      `🔄 Credential refresh scheduled ~${Math.max(0, minutesUntilExpiry - 5)} min from now (credentials expire in ${minutesUntilExpiry} min)`,
+    )
+  }
 
   console.error("📍 Debug: Credentials set in environment")
   console.error(`   - AWS_ACCESS_KEY_ID set: ${!!process.env.AWS_ACCESS_KEY_ID}`)
@@ -225,19 +296,31 @@ async function initializeANR(): Promise<void> {
     initializeOTEL(config, telemetryContext)
     trackSessionStart(telemetryContext.userId)
   }
-  await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
+  try {
+    await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
+  } catch (err) {
+    console.error("⚠️ Session logging failed:", err instanceof Error ? err.message : err)
+  }
 
   // Check quota
-  const quotaResult = await checkQuota(
-    {
-      userEmail: telemetryContext.userEmail || telemetryContext.userId,
-      organization: telemetryContext.organization,
-      teamId: telemetryContext.teamId,
-    },
-    config.modelsApiEndpoint,
-    config.quotaFailMode,
-    tokens.idToken,
-  )
+  console.error("📍 Checking quota...")
+  process.stderr.write("")
+  let quotaResult
+  try {
+    quotaResult = await checkQuota(
+      {
+        userEmail: telemetryContext.userEmail || telemetryContext.userId,
+        organization: telemetryContext.organization,
+        teamId: telemetryContext.teamId,
+      },
+      config.modelsApiEndpoint,
+      config.quotaFailMode,
+      tokens.idToken,
+    )
+  } catch (err) {
+    console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
 
   if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
@@ -345,11 +428,40 @@ process.on("uncaughtException", (e) => {
   })
 })
 
+const ANR_MARKERS = ["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "IDENTITY_POOL_ID"]
+
+function detectANR(): boolean {
+  if (process.env.OPENCODE_FLAVOR === "anr") return true
+  const home = process.env.HOME || process.env.USERPROFILE
+  if (!home) return false
+  const dirs = [process.cwd(), path.join(home, ".config", "opencode-anr")]
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue
+    for (const name of readdirSync(dir)) {
+      if (name !== ".env" && !name.startsWith(".env.")) continue
+      try {
+        const content = readFileSync(path.join(dir, name), "utf-8")
+        const found = content.split("\n").some((line: string) => {
+          const trimmed = line.trim()
+          return ANR_MARKERS.some((m) => trimmed.startsWith(m))
+        })
+        if (found) return true
+      } catch {}
+    }
+  }
+  return false
+}
+
 /**
  * Main CLI function
  * Pass argv to test/override, or undefined to use process.argv
  */
 export async function main(argv?: string[]) {
+  // Auto-detect ANR mode from .env files if not already set
+  if (!process.env.OPENCODE_FLAVOR && detectANR()) {
+    process.env.OPENCODE_FLAVOR = "anr"
+  }
+
   // Check if running in ANR mode
   const anrMode =
     process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
@@ -528,12 +640,22 @@ export async function main(argv?: string[]) {
     // Most notably, some docker-container-based MCP servers don't handle such signals unless
     // run using `docker run --init`.
     // Explicitly exit to avoid any hanging subprocesses.
+    //
+    // Skip forced exit for long-running server commands (serve, web, workspace-serve).
+    // Yargs can resolve cli.parse() before the command handler's promise settles,
+    // causing the finally block to run while the server is still active.
+    const args = argv ?? hideBin(process.argv)
+    const command = args[args.findIndex((a) => !a.startsWith("-"))]
+    if (command === "serve" || command === "web" || command === "workspace-serve") return
     process.exit()
   }
 }
 
-// If run directly (not imported), execute main
-if (import.meta.main) {
+// Run main when executed directly. In compiled binaries built with
+// conditions:["browser"], import.meta.main is false, so also check for
+// the build-time OPENCODE_VERSION constant which is only defined in
+// compiled builds.
+if (import.meta.main || typeof OPENCODE_VERSION === "string") {
   main().catch((error) => {
     console.error("❌ Fatal error:", error)
     process.exit(1)

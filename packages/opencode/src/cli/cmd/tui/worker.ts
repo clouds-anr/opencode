@@ -53,10 +53,12 @@ if (process.env.OPENCODE_FLAVOR === "anr") {
   }
 
   // Audit logger: so logTokenUsage calls from processor.ts write to DynamoDB
-  if (process.env.OPENCODE_ENABLE_AUDIT !== "0" &&
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY &&
-      process.env.AWS_SESSION_TOKEN) {
+  if (
+    process.env.OPENCODE_ENABLE_AUDIT !== "0" &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY &&
+    process.env.AWS_SESSION_TOKEN
+  ) {
     initializeAuditLogger(config, {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -86,7 +88,7 @@ const startEventStream = (directory: string) => {
     const request = new Request(input, init)
     const auth = getAuthorizationHeader()
     if (auth) request.headers.set("Authorization", auth)
-    return Server.App().fetch(request)
+    return Server.Default().fetch(request)
   }) as typeof globalThis.fetch
 
   const sdk = createOpencodeClient({
@@ -141,7 +143,7 @@ export const rpc = {
       headers,
       body: input.body,
     })
-    const response = await Server.App().fetch(request)
+    const response = await Server.Default().fetch(request)
     const body = await response.text()
     return {
       status: response.status,
@@ -167,6 +169,18 @@ export const rpc = {
     Config.global.reset()
     await Instance.disposeAll()
   },
+  async updateCredentials(input: {
+    accessKeyId: string
+    secretAccessKey: string
+    sessionToken: string
+    idToken?: string
+  }) {
+    process.env.AWS_ACCESS_KEY_ID = input.accessKeyId
+    process.env.AWS_SECRET_ACCESS_KEY = input.secretAccessKey
+    process.env.AWS_SESSION_TOKEN = input.sessionToken
+    if (input.idToken) process.env.OPENCODE_ANR_ID_TOKEN = input.idToken
+    Log.Default.info("worker credentials updated")
+  },
   async shutdown() {
     Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
@@ -179,6 +193,10 @@ export const rpc = {
       }),
     ])
     if (server) server.stop(true)
+  },
+  async setWorkspace(input: { workspaceID?: string }) {
+    // Restart the event stream for the new workspace
+    startEventStream(input.workspaceID ?? process.cwd())
   },
 }
 

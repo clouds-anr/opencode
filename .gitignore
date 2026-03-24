@@ -28,3 +28,11 @@ opencode-dev
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Windows reserved device names
+nul
+con
+prn
+aux
+com*
+lpt*
