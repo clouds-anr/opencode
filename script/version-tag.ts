@@ -38,22 +38,28 @@ const resolvedChannel = await (async () => {
 
 const preview = resolvedChannel !== "latest"
 
-const version = await (async () => {
-  if (override) return override
-  if (preview) return `0.0.0-${resolvedChannel}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
-
-  // Derive from the latest git tag
+// Derive base version from the latest git tag
+async function latestTag() {
   const raw = await $`git tag -l "v*.*.*" --sort=-v:refname`.text()
   const tags = raw
     .split("\n")
     .map((t) => t.trim())
     .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
-
   if (tags.length === 0) throw new Error("No version tags found in the repository")
+  return tags[0]!.slice(1) // strip leading "v"
+}
 
-  const latest = tags[0]!.slice(1) // strip leading "v"
+const version = await (async () => {
+  if (override) return override
+
+  const latest = await latestTag()
+
+  if (preview) {
+    const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")
+    return `${latest}-${resolvedChannel}-${timestamp}`
+  }
+
   const [major, minor, patch] = latest.split(".").map((x) => Number(x) || 0)
-
   const t = bump?.toLowerCase()
   if (t === "major") return `${major! + 1}.0.0`
   if (t === "minor") return `${major}.${minor! + 1}.0`
@@ -77,9 +83,10 @@ if (!preview) {
   const release = await $`gh release view v${version} --json tagName,databaseId`.json()
   output.push(`release=${release.databaseId}`)
   output.push(`tag=${release.tagName}`)
-} else if (resolvedChannel === "beta") {
-  await $`gh release create v${version} -d --title "v${version}" --repo ${process.env.GH_REPO}`
-  const release = await $`gh release view v${version} --json tagName,databaseId --repo ${process.env.GH_REPO}`.json()
+} else {
+  const repo = process.env.GH_REPO
+  await $`gh release create v${version} -d --prerelease --title "v${version}" --notes "Preview release ${version}" --repo ${repo}`
+  const release = await $`gh release view v${version} --json tagName,databaseId --repo ${repo}`.json()
   output.push(`release=${release.databaseId}`)
   output.push(`tag=${release.tagName}`)
 }
