@@ -153,6 +153,7 @@ async function initializeANR(): Promise<void> {
   clearOTELLogs()
 
   console.error("\n🚀 OpenCode ANR\n")
+  process.stderr.write("")
 
   // Load configuration
   const config = await getValidatedANRConfig(undefined, false)
@@ -162,26 +163,44 @@ async function initializeANR(): Promise<void> {
 
   // Authenticate with OIDC
   console.error("🔐 Authenticating...")
-  const tokens = await authenticateWithOIDC(config)
+  process.stderr.write("")
+  let tokens
+  try {
+    tokens = await authenticateWithOIDC(config)
+  } catch (err) {
+    console.error("❌ Authentication failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
   console.error("✅ Authenticated\n")
+  process.stderr.write("")
   console.error("📍 Debug: Received tokens from OIDC")
   console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
   console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
   console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
   console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s\n`)
+  process.stderr.write("")
 
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
 
   // Exchange token for AWS credentials
   console.error("💱 Exchanging token for AWS credentials...")
-  const awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  process.stderr.write("")
+  let awsCredentials
+  try {
+    awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+  } catch (err) {
+    console.error("❌ AWS credential exchange failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
   console.error("✅ AWS credentials obtained\n")
+  process.stderr.write("")
   console.error("📍 Debug: AWS credentials exchanged")
   console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
   console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
   console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
   console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}\n`)
+  process.stderr.write("")
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -277,19 +296,31 @@ async function initializeANR(): Promise<void> {
     initializeOTEL(config, telemetryContext)
     trackSessionStart(telemetryContext.userId)
   }
-  await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
+  try {
+    await logSessionStart(config, telemetryContext.userId, telemetryContext, { sessionId })
+  } catch (err) {
+    console.error("⚠️ Session logging failed:", err instanceof Error ? err.message : err)
+  }
 
   // Check quota
-  const quotaResult = await checkQuota(
-    {
-      userEmail: telemetryContext.userEmail || telemetryContext.userId,
-      organization: telemetryContext.organization,
-      teamId: telemetryContext.teamId,
-    },
-    config.modelsApiEndpoint,
-    config.quotaFailMode,
-    tokens.idToken,
-  )
+  console.error("📍 Checking quota...")
+  process.stderr.write("")
+  let quotaResult
+  try {
+    quotaResult = await checkQuota(
+      {
+        userEmail: telemetryContext.userEmail || telemetryContext.userId,
+        organization: telemetryContext.organization,
+        teamId: telemetryContext.teamId,
+      },
+      config.modelsApiEndpoint,
+      config.quotaFailMode,
+      tokens.idToken,
+    )
+  } catch (err) {
+    console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)
+    process.exit(1)
+  }
 
   if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
