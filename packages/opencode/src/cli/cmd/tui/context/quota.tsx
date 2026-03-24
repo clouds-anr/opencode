@@ -75,7 +75,7 @@ async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
       return null
     }
 
-    const url = `${endpoint.replace(/\/$/, "")}/quota/check`
+    const url = `${endpoint.replace(/\/$/, "")}/quota`
     logQuota(`📡 Quota API: Calling ${url.split("/").slice(0, 3).join("/")}...`)
 
     const response = await fetch(url, {
