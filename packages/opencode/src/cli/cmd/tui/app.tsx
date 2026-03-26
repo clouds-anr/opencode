@@ -37,7 +37,7 @@ import { KVProvider, useKV } from "./context/kv"
 import { QuotaProvider, useQuota } from "./context/quota"
 import { Provider } from "@/provider/provider"
 import { ArgsProvider, useArgs, type Args } from "./context/args"
-import open from "open"
+import { open } from "@/util/open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { TuiConfigProvider } from "./context/tui-config"
@@ -584,7 +584,7 @@ function App() {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => {})
+        open("https://opencode.ai/docs")
         dialog.clear()
       },
       category: "System",
