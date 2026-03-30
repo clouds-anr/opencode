@@ -263,6 +263,16 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     if (config.manager && !exporterHeaders["x-manager"]) exporterHeaders["x-manager"] = config.manager
     if (config.accountId && !exporterHeaders["x-account-id"]) exporterHeaders["x-account-id"] = config.accountId
 
+    // Ensure all attribution headers have defaults (matching GovClaudeClient behavior)
+    // so the OTel collector's attributes_processor always has dimensions to extract
+    if (!exporterHeaders["x-department"]) exporterHeaders["x-department"] = "unspecified"
+    if (!exporterHeaders["x-organization"]) exporterHeaders["x-organization"] = "default"
+    if (!exporterHeaders["x-team-id"]) exporterHeaders["x-team-id"] = "default-team"
+    if (!exporterHeaders["x-cost-center"]) exporterHeaders["x-cost-center"] = "general"
+    if (!exporterHeaders["x-location"]) exporterHeaders["x-location"] = "remote"
+    if (!exporterHeaders["x-role"]) exporterHeaders["x-role"] = "user"
+    if (!exporterHeaders["x-manager"]) exporterHeaders["x-manager"] = "unassigned"
+
     // Create metric exporter with enriched headers and AWS authentication
     // Add AWS credentials as headers if available (for ALB/API Gateway authentication)
     if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
@@ -696,6 +706,21 @@ function printDiagnosticSummary(): void {
     exportsSuccessful: diagnostics.exportsSuccessful,
   })
   logToFile("═══════════════════════════════════════════════════════════════════════════════")
+}
+
+/**
+ * Force-flush pending metrics to the collector immediately.
+ * Call after trackModelCall() so data reaches CloudWatch
+ * without waiting for the periodic export timer.
+ */
+export async function flushOTEL(): Promise<void> {
+  if (meterProvider) {
+    try {
+      await meterProvider.forceFlush()
+    } catch {
+      // silently fail — don't block model calls
+    }
+  }
 }
 
 /**
