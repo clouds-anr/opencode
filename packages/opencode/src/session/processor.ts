@@ -272,7 +272,7 @@ export namespace SessionProcessor {
                           trackCodeEditDecision("accepted", lang)
                         } else if (tool === "write" && inp.content !== undefined) {
                           const lines = inp.content.split("\n").length
-                          trackLinesOfCode(lines, "written", lang)
+                          trackLinesOfCode(lines, "added", lang)
                           trackCodeEditTool("write", lang, true)
                           trackCodeEditDecision("accepted", lang)
                         } else if (tool === "multiedit" && Array.isArray(inp.edits)) {
