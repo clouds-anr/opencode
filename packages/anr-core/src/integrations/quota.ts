@@ -40,7 +40,7 @@ export interface QuotaCheckResponse {
 }
 
 const policyCache = new Map<string, { policy: QuotaPolicy; timestamp: number }>()
-const CACHE_TTL = 3600_000 // 1 hour
+const CACHE_TTL = 300_000 // 5 minutes — refreshed per-prompt
 
 function getCacheKey(req: QuotaCheckRequest): string {
   return `${req.userEmail}#${req.organization || ""}#${req.teamId || ""}`

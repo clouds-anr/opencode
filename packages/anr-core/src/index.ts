@@ -32,6 +32,8 @@ export {
   trackLinesOfCode,
   trackCodeEditTool,
   trackCodeEditDecision,
+  trackCommit,
+  trackActiveTime,
   getTelemetryContext,
   getOTELLogFilePath,
   clearOTELLogs,

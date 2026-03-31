@@ -432,8 +432,15 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     meter.createCounter("claude_code.code_edit_tool.decision", {
       description: "Code edit tool decisions (from CLI hook)",
     })
+    meter.createCounter("claude_code.commit.count", {
+      description: "Commits made during session",
+    })
+    meter.createCounter("claude_code.active_time.total", {
+      description: "Active coding time in seconds",
+      unit: "s",
+    })
     
-    logToFile(`[Instruments] Pre-registered 10 instruments with MeterProvider`)
+    logToFile(`[Instruments] Pre-registered 12 instruments with MeterProvider`)
 
     logToFile(`OpenTelemetry initialized`, { endpoint: config.otelEndpoint })
   } catch (error) {
@@ -563,10 +570,10 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
       tokenCounter.add(reasoningTokens, { ...modelAttr, type: "reasoning" })
     }
     if (cacheReadTokens > 0) {
-      tokenCounter.add(cacheReadTokens, { ...modelAttr, type: "cache_read" })
+      tokenCounter.add(cacheReadTokens, { ...modelAttr, type: "cacheRead" })
     }
     if (cacheWriteTokens > 0) {
-      tokenCounter.add(cacheWriteTokens, { ...modelAttr, type: "cache_write" })
+      tokenCounter.add(cacheWriteTokens, { ...modelAttr, type: "cacheCreation" })
     }
     
     // Record model call count
@@ -679,17 +686,51 @@ export function trackCodeEditTool(toolName: string, language: string, applied: b
 /**
  * Track code-edit-tool decision (accepted/rejected by user)
  */
-export function trackCodeEditDecision(decision: string): void {
+export function trackCodeEditDecision(decision: string, language?: string): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
     const counter = meter.createCounter("claude_code.code_edit_tool.decision", {
       description: "Code edit tool decisions",
     })
-    // Only decision is a declared dimension for this metric.
-    counter.add(1, { decision })
-    logToFile(`Code edit decision tracked: ${decision}`)
+    const attrs: Record<string, string> = { decision }
+    if (language) attrs.language = language
+    counter.add(1, attrs)
+    logToFile(`Code edit decision tracked: ${decision} (${language || "unknown"})`)
   } catch (error) {
     logToFile(`⚠️  Code edit decision tracking failed: ${error}`)
+  }
+}
+
+/**
+ * Track a git commit made during the session
+ */
+export function trackCommit(): void {
+  try {
+    const meter = metrics.getMeter("opencode-anr")
+    const counter = meter.createCounter("claude_code.commit.count", {
+      description: "Commits made during session",
+    })
+    counter.add(1)
+    logToFile(`Commit tracked`)
+  } catch (error) {
+    logToFile(`⚠️  Commit tracking failed: ${error}`)
+  }
+}
+
+/**
+ * Track active coding time in seconds
+ */
+export function trackActiveTime(seconds: number): void {
+  try {
+    const meter = metrics.getMeter("opencode-anr")
+    const counter = meter.createCounter("claude_code.active_time.total", {
+      description: "Active coding time in seconds",
+      unit: "s",
+    })
+    counter.add(seconds)
+    logToFile(`Active time tracked: ${seconds}s`)
+  } catch (error) {
+    logToFile(`⚠️  Active time tracking failed: ${error}`)
   }
 }
 
