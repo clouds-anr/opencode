@@ -21,6 +21,7 @@ export {
 // Telemetry & Observability
 export {
   initializeOTEL,
+  flushOTEL,
   shutdownOTEL,
   registerOTELShutdownHandlers,
   getMeter,
@@ -28,6 +29,9 @@ export {
   trackModelCall,
   trackSessionStart,
   trackSessionEnd,
+  trackLinesOfCode,
+  trackCodeEditTool,
+  trackCodeEditDecision,
   getTelemetryContext,
   getOTELLogFilePath,
   clearOTELLogs,

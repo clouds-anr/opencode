@@ -17,7 +17,7 @@ import { Config } from "@/config/config"
 import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
-import { trackModelCall, getTelemetryContext, logTokenUsage } from "@opencode-ai/anr-core"
+import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision } from "@opencode-ai/anr-core"
 import { refresh as refreshANRCredentials } from "@/auth/anr-refresh"
 
 export namespace SessionProcessor {
@@ -234,6 +234,59 @@ export namespace SessionProcessor {
                       },
                     })
 
+                    // Track code edit metrics for ANR telemetry
+                    if (process.env.OPENCODE_FLAVOR === "anr") {
+                      try {
+                        const inp = value.input ?? match.state.input
+                        const tool = match.tool
+                        const EXT_MAP: Record<string, string> = {
+                          ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+                          py: "python", rs: "rust", go: "go", java: "java", rb: "ruby",
+                          cpp: "cpp", c: "c", cs: "csharp", swift: "swift", kt: "kotlin",
+                          sh: "shell", bash: "shell", zsh: "shell", md: "markdown",
+                          json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+                          html: "html", css: "css", scss: "scss", sql: "sql",
+                        }
+                        const ext = (inp.filePath || "").split(".").pop()?.toLowerCase() || ""
+                        const lang = EXT_MAP[ext] || ext || "unknown"
+
+                        if (tool === "edit" && inp.oldString !== undefined && inp.newString !== undefined) {
+                          const removed = inp.oldString.split("\n").length
+                          const added = inp.newString.split("\n").length
+                          trackLinesOfCode(added, "added", lang)
+                          trackLinesOfCode(removed, "removed", lang)
+                          trackCodeEditTool("edit", lang, true)
+                          trackCodeEditDecision("accepted")
+                        } else if (tool === "write" && inp.content !== undefined) {
+                          const lines = inp.content.split("\n").length
+                          trackLinesOfCode(lines, "written", lang)
+                          trackCodeEditTool("write", lang, true)
+                          trackCodeEditDecision("accepted")
+                        } else if (tool === "multiedit" && Array.isArray(inp.edits)) {
+                          let added = 0
+                          let removed = 0
+                          for (const e of inp.edits) {
+                            if (e.oldString !== undefined) removed += e.oldString.split("\n").length
+                            if (e.newString !== undefined) added += e.newString.split("\n").length
+                          }
+                          trackLinesOfCode(added, "added", lang)
+                          trackLinesOfCode(removed, "removed", lang)
+                          trackCodeEditTool("multiedit", lang, true)
+                          trackCodeEditDecision("accepted")
+                        } else if (tool === "apply_patch" && inp.patchText) {
+                          const lines = inp.patchText.split("\n")
+                          const added = lines.filter((l: string) => l.startsWith("+") && !l.startsWith("+++")).length
+                          const removed = lines.filter((l: string) => l.startsWith("-") && !l.startsWith("---")).length
+                          trackLinesOfCode(added, "added")
+                          trackLinesOfCode(removed, "removed")
+                          trackCodeEditTool("apply_patch", "mixed", true)
+                          trackCodeEditDecision("accepted")
+                        }
+                      } catch {
+                        // silently fail — don't block tool results
+                      }
+                    }
+
                     delete toolcalls[value.toolCallId]
                   }
                   break
@@ -300,7 +353,7 @@ export namespace SessionProcessor {
                       const context = getTelemetryContext()
 
                       trackModelCall(
-                        input.model.name || input.model.id,
+                        input.model.id || input.model.name,
                         usage.tokens.input,
                         usage.tokens.output,
                         usage.tokens.reasoning,
@@ -308,6 +361,10 @@ export namespace SessionProcessor {
                         usage.tokens.cache.write,
                         context || undefined, // Pass context explicitly
                       )
+
+                      // Push metrics to collector now instead of waiting for
+                      // the 10s periodic timer — the worker may exit before it fires
+                      flushOTEL()
 
                       // Log to audit trail
                       if (context) {

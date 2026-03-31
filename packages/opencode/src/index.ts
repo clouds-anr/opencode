@@ -50,6 +50,7 @@ import {
   logAuthEvent,
   logSessionStart,
   logSessionEnd,
+  logQuotaCheck,
   checkQuota,
   type TelemetryContext,
 } from "@opencode-ai/anr-core"
@@ -148,7 +149,7 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
 /**
  * Initialize ANR mode: authentication, quota, telemetry
  */
-async function initializeANR(): Promise<void> {
+async function initializeANR(envFile?: string): Promise<void> {
   // Clear OTEL logs from previous session for clean debugging
   clearOTELLogs()
 
@@ -156,7 +157,10 @@ async function initializeANR(): Promise<void> {
   process.stderr.write("")
 
   // Load configuration
-  const config = await getValidatedANRConfig(undefined, false)
+  const config = await getValidatedANRConfig(envFile, false)
+
+  // Pass env file path to the worker so it loads the same config
+  if (envFile) process.env.OPENCODE_ANR_ENV_FILE = envFile
 
   // Generate session ID
   const sessionId = randomUUID()
@@ -322,6 +326,12 @@ async function initializeANR(): Promise<void> {
     process.exit(1)
   }
 
+  // Audit the quota check result
+  logQuotaCheck(config, telemetryContext.userId, !!quotaResult?.usage?.allowed, telemetryContext, {
+    daily: quotaResult?.usage?.dailyUsagePercent,
+    monthly: quotaResult?.usage?.monthlyUsagePercent,
+  })
+
   if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
     await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
@@ -466,8 +476,12 @@ export async function main(argv?: string[]) {
   const anrMode =
     process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
 
+  // Parse --env-file before ANR init so the config loader can use it
+  const envIdx = process.argv.indexOf("--env-file")
+  const envFile = envIdx !== -1 ? process.argv[envIdx + 1] : undefined
+
   if (anrMode) {
-    await initializeANR()
+    await initializeANR(envFile)
   }
 
   let cli = yargs(argv ?? hideBin(process.argv))
@@ -486,6 +500,10 @@ export async function main(argv?: string[]) {
       describe: "log level",
       type: "string",
       choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+    })
+    .option("env-file", {
+      describe: "path to ANR .env config file",
+      type: "string",
     })
     .middleware(async (opts) => {
       await Log.init({
