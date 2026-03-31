@@ -5,8 +5,8 @@ import { EventEmitter } from "events"
 let openShouldFail = false
 let openCalledWith: string | undefined
 
-mock.module("open", () => ({
-  default: async (url: string) => {
+mock.module("../../src/util/open", () => ({
+  open: (url: string) => {
     openCalledWith = url
 
     // Return a mock subprocess that emits an error if openShouldFail is true
