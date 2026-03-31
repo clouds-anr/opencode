@@ -33,6 +33,12 @@ const MODEL_COST_PER_1K: Record<string, { input: number; output: number }> = {
   "claude-3-5-sonnet-20241022":         { input: 0.003,  output: 0.015  },
   "claude-3-5-haiku-20241022":          { input: 0.0008, output: 0.004  },
   "claude-3-opus-20240229":             { input: 0.015,  output: 0.075  },
+  // Bedrock model ID formats
+  "claude-opus-4-6":                    { input: 0.015,  output: 0.075  },
+  "claude-sonnet-4":                    { input: 0.003,  output: 0.015  },
+  "claude-3-5-sonnet":                  { input: 0.003,  output: 0.015  },
+  "claude-3-5-haiku":                   { input: 0.0008, output: 0.004  },
+  "claude-3-opus":                      { input: 0.015,  output: 0.075  },
 }
 
 function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
