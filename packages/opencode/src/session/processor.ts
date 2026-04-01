@@ -367,6 +367,9 @@ export namespace SessionProcessor {
                       // Get context and track metrics
                       const context = getTelemetryContext()
 
+                      // Cost from model data (prices are per million tokens)
+                      const cost = (usage.tokens.input * input.model.cost.input + usage.tokens.output * input.model.cost.output) / 1_000_000
+
                       trackModelCall(
                         input.model.id || input.model.name,
                         usage.tokens.input,
@@ -374,7 +377,8 @@ export namespace SessionProcessor {
                         usage.tokens.reasoning,
                         usage.tokens.cache.read,
                         usage.tokens.cache.write,
-                        context || undefined, // Pass context explicitly
+                        context || undefined,
+                        cost,
                       )
 
                       // Push metrics to collector now instead of waiting for

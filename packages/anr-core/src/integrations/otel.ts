@@ -24,31 +24,6 @@ const logFile = resolve(logDir, "otel-metrics.log")
 const debugMode = process.env.OPENCODE_DEBUG_OTEL === "1" || process.env.OPENCODE_DEBUG === "1"
 
 /**
- * Per-token cost lookup (USD per 1K tokens)
- * Used to derive claude_code.cost.usage from token counts.
- */
-const MODEL_COST_PER_1K: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-20250514":           { input: 0.003,  output: 0.015  },
-  "claude-opus-4-20250514":             { input: 0.015,  output: 0.075  },
-  "claude-3-5-sonnet-20241022":         { input: 0.003,  output: 0.015  },
-  "claude-3-5-haiku-20241022":          { input: 0.0008, output: 0.004  },
-  "claude-3-opus-20240229":             { input: 0.015,  output: 0.075  },
-  // Bedrock model ID formats
-  "claude-opus-4-6":                    { input: 0.015,  output: 0.075  },
-  "claude-sonnet-4":                    { input: 0.003,  output: 0.015  },
-  "claude-3-5-sonnet":                  { input: 0.003,  output: 0.015  },
-  "claude-3-5-haiku":                   { input: 0.0008, output: 0.004  },
-  "claude-3-opus":                      { input: 0.015,  output: 0.075  },
-}
-
-function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const key = Object.keys(MODEL_COST_PER_1K).find(k => model.includes(k))
-  if (!key) return 0
-  const rate = MODEL_COST_PER_1K[key]!
-  return (inputTokens / 1000) * rate.input + (outputTokens / 1000) * rate.output
-}
-
-/**
  * Get the log file path for debugging
  */
 export function getOTELLogFilePath(): string {
@@ -508,7 +483,7 @@ export function trackCommand(commandName: string, duration: number): void {
  * Track a model invocation with token usage and context attributes
  * Context can be passed explicitly or will use stored context
  */
-export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, reasoningTokens: number = 0, cacheReadTokens: number = 0, cacheWriteTokens: number = 0, context?: TelemetryContext): void {
+export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, reasoningTokens: number = 0, cacheReadTokens: number = 0, cacheWriteTokens: number = 0, context?: TelemetryContext, cost: number = 0): void {
   const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
   
   try {
@@ -579,8 +554,7 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
     // Record model call count
     modelCallCounter.add(1, modelAttr)
 
-    // Record estimated cost
-    const cost = estimateCost(modelId, inputTokens, outputTokens)
+    // Record cost (calculated by caller from ModelsDev cached prices)
     if (cost > 0) {
       const costCounter = meter.createCounter("claude_code.cost.usage", {
         description: "Estimated cost in USD",
