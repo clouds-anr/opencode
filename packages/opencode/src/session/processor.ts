@@ -43,6 +43,8 @@ export namespace SessionProcessor {
     }
     // Check status code — 403 with credential-related errors
     if ((e as any)?.statusCode === 403 && /credential|token|security/i.test(message)) return true
+    // Check status code — 401 Unauthorized (expired JWT / missing auth)
+    if ((e as any)?.statusCode === 401 || (e as any)?.status === 401) return true
     return false
   }
 

@@ -22,7 +22,8 @@ async function realTest() {
   try {
     log("🧪 Starting REAL OTEL Metrics Test")
     
-    const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector-alb-395007917.us-east-2.elb.amazonaws.com"
+    const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    if (!endpoint) throw new Error("OTEL_EXPORTER_OTLP_ENDPOINT env var required")
     
     // Create resource
     const resource = Resource.default().merge(new Resource({

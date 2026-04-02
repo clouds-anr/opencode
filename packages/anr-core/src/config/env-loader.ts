@@ -97,12 +97,12 @@ function parseEnvConfig(quiet = false): ANRConfig {
     // AWS & Bedrock
     awsProfile: env.AWS_PROFILE || env.OPENCODE_AWS_PROFILE || defaultConfig.awsProfile || "",
     awsRegion: env.AWS_REGION || env.OPENCODE_AWS_REGION || defaultConfig.awsRegion!,
-    useBedrockProvider: env.CLAUDE_CODE_USE_BEDROCK === "1",
+    useBedrockProvider: env.OPENCODE_USE_BEDROCK === "1",
     anthropicModel: env.ANTHROPIC_MODEL || "",
     anthropicSmallFastModel: env.ANTHROPIC_SMALL_FAST_MODEL || "",
 
     // Telemetry
-    enableTelemetry: env.OPENCODE_ENABLE_TELEMETRY === "1" || env.CLAUDE_CODE_ENABLE_TELEMETRY === "1",
+    enableTelemetry: env.OPENCODE_ENABLE_TELEMETRY === "1",
     enableAudit: env.OPENCODE_ENABLE_AUDIT !== "0", // enabled by default unless explicitly disabled
     otelMetricsExporter: env.OTEL_METRICS_EXPORTER || defaultConfig.otelMetricsExporter!,
     otelProtocol: env.OTEL_EXPORTER_OTLP_PROTOCOL || defaultConfig.otelProtocol!,
@@ -138,7 +138,7 @@ function parseEnvConfig(quiet = false): ANRConfig {
     cognitoUserPoolId: env.COGNITO_USER_POOL_ID || "",
 
     // Optional installer URLs
-    installerUrlClaude: env.INSTALLER_URL_CLAUDE,
+    installerUrlOpencode: env.INSTALLER_URL_OPENCODE,
     installerUrlGit: env.INSTALLER_URL_GIT,
   }
 }

@@ -319,7 +319,7 @@ async function initializeANR(envFile?: string): Promise<void> {
       },
       config.modelsApiEndpoint,
       config.quotaFailMode,
-      tokens.idToken,
+      process.env.OPENCODE_ANR_ID_TOKEN || tokens.idToken,
     )
   } catch (err) {
     console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)

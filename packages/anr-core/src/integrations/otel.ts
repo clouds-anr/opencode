@@ -244,7 +244,7 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     if (config.manager && !exporterHeaders["x-manager"]) exporterHeaders["x-manager"] = config.manager
     if (config.accountId && !exporterHeaders["x-account-id"]) exporterHeaders["x-account-id"] = config.accountId
 
-    // Ensure all attribution headers have defaults (matching GovClaudeClient behavior)
+    // Ensure all attribution headers have defaults (matching ANR client behavior)
     // so the OTel collector's attributes_processor always has dimensions to extract
     if (!exporterHeaders["x-department"]) exporterHeaders["x-department"] = "unspecified"
     if (!exporterHeaders["x-organization"]) exporterHeaders["x-organization"] = "default"
@@ -372,45 +372,45 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     const meter = meterProvider.getMeter("opencode-anr")
     
     // Pre-create all instruments (SDK will cache and reuse them)
-    meter.createCounter("claude_code.token.usage", {
+    meter.createCounter("opencode.token.usage", {
       description: "Total tokens used in model calls",
       unit: "1",
     })
-    meter.createCounter("claude_code.model.calls.count", {
+    meter.createCounter("opencode.model.calls.count", {
       description: "Number of model API calls",
     })
-    meter.createCounter("claude_code.session.started", {
+    meter.createCounter("opencode.session.started", {
       description: "Number of sessions started",
     })
-    meter.createHistogram("claude_code.session.duration_seconds", {
+    meter.createHistogram("opencode.session.duration_seconds", {
       description: "Duration of sessions",
       unit: "s",
     })
-    meter.createHistogram("claude_code.command.duration_ms", {
+    meter.createHistogram("opencode.command.duration_ms", {
       description: "Duration of CLI command execution",
       unit: "ms",
     })
-    meter.createCounter("claude_code.command.count", {
+    meter.createCounter("opencode.command.count", {
       description: "Number of CLI commands executed",
     })
-    meter.createCounter("claude_code.cost.usage", {
+    meter.createCounter("opencode.cost.usage", {
       description: "Estimated cost in USD",
       unit: "USD",
     })
-    meter.createCounter("claude_code.lines_of_code.count", {
+    meter.createCounter("opencode.lines_of_code.count", {
       description: "Lines of code (from CLI hook)",
       unit: "1",
     })
-    meter.createCounter("claude_code.code_edit_tool.applied", {
+    meter.createCounter("opencode.code_edit_tool.applied", {
       description: "Code edit tool applications (from CLI hook)",
     })
-    meter.createCounter("claude_code.code_edit_tool.decision", {
+    meter.createCounter("opencode.code_edit_tool.decision", {
       description: "Code edit tool decisions (from CLI hook)",
     })
-    meter.createCounter("claude_code.commit.count", {
+    meter.createCounter("opencode.commit.count", {
       description: "Commits made during session",
     })
-    meter.createCounter("claude_code.active_time.total", {
+    meter.createCounter("opencode.active_time.total", {
       description: "Active coding time in seconds",
       unit: "s",
     })
@@ -458,11 +458,11 @@ export function trackCommand(commandName: string, duration: number): void {
 
     // Get instruments from global meter
     const meter = metrics.getMeter("opencode-anr")
-    const commandDurationHistogram = meter.createHistogram("claude_code.command.duration_ms", {
+    const commandDurationHistogram = meter.createHistogram("opencode.command.duration_ms", {
       description: "Duration of CLI command execution",
       unit: "ms",
     })
-    const commandCounter = meter.createCounter("claude_code.command.count", {
+    const commandCounter = meter.createCounter("opencode.command.count", {
       description: "Number of CLI commands executed",
     })
 
@@ -521,11 +521,11 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
 
     // Get instruments from global meter
     const meter = metrics.getMeter("opencode-anr")
-    const tokenCounter = meter.createCounter("claude_code.token.usage", {
+    const tokenCounter = meter.createCounter("opencode.token.usage", {
       description: "Total tokens used in model calls",
       unit: "1",
     })
-    const modelCallCounter = meter.createCounter("claude_code.model.calls.count", {
+    const modelCallCounter = meter.createCounter("opencode.model.calls.count", {
       description: "Number of model API calls",
     })
 
@@ -556,7 +556,7 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
 
     // Record cost (calculated by caller from ModelsDev cached prices)
     if (cost > 0) {
-      const costCounter = meter.createCounter("claude_code.cost.usage", {
+      const costCounter = meter.createCounter("opencode.cost.usage", {
         description: "Estimated cost in USD",
         unit: "USD",
       })
@@ -580,7 +580,7 @@ export function trackSessionStart(userId: string): void {
 
     // Get instrument from global meter
     const meter = metrics.getMeter("opencode-anr")
-    const sessionStartCounter = meter.createCounter("claude_code.session.started", {
+    const sessionStartCounter = meter.createCounter("opencode.session.started", {
       description: "Number of sessions started",
     })
 
@@ -604,7 +604,7 @@ export function trackSessionEnd(userId: string, duration: number): void {
 
     // Get instrument from global meter
     const meter = metrics.getMeter("opencode-anr")
-    const sessionEndHistogram = meter.createHistogram("claude_code.session.duration_seconds", {
+    const sessionEndHistogram = meter.createHistogram("opencode.session.duration_seconds", {
       description: "Duration of sessions",
       unit: "s",
     })
@@ -626,7 +626,7 @@ export function trackSessionEnd(userId: string, duration: number): void {
 export function trackLinesOfCode(count: number, type: string, language?: string): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
-    const counter = meter.createCounter("claude_code.lines_of_code.count", {
+    const counter = meter.createCounter("opencode.lines_of_code.count", {
       description: "Lines of code",
       unit: "1",
     })
@@ -646,7 +646,7 @@ export function trackLinesOfCode(count: number, type: string, language?: string)
 export function trackCodeEditTool(toolName: string, language: string, applied: boolean): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
-    const counter = meter.createCounter("claude_code.code_edit_tool.applied", {
+    const counter = meter.createCounter("opencode.code_edit_tool.applied", {
       description: "Code edit tool applications",
     })
     // Only tool_name + language are declared dimensions for this metric.
@@ -663,7 +663,7 @@ export function trackCodeEditTool(toolName: string, language: string, applied: b
 export function trackCodeEditDecision(decision: string, language?: string): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
-    const counter = meter.createCounter("claude_code.code_edit_tool.decision", {
+    const counter = meter.createCounter("opencode.code_edit_tool.decision", {
       description: "Code edit tool decisions",
     })
     const attrs: Record<string, string> = { decision }
@@ -681,7 +681,7 @@ export function trackCodeEditDecision(decision: string, language?: string): void
 export function trackCommit(): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
-    const counter = meter.createCounter("claude_code.commit.count", {
+    const counter = meter.createCounter("opencode.commit.count", {
       description: "Commits made during session",
     })
     counter.add(1)
@@ -697,7 +697,7 @@ export function trackCommit(): void {
 export function trackActiveTime(seconds: number): void {
   try {
     const meter = metrics.getMeter("opencode-anr")
-    const counter = meter.createCounter("claude_code.active_time.total", {
+    const counter = meter.createCounter("opencode.active_time.total", {
       description: "Active coding time in seconds",
       unit: "s",
     })
@@ -889,7 +889,7 @@ export function getMetricsPreview() {
   
   return {
     exampleModelCallMetric: {
-      name: "claude_code.model.calls.count",
+      name: "opencode.model.calls.count",
       value: 1,
       attributes: ctx ? {
         model: "claude-3-5-sonnet",
@@ -903,7 +903,7 @@ export function getMetricsPreview() {
       },
     },
     exampleTokenMetric: {
-      name: "claude_code.token.usage",
+      name: "opencode.token.usage",
       value: 5000,
       unit: "tokens",
       attributes: ctx ? {
@@ -916,7 +916,7 @@ export function getMetricsPreview() {
       },
     },
     exampleCommandMetric: {
-      name: "claude_code.command.duration_ms",
+      name: "opencode.command.duration_ms",
       value: 2456,
       unit: "ms",
       attributes: ctx ? {

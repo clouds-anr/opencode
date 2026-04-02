@@ -78,8 +78,10 @@ export async function checkQuota(
 
     // Add JWT bearer token for API Gateway JWT Authorizer validation
     // The Lambda extracts email from JWT claims, not query parameters
-    if (idToken) {
-      headers.Authorization = `Bearer ${idToken}`
+    // Prefer refreshed token from env over the one passed in (may be stale)
+    const token = process.env.OPENCODE_ANR_ID_TOKEN || idToken
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
     } else {
       console.warn("⚠️  No JWT token provided - API will return 401")
     }
@@ -94,7 +96,6 @@ export async function checkQuota(
 
     if (!response.ok) {
       console.warn(`⚠️  Quota API returned ${response.status}. Using fallback data.`)
-      // Always return mock data on API error for testing
       return mockQuotaResponse()
     }
 

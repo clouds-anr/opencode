@@ -290,11 +290,11 @@ const SimulateCommand = cmd({
       console.log(`\n🔹 Simulated metrics (${argv.metrics}):`);
       for (let i = 1; i <= argv.metrics; i++) {
         if (i === 1) {
-          console.log(`   1️⃣  claude_code.model.calls.count = 1 (gauge)`)
+          console.log(`   1️⃣  opencode.model.calls.count = 1 (gauge)`)
         } else if (i === 2) {
-          console.log(`   2️⃣  claude_code.token.usage = 5000 (counter)`)
+          console.log(`   2️⃣  opencode.token.usage = 5000 (counter)`)
         } else if (i === 3) {
-          console.log(`   3️⃣  claude_code.command.duration_ms = 2456 (histogram)`)
+          console.log(`   3️⃣  opencode.command.duration_ms = 2456 (histogram)`)
         }
       }
 
