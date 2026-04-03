@@ -82,7 +82,7 @@ export namespace SessionProcessor {
           const result = await checkQuota(
             { userEmail: email },
             process.env.OPENCODE_API_ENDPOINT,
-            "open",
+            (process.env.QUOTA_FAIL_MODE as "closed" | "open") || "closed",
             process.env.OPENCODE_ANR_ID_TOKEN,
           )
           if (result) {

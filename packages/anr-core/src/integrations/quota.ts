@@ -60,7 +60,6 @@ export async function checkQuota(
   idToken?: string,
 ): Promise<QuotaCheckResponse | null> {
   if (!endpoint) {
-    console.warn("❌ OPENCODE_API_ENDPOINT not configured for quota")
     return failMode === "open" ? mockQuotaResponse() : null
   }
 
@@ -82,8 +81,6 @@ export async function checkQuota(
     const token = process.env.OPENCODE_ANR_ID_TOKEN || idToken
     if (token) {
       headers.Authorization = `Bearer ${token}`
-    } else {
-      console.warn("⚠️  No JWT token provided - API will return 401")
     }
 
     // Construct endpoint with /quota path
@@ -95,8 +92,7 @@ export async function checkQuota(
     })
 
     if (!response.ok) {
-      console.warn(`⚠️  Quota API returned ${response.status}. Using fallback data.`)
-      return mockQuotaResponse()
+      return failMode === "open" ? mockQuotaResponse() : null
     }
 
     // API Gateway returns { statusCode, body: JSON.stringify(...) }
@@ -113,12 +109,9 @@ export async function checkQuota(
       policyCache.set(cacheKey, { policy, timestamp: Date.now() })
       return quotaResponse
     }
-
     return failMode === "open" ? mockQuotaResponse() : null
-  } catch (error) {
-    console.warn(`❌ Quota API error: ${error instanceof Error ? error.message : String(error)}`)
-    // Always return mock data on error for testing
-    return mockQuotaResponse()
+  } catch {
+    return failMode === "open" ? mockQuotaResponse() : null
   }
 }
 

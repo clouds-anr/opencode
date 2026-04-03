@@ -307,8 +307,6 @@ async function initializeANR(envFile?: string): Promise<void> {
   }
 
   // Check quota
-  console.error("📍 Checking quota...")
-  process.stderr.write("")
   let quotaResult
   try {
     quotaResult = await checkQuota(
