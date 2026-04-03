@@ -5,7 +5,16 @@
 
 // Configuration
 export { type ANRConfig, defaultConfig } from "./config/types"
-export { loadANRConfig, getValidatedANRConfig, validateANRConfig } from "./config/env-loader"
+export {
+  loadANRConfig,
+  getValidatedANRConfig,
+  validateANRConfig,
+  findEnvFiles,
+  saveLastEnv,
+  getLastEnv,
+  clearStaleEnv,
+  type EnvFileInfo,
+} from "./config/env-loader"
 
 // Authentication
 export { authenticateWithOIDC, refreshOIDCTokens, type OIDCTokens } from "./integrations/oidc-auth"
