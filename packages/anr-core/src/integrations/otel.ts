@@ -244,15 +244,8 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     if (config.manager && !exporterHeaders["x-manager"]) exporterHeaders["x-manager"] = config.manager
     if (config.accountId && !exporterHeaders["x-account-id"]) exporterHeaders["x-account-id"] = config.accountId
 
-    // Ensure all attribution headers have defaults (matching ANR client behavior)
-    // so the OTel collector's attributes_processor always has dimensions to extract
-    if (!exporterHeaders["x-department"]) exporterHeaders["x-department"] = "unspecified"
-    if (!exporterHeaders["x-organization"]) exporterHeaders["x-organization"] = "default"
-    if (!exporterHeaders["x-team-id"]) exporterHeaders["x-team-id"] = "default-team"
-    if (!exporterHeaders["x-cost-center"]) exporterHeaders["x-cost-center"] = "general"
-    if (!exporterHeaders["x-location"]) exporterHeaders["x-location"] = "remote"
-    if (!exporterHeaders["x-role"]) exporterHeaders["x-role"] = "user"
-    if (!exporterHeaders["x-manager"]) exporterHeaders["x-manager"] = "unassigned"
+    // Only send attribution headers that have real values from JWT claims or config.
+    // No fake defaults — missing attributes simply won't appear as dimensions.
 
     // Create metric exporter with enriched headers and AWS authentication
     // Add AWS credentials as headers if available (for ALB/API Gateway authentication)

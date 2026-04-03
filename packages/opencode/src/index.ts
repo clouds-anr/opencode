@@ -135,6 +135,8 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
     terminalType: detectTerminalType(),
     sessionId,
     organization: claims.organization || claims["custom:organization"],
+    department: claims["custom:department"],
+    costCenter: claims["custom:cost_center"],
   }
 
   // Enrich from config
