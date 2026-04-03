@@ -62,7 +62,7 @@ export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCToken
   const params = new URLSearchParams({
     client_id: config.clientId,
     response_type: "code",
-    scope: "openid email",
+    scope: "openid email profile",
     redirect_uri: redirectURI,
     state: state,
     nonce: nonce,

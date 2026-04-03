@@ -1,0 +1,32 @@
+{
+    "UserPoolClient": {
+        "UserPoolId": "us-east-2_M3mLLrjsa",
+        "ClientName": "OpenCodeApp",
+        "ClientId": "687l9t5094usr3e822u01ihho3",
+        "LastModifiedDate": "2026-04-03T17:12:18.330000-04:00",
+        "CreationDate": "2026-04-02T16:34:38.527000-04:00",
+        "RefreshTokenValidity": 5,
+        "AccessTokenValidity": 60,
+        "IdTokenValidity": 60,
+        "TokenValidityUnits": {
+            "AccessToken": "minutes",
+            "IdToken": "minutes",
+            "RefreshToken": "days"
+        },
+        "ReadAttributes": [
+            "custom:cost_center",
+            "custom:department",
+            "custom:organization",
+            "email",
+            "email_verified",
+            "name",
+            "preferred_username",
+            "sub"
+        ],
+        "AllowedOAuthFlowsUserPoolClient": false,
+        "PreventUserExistenceErrors": "ENABLED",
+        "EnableTokenRevocation": true,
+        "EnablePropagateAdditionalUserContextData": false,
+        "AuthSessionValidity": 3
+    }
+}
