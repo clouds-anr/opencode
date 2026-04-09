@@ -472,9 +472,10 @@ function detectANR(): boolean {
  */
 async function selectEnvFile(): Promise<string | undefined> {
   // Resolve the opencodeANR package directory (canonical location for env files)
-  const root = process.env.npm_package_json
-    ? path.resolve(process.env.npm_package_json, "..")
-    : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
+  // Prefer import.meta.url (always points to this source file) over npm_package_json
+  // which may point to the workspace root package.json when run via `bun dev:anr`
+  const root = import.meta.url.replace("file://", "").split("/src/")[0]
+    || (process.env.npm_package_json ? path.resolve(process.env.npm_package_json, "..") : process.cwd())
   const dirs = [
     path.resolve(root, "../opencodeANR"),
     path.resolve(process.env.HOME || "~", ".config", "opencode-anr"),
