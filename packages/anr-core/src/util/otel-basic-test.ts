@@ -21,7 +21,8 @@ try {
   log("✅ Step 2: Resource created")
 
   // Create exporter
-  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector-alb-395007917.us-east-2.elb.amazonaws.com"
+  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+  if (!endpoint) throw new Error("OTEL_EXPORTER_OTLP_ENDPOINT env var required")
   const exporter = new OTLPMetricExporter({
     url: `${endpoint}/v1/metrics`,
     headers: { "x-user-email": "test@opencode.local" },

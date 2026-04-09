@@ -40,7 +40,7 @@ export interface QuotaCheckResponse {
 }
 
 const policyCache = new Map<string, { policy: QuotaPolicy; timestamp: number }>()
-const CACHE_TTL = 3600_000 // 1 hour
+const CACHE_TTL = 300_000 // 5 minutes — refreshed per-prompt
 
 function getCacheKey(req: QuotaCheckRequest): string {
   return `${req.userEmail}#${req.organization || ""}#${req.teamId || ""}`
@@ -60,7 +60,6 @@ export async function checkQuota(
   idToken?: string,
 ): Promise<QuotaCheckResponse | null> {
   if (!endpoint) {
-    console.warn("❌ OPENCODE_API_ENDPOINT not configured for quota")
     return failMode === "open" ? mockQuotaResponse() : null
   }
 
@@ -78,10 +77,10 @@ export async function checkQuota(
 
     // Add JWT bearer token for API Gateway JWT Authorizer validation
     // The Lambda extracts email from JWT claims, not query parameters
-    if (idToken) {
-      headers.Authorization = `Bearer ${idToken}`
-    } else {
-      console.warn("⚠️  No JWT token provided - API will return 401")
+    // Prefer refreshed token from env over the one passed in (may be stale)
+    const token = process.env.OPENCODE_ANR_ID_TOKEN || idToken
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
     }
 
     // Construct endpoint with /quota path
@@ -93,9 +92,7 @@ export async function checkQuota(
     })
 
     if (!response.ok) {
-      console.warn(`⚠️  Quota API returned ${response.status}. Using fallback data.`)
-      // Always return mock data on API error for testing
-      return mockQuotaResponse()
+      return failMode === "open" ? mockQuotaResponse() : null
     }
 
     // API Gateway returns { statusCode, body: JSON.stringify(...) }
@@ -112,12 +109,9 @@ export async function checkQuota(
       policyCache.set(cacheKey, { policy, timestamp: Date.now() })
       return quotaResponse
     }
-
     return failMode === "open" ? mockQuotaResponse() : null
-  } catch (error) {
-    console.warn(`❌ Quota API error: ${error instanceof Error ? error.message : String(error)}`)
-    // Always return mock data on error for testing
-    return mockQuotaResponse()
+  } catch {
+    return failMode === "open" ? mockQuotaResponse() : null
   }
 }
 

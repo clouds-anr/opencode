@@ -42,7 +42,7 @@ export interface ANRConfig {
   cognitoUserPoolId: string
 
   // Optional installer URLs
-  installerUrlClaude?: string
+  installerUrlOpencode?: string
   installerUrlGit?: string
 
   // Organization context (for telemetry enrichment)
@@ -57,7 +57,6 @@ export interface ANRConfig {
 }
 
 export const defaultConfig: Partial<ANRConfig> = {
-  awsRegion: "us-east-2",
   useBedrockProvider: true,
   enableTelemetry: true,
   enableAudit: true,

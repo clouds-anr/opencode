@@ -30,7 +30,8 @@ async function main() {
   console.log("═".repeat(70))
 
   // ── Config ──
-  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector-alb-395007917.us-east-2.elb.amazonaws.com"
+  const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+  if (!endpoint) throw new Error("OTEL_EXPORTER_OTLP_ENDPOINT env var required")
   const region = process.env.OPENCODE_AWS_REGION || "us-east-2"
 
   const config = {
@@ -83,35 +84,35 @@ async function main() {
   show("\n📝", "Recording test metrics...")
   const meter = metrics.getMeter("opencode-anr")
 
-  const session = meter.createCounter("claude_code.session.started", { description: "Sessions started" })
+  const session = meter.createCounter("opencode.session.started", { description: "Sessions started" })
   session.add(1)
-  show("  📊", "claude_code.session.started = 1")
+  show("  📊", "opencode.session.started = 1")
 
-  const tokens = meter.createCounter("claude_code.token.usage", { description: "Token usage" })
+  const tokens = meter.createCounter("opencode.token.usage", { description: "Token usage" })
   tokens.add(150, { type: "input", model: "us.anthropic.claude-sonnet-4-20250514-v1:0" })
   tokens.add(75, { type: "output", model: "us.anthropic.claude-sonnet-4-20250514-v1:0" })
-  show("  📊", "claude_code.token.usage: 150 input + 75 output")
+  show("  📊", "opencode.token.usage: 150 input + 75 output")
 
-  const calls = meter.createCounter("claude_code.model.calls.count", { description: "Model calls" })
+  const calls = meter.createCounter("opencode.model.calls.count", { description: "Model calls" })
   calls.add(1, { model: "us.anthropic.claude-sonnet-4-20250514-v1:0" })
-  show("  📊", "claude_code.model.calls.count = 1")
+  show("  📊", "opencode.model.calls.count = 1")
 
-  const cost = meter.createCounter("claude_code.cost.usage", { description: "Estimated cost", unit: "USD" })
+  const cost = meter.createCounter("opencode.cost.usage", { description: "Estimated cost", unit: "USD" })
   cost.add(0.001125, { model: "us.anthropic.claude-sonnet-4-20250514-v1:0" })
-  show("  📊", "claude_code.cost.usage = $0.001125")
+  show("  📊", "opencode.cost.usage = $0.001125")
 
-  const loc = meter.createCounter("claude_code.lines_of_code.count", { description: "Lines of code", unit: "1" })
+  const loc = meter.createCounter("opencode.lines_of_code.count", { description: "Lines of code", unit: "1" })
   loc.add(42, { type: "added", language: "typescript" })
   loc.add(10, { type: "removed", language: "typescript" })
-  show("  📊", "claude_code.lines_of_code.count: 42 added + 10 removed")
+  show("  📊", "opencode.lines_of_code.count: 42 added + 10 removed")
 
-  const editTool = meter.createCounter("claude_code.code_edit_tool.applied", { description: "Code edit tool" })
+  const editTool = meter.createCounter("opencode.code_edit_tool.applied", { description: "Code edit tool" })
   editTool.add(1, { tool_name: "str_replace_editor", language: "typescript" })
-  show("  📊", "claude_code.code_edit_tool.applied = 1")
+  show("  📊", "opencode.code_edit_tool.applied = 1")
 
-  const editDecision = meter.createCounter("claude_code.code_edit_tool.decision", { description: "Edit decisions" })
+  const editDecision = meter.createCounter("opencode.code_edit_tool.decision", { description: "Edit decisions" })
   editDecision.add(1, { decision: "accepted" })
-  show("  📊", "claude_code.code_edit_tool.decision = 1 (accepted)")
+  show("  📊", "opencode.code_edit_tool.decision = 1 (accepted)")
 
   // ── Wait for export ──
   show("\n⏳", "Waiting for export cycles (15s, interval=5s)...")
