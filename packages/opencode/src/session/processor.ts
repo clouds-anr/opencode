@@ -17,7 +17,7 @@ import { Config } from "@/config/config"
 import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
-import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision } from "@opencode-ai/anr-core"
+import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision, trackCommit, trackActiveTime, checkQuota } from "@opencode-ai/anr-core"
 import { refresh as refreshANRCredentials } from "@/auth/anr-refresh"
 
 export namespace SessionProcessor {
@@ -43,6 +43,8 @@ export namespace SessionProcessor {
     }
     // Check status code — 403 with credential-related errors
     if ((e as any)?.statusCode === 403 && /credential|token|security/i.test(message)) return true
+    // Check status code — 401 Unauthorized (expired JWT / missing auth)
+    if ((e as any)?.statusCode === 401 || (e as any)?.status === 401) return true
     return false
   }
 
@@ -72,16 +74,29 @@ export namespace SessionProcessor {
         log.info("process")
         needsCompaction = false
         const shouldBreak = (await Config.get()).experimental?.continue_loop_on_deny !== true
+        const processStart = Date.now()
 
-        // Check quota before attempting model invocation
-        const quotaAllowed = process.env.OPENCODE_ANR_QUOTA_ALLOWED !== "false"
-        if (!quotaAllowed) {
-          const warningLevel = process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL || "normal"
-          const reason =
-            warningLevel === "critical"
+        // Per-prompt quota check — calls API (cached 5 min) to get fresh usage
+        if (process.env.OPENCODE_FLAVOR === "anr" && process.env.OPENCODE_API_ENDPOINT) {
+          const email = process.env.OPENCODE_ANR_USER_EMAIL || ""
+          const result = await checkQuota(
+            { userEmail: email },
+            process.env.OPENCODE_API_ENDPOINT,
+            (process.env.QUOTA_FAIL_MODE as "closed" | "open") || "closed",
+            process.env.OPENCODE_ANR_ID_TOKEN,
+          )
+          if (result) {
+            process.env.OPENCODE_ANR_QUOTA_ALLOWED = String(result.usage.allowed)
+            process.env.OPENCODE_ANR_QUOTA_WARNING_LEVEL = result.usage.warningLevel
+            process.env.OPENCODE_ANR_QUOTA_DAILY_PERCENT = String(result.usage.dailyUsagePercent)
+            process.env.OPENCODE_ANR_QUOTA_MONTHLY_PERCENT = String(result.usage.monthlyUsagePercent)
+          }
+          if (result && !result.usage.allowed) {
+            const reason = result.usage.warningLevel === "critical"
               ? "Quota limit exceeded. Cannot proceed with model invocation."
               : "Quota check failed. Please review your usage."
-          throw new Error(reason)
+            throw new Error(reason)
+          }
         }
 
         while (true) {
@@ -256,12 +271,12 @@ export namespace SessionProcessor {
                           trackLinesOfCode(added, "added", lang)
                           trackLinesOfCode(removed, "removed", lang)
                           trackCodeEditTool("edit", lang, true)
-                          trackCodeEditDecision("accepted")
+                          trackCodeEditDecision("accepted", lang)
                         } else if (tool === "write" && inp.content !== undefined) {
                           const lines = inp.content.split("\n").length
-                          trackLinesOfCode(lines, "written", lang)
+                          trackLinesOfCode(lines, "added", lang)
                           trackCodeEditTool("write", lang, true)
-                          trackCodeEditDecision("accepted")
+                          trackCodeEditDecision("accepted", lang)
                         } else if (tool === "multiedit" && Array.isArray(inp.edits)) {
                           let added = 0
                           let removed = 0
@@ -272,7 +287,7 @@ export namespace SessionProcessor {
                           trackLinesOfCode(added, "added", lang)
                           trackLinesOfCode(removed, "removed", lang)
                           trackCodeEditTool("multiedit", lang, true)
-                          trackCodeEditDecision("accepted")
+                          trackCodeEditDecision("accepted", lang)
                         } else if (tool === "apply_patch" && inp.patchText) {
                           const lines = inp.patchText.split("\n")
                           const added = lines.filter((l: string) => l.startsWith("+") && !l.startsWith("+++")).length
@@ -280,7 +295,9 @@ export namespace SessionProcessor {
                           trackLinesOfCode(added, "added")
                           trackLinesOfCode(removed, "removed")
                           trackCodeEditTool("apply_patch", "mixed", true)
-                          trackCodeEditDecision("accepted")
+                          trackCodeEditDecision("accepted", "mixed")
+                        } else if (tool === "bash" && typeof inp.command === "string" && /\bgit\s+commit\b/.test(inp.command)) {
+                          trackCommit()
                         }
                       } catch {
                         // silently fail — don't block tool results
@@ -352,6 +369,9 @@ export namespace SessionProcessor {
                       // Get context and track metrics
                       const context = getTelemetryContext()
 
+                      // Cost from model data (prices are per million tokens)
+                      const cost = (usage.tokens.input * input.model.cost.input + usage.tokens.output * input.model.cost.output) / 1_000_000
+
                       trackModelCall(
                         input.model.id || input.model.name,
                         usage.tokens.input,
@@ -359,7 +379,8 @@ export namespace SessionProcessor {
                         usage.tokens.reasoning,
                         usage.tokens.cache.read,
                         usage.tokens.cache.write,
-                        context || undefined, // Pass context explicitly
+                        context || undefined,
+                        cost,
                       )
 
                       // Push metrics to collector now instead of waiting for
@@ -573,6 +594,11 @@ export namespace SessionProcessor {
           }
           input.assistantMessage.time.completed = Date.now()
           await Session.updateMessage(input.assistantMessage)
+          // Track active processing time for ANR telemetry
+          if (process.env.OPENCODE_FLAVOR === "anr") {
+            const elapsed = Math.round((Date.now() - processStart) / 1000)
+            if (elapsed > 0) trackActiveTime(elapsed)
+          }
           if (needsCompaction) return "compact"
           if (blocked) return "stop"
           if (input.assistantMessage.error) return "stop"

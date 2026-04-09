@@ -27,7 +27,7 @@ function arg(name: string, fallback: string): string {
   return process.argv[idx + 1]!
 }
 
-const NAMESPACE = arg("namespace", "ClaudeCode")
+const NAMESPACE = arg("namespace", "OpenCode")
 const REGION = arg("region", "us-east-2")
 const PROFILE = arg("profile", "anr-bedrock-internal-us-east-1")
 const MINUTES = parseInt(arg("minutes", "60"), 10)
@@ -36,16 +36,16 @@ const SHOW_ALL = process.argv.includes("--all")
 
 // Metrics the e2e test sends + real-world production metrics
 const METRICS: { name: string; stat: string; label: string }[] = [
-  { name: "claude_code.session.started",          stat: "Sum",     label: "Sessions started" },
-  { name: "claude_code.token.usage",              stat: "Sum",     label: "Token usage (input + output)" },
-  { name: "claude_code.model.calls.count",        stat: "Sum",     label: "Model API calls" },
-  { name: "claude_code.session.duration_seconds",  stat: "Sum",     label: "Session duration" },
-  { name: "claude_code.command.duration_ms",       stat: "Sum",     label: "Command duration" },
-  { name: "claude_code.command.count",             stat: "Sum",     label: "Commands executed" },
-  { name: "claude_code.cost.usage",                stat: "Sum",     label: "Estimated cost (USD)" },
-  { name: "claude_code.lines_of_code.count",       stat: "Sum",     label: "Lines of code" },
-  { name: "claude_code.code_edit_tool.applied",    stat: "Sum",     label: "Code edit tool applications" },
-  { name: "claude_code.code_edit_tool.decision",   stat: "Sum",     label: "Code edit decisions" },
+  { name: "opencode.session.started",          stat: "Sum",     label: "Sessions started" },
+  { name: "opencode.token.usage",              stat: "Sum",     label: "Token usage (input + output)" },
+  { name: "opencode.model.calls.count",        stat: "Sum",     label: "Model API calls" },
+  { name: "opencode.session.duration_seconds",  stat: "Sum",     label: "Session duration" },
+  { name: "opencode.command.duration_ms",       stat: "Sum",     label: "Command duration" },
+  { name: "opencode.command.count",             stat: "Sum",     label: "Commands executed" },
+  { name: "opencode.cost.usage",                stat: "Sum",     label: "Estimated cost (USD)" },
+  { name: "opencode.lines_of_code.count",       stat: "Sum",     label: "Lines of code" },
+  { name: "opencode.code_edit_tool.applied",    stat: "Sum",     label: "Code edit tool applications" },
+  { name: "opencode.code_edit_tool.decision",   stat: "Sum",     label: "Code edit decisions" },
 ]
 
 function iso(d: Date) {

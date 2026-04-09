@@ -204,7 +204,7 @@ function buildOTELMetricsPayload(config: ANRConfig, context: any) {
             },
             metrics: [
               {
-                name: "claude_code.test.metric",
+                name: "opencode.test.metric",
                 description: "Test metric from harness",
                 unit: "1",
                 sum: {
