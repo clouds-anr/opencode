@@ -42,7 +42,7 @@ process.on("uncaughtException", (e) => {
 // Initialize OTEL and audit logger in the worker. The main thread's
 // MeterProvider and dynamoClient are not shared with Bun Workers.
 if (process.env.OPENCODE_FLAVOR === "anr") {
-  const config = await loadANRConfig(undefined, true)
+  const config = await loadANRConfig(process.env.OPENCODE_ANR_ENV_FILE, true)
 
   // OTEL: so token metrics from session processing are recorded
   if (process.env.OPENCODE_ENABLE_TELEMETRY === "1") {

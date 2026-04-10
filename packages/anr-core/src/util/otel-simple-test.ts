@@ -42,7 +42,8 @@ export async function runSimpleOTELTest() {
     log("✅ Resource created")
 
     // Determine endpoint and protocol
-    const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://otel-collector-alb-395007917.us-east-2.elb.amazonaws.com"
+    const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    if (!endpoint) throw new Error("OTEL_EXPORTER_OTLP_ENDPOINT env var required")
     const protocol = process.env.OTEL_EXPORTER_OTLP_PROTOCOL || "http/protobuf"
 
     log("📋 Configuration", { endpoint, protocol, logFile })

@@ -8,7 +8,8 @@
  *   4. Full MeterProvider pipeline (does the SDK pipeline work?)
  */
 
-const ENDPOINT = "http://otel-collector-alb-395007917.us-east-2.elb.amazonaws.com"
+const ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+if (!ENDPOINT) throw new Error("OTEL_EXPORTER_OTLP_ENDPOINT env var required")
 
 const colors = {
   reset: "\x1b[0m",

@@ -50,7 +50,12 @@ import {
   logAuthEvent,
   logSessionStart,
   logSessionEnd,
+  logQuotaCheck,
   checkQuota,
+  findEnvFiles,
+  saveLastEnv,
+  getLastEnv,
+  clearStaleEnv,
   type TelemetryContext,
 } from "@opencode-ai/anr-core"
 import { randomUUID } from "crypto"
@@ -130,6 +135,8 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
     terminalType: detectTerminalType(),
     sessionId,
     organization: claims.organization || claims["custom:organization"],
+    department: claims["custom:department"],
+    costCenter: claims["custom:cost_center"],
   }
 
   // Enrich from config
@@ -148,7 +155,7 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
 /**
  * Initialize ANR mode: authentication, quota, telemetry
  */
-async function initializeANR(): Promise<void> {
+async function initializeANR(envFile?: string): Promise<void> {
   // Clear OTEL logs from previous session for clean debugging
   clearOTELLogs()
 
@@ -156,7 +163,10 @@ async function initializeANR(): Promise<void> {
   process.stderr.write("")
 
   // Load configuration
-  const config = await getValidatedANRConfig(undefined, false)
+  const config = await getValidatedANRConfig(envFile, false)
+
+  // Pass env file path to the worker so it loads the same config
+  if (envFile) process.env.OPENCODE_ANR_ENV_FILE = envFile
 
   // Generate session ID
   const sessionId = randomUUID()
@@ -303,8 +313,6 @@ async function initializeANR(): Promise<void> {
   }
 
   // Check quota
-  console.error("📍 Checking quota...")
-  process.stderr.write("")
   let quotaResult
   try {
     quotaResult = await checkQuota(
@@ -315,12 +323,18 @@ async function initializeANR(): Promise<void> {
       },
       config.modelsApiEndpoint,
       config.quotaFailMode,
-      tokens.idToken,
+      process.env.OPENCODE_ANR_ID_TOKEN || tokens.idToken,
     )
   } catch (err) {
     console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)
     process.exit(1)
   }
+
+  // Audit the quota check result
+  logQuotaCheck(config, telemetryContext.userId, !!quotaResult?.usage?.allowed, telemetryContext, {
+    daily: quotaResult?.usage?.dailyUsagePercent,
+    monthly: quotaResult?.usage?.monthlyUsagePercent,
+  })
 
   if (!quotaResult || !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
@@ -453,6 +467,66 @@ function detectANR(): boolean {
 }
 
 /**
+ * Interactive env file picker for ANR mode.
+ * Matches Donta's ui.Select() behavior from GovClaudeClient.
+ */
+async function selectEnvFile(): Promise<string | undefined> {
+  // Resolve the opencodeANR package directory (canonical location for env files)
+  // Prefer import.meta.url (always points to this source file) over npm_package_json
+  // which may point to the workspace root package.json when run via `bun dev:anr`
+  const root = import.meta.url.replace("file://", "").split("/src/")[0]
+    || (process.env.npm_package_json ? path.resolve(process.env.npm_package_json, "..") : process.cwd())
+  const dirs = [
+    path.resolve(root, "../opencodeANR"),
+    path.resolve(process.env.HOME || "~", ".config", "opencode-anr"),
+  ]
+
+  const files = findEnvFiles(dirs)
+  if (files.length === 0) return undefined
+  if (files.length === 1) {
+    saveLastEnv(files[0].path)
+    return files[0].path
+  }
+
+  // Pre-select the last-used env file
+  const last = getLastEnv()
+  const lastIdx = last ? files.findIndex((f) => f.path === last) : -1
+
+  // If not a terminal, use last or first
+  if (!process.stderr.isTTY) {
+    const idx = lastIdx >= 0 ? lastIdx : 0
+    return files[idx]?.path
+  }
+
+  // Interactive picker
+  process.stderr.write("\nSelect environment:\n")
+  for (let i = 0; i < files.length; i++) {
+    const marker = i === lastIdx ? " (last used)" : ""
+    process.stderr.write(`  ${i + 1}. ${files[i]?.display ?? files[i]?.name}${marker}\n`)
+  }
+
+  const rl = await import("readline")
+  const prompt = rl.createInterface({ input: process.stdin, output: process.stderr })
+  const dflt = lastIdx >= 0 ? lastIdx + 1 : 1
+  const answer = await new Promise<string>((ok) => {
+    prompt.question(`Choice [${dflt}]: `, (a) => {
+      prompt.close()
+      ok(a.trim())
+    })
+  })
+
+  const choice = answer === "" ? dflt : parseInt(answer, 10)
+  if (Number.isNaN(choice) || choice < 1 || choice > files.length) {
+    process.stderr.write("Invalid selection, using default.\n")
+    return files[dflt - 1]?.path
+  }
+
+  const selected = files[choice - 1]?.path
+  if (selected) saveLastEnv(selected)
+  return selected
+}
+
+/**
  * Main CLI function
  * Pass argv to test/override, or undefined to use process.argv
  */
@@ -466,8 +540,20 @@ export async function main(argv?: string[]) {
   const anrMode =
     process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
 
+  // Parse --env-file before ANR init so the config loader can use it
+  const envIdx = process.argv.indexOf("--env-file")
+  let envFile = envIdx !== -1 ? process.argv[envIdx + 1] : undefined
+
   if (anrMode) {
-    await initializeANR()
+    // If no --env-file flag, show picker (or auto-select if only one)
+    if (!envFile) {
+      envFile = await selectEnvFile()
+    }
+
+    // Clear stale env vars before loading new config
+    clearStaleEnv()
+
+    await initializeANR(envFile)
   }
 
   let cli = yargs(argv ?? hideBin(process.argv))
@@ -486,6 +572,10 @@ export async function main(argv?: string[]) {
       describe: "log level",
       type: "string",
       choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+    })
+    .option("env-file", {
+      describe: "path to ANR .env config file",
+      type: "string",
     })
     .middleware(async (opts) => {
       await Log.init({
