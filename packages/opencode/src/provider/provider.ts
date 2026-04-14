@@ -314,7 +314,7 @@ export namespace Provider {
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
           // Skip region prefixing if model already has a cross-region inference profile prefix
           // Models from models.dev may already include prefixes like us., eu., global., etc.
-          const crossRegionPrefixes = ["global.", "us.", "eu.", "jp.", "apac.", "au."]
+          const crossRegionPrefixes = ["global.", "us-gov.", "us.", "eu.", "jp.", "apac.", "au."]
           if (crossRegionPrefixes.some((prefix) => modelID.startsWith(prefix))) {
             return sdk.languageModel(modelID)
           }
@@ -329,19 +329,14 @@ export namespace Provider {
 
           switch (regionPrefix) {
             case "us": {
-              const modelRequiresPrefix = [
-                "nova-micro",
-                "nova-lite",
-                "nova-pro",
-                "nova-premier",
-                "nova-2",
-                "claude",
-                "deepseek.r",
-                "llama",
-              ].some((m) => modelID.includes(m))
               const isGovCloud = region.startsWith("us-gov")
-              if (modelRequiresPrefix && !isGovCloud) {
-                modelID = `${regionPrefix}.${modelID}`
+              // GovCloud only has inference profiles for claude; other models use direct IDs
+              const prefixed = isGovCloud
+                ? ["claude"]
+                : ["nova-micro", "nova-lite", "nova-pro", "nova-premier", "nova-2", "claude", "deepseek.r", "llama"]
+              const modelRequiresPrefix = prefixed.some((m) => modelID.includes(m))
+              if (modelRequiresPrefix) {
+                modelID = isGovCloud ? `us-gov.${modelID}` : `${regionPrefix}.${modelID}`
               }
               break
             }
@@ -1280,7 +1275,7 @@ export namespace Provider {
       }
       for (const item of priority) {
         if (providerID === "amazon-bedrock") {
-          const crossRegionPrefixes = ["global.", "us.", "eu."]
+          const crossRegionPrefixes = ["global.", "us-gov.", "us.", "eu."]
           const candidates = Object.keys(provider.models).filter((m) => m.includes(item))
 
           // Model selection priority:
@@ -1292,6 +1287,10 @@ export namespace Provider {
 
           const region = provider.options?.region
           if (region) {
+            if (region.startsWith("us-gov")) {
+              const govMatch = candidates.find((m) => m.startsWith("us-gov."))
+              if (govMatch) return getModel(providerID, govMatch)
+            }
             const regionPrefix = region.split("-")[0]
             if (regionPrefix === "us" || regionPrefix === "eu") {
               const regionalMatch = candidates.find((m) => m.startsWith(`${regionPrefix}.`))
