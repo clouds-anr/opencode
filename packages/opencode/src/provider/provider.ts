@@ -329,17 +329,12 @@ export namespace Provider {
 
           switch (regionPrefix) {
             case "us": {
-              const modelRequiresPrefix = [
-                "nova-micro",
-                "nova-lite",
-                "nova-pro",
-                "nova-premier",
-                "nova-2",
-                "claude",
-                "deepseek.r",
-                "llama",
-              ].some((m) => modelID.includes(m))
               const isGovCloud = region.startsWith("us-gov")
+              // GovCloud only has inference profiles for claude; other models use direct IDs
+              const prefixed = isGovCloud
+                ? ["claude"]
+                : ["nova-micro", "nova-lite", "nova-pro", "nova-premier", "nova-2", "claude", "deepseek.r", "llama"]
+              const modelRequiresPrefix = prefixed.some((m) => modelID.includes(m))
               if (modelRequiresPrefix) {
                 modelID = isGovCloud ? `us-gov.${modelID}` : `${regionPrefix}.${modelID}`
               }
