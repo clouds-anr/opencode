@@ -1,0 +1,77 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "zen/claude-opus-4-5",
+  "default_agent": "csp_orchestrator",
+  "keybinds": {
+    "f9": "agent:prev",
+    "f10": "agent:next"
+  },
+  "agent": {
+    "csp_orchestrator": {
+      "description": "CSP Team Orchestrator - cloud architecture, DB migrations, SQL platform",
+      "mode": "primary",
+      "prompt": "{file:~/.config/opencode/agent/csp_orchestrator.md}"
+    },
+    "researcher": {
+      "description": "Researcher + Planner - deep analysis, actionable plans",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/researcher.md}"
+    },
+    "implementor_csp": {
+      "description": "Implementor CSP - cloud configs, DB scripts, Azure Bicep/ARM, PostgreSQL",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/implementor_csp.md}"
+    },
+    "tester_csp": {
+      "description": "Tester CSP - migration validation, schema testing, cloud config verification",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/tester_csp.md}"
+    },
+    "senior_cloud_architect": {
+      "description": "Senior Cloud Architect - architecture design, Mermaid diagrams, NFR analysis",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/senior-cloud-architect.md}"
+    },
+    "ms_sql_dba": {
+      "description": "MS SQL DBA - SQL Server administration, T-SQL, performance tuning",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/ms-sql-dba-agent.md}"
+    },
+    "oracle_to_postgres": {
+      "description": "Oracle→PostgreSQL Migration Expert - application migration phases",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/oracle-to-postgres-migration-expert-agent.md}"
+    },
+    "documentation": {
+      "description": "Documentation - maintains PlantUML diagrams, ADRs, and technical docs",
+      "mode": "subagent",
+      "prompt": "{file:~/.config/opencode/agent/documentation.md}"
+    },
+    "truth_teller": {
+      "description": "Truth-Teller (default) - challenges assumptions",
+      "mode": "subagent",
+      "model": "zen/claude-opus-4-5",
+      "prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+    },
+    "truth_teller_opus": {
+      "description": "Truth-Teller (Opus) - Truth-teller using Claude Opus",
+      "mode": "subagent",
+      "model": "zen/claude-opus-4-5",
+      "prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+    },
+    "truth_teller_qwen": {
+      "description": "Truth-Teller (Qwen) - Truth-teller using Qwen3 Coder",
+      "mode": "subagent",
+      "model": "zen/qwen3-coder-480b",
+      "prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+    },
+    "truth_teller_grok": {
+      "description": "Truth-Teller (Grok) - Truth-teller using Grok",
+      "mode": "subagent",
+      "model": "zen/grok-3",
+      "prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+    },
+    "plan": { "disable": true },
+    "build": { "disable": true }
+  }
+}
