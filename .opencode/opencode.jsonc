@@ -14,5 +14,188 @@
 	"tools": {
 		"github-triage": false,
 		"github-pr-search": false
+	},
+	// All team orchestrators are available simultaneously.
+	// Run .opencode/install_all.sh once to install agents to ~/.config/opencode/agent/
+	// then use @<team>_orchestrator to address any team directly.
+	"agent": {
+		// ── Shared agents (used by all teams) ─────────────────────────────────
+		"researcher": {
+			"description": "Researcher + Planner - deep analysis, actionable plans",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/researcher.md}"
+		},
+		"documentation": {
+			"description": "Documentation - PlantUML diagrams, ADRs, API docs",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/documentation.md}"
+		},
+		"truth_teller": {
+			"description": "Truth-Teller (default) - challenges assumptions",
+			"mode": "subagent",
+			"model": "opencode/claude-opus-4-5",
+			"prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+		},
+		"truth_teller_opus": {
+			"description": "Truth-Teller (Opus) - Claude Opus perspective",
+			"mode": "subagent",
+			"model": "opencode/claude-opus-4-5",
+			"prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+		},
+		"truth_teller_qwen": {
+			"description": "Truth-Teller (Qwen) - Qwen3 Coder perspective",
+			"mode": "subagent",
+			"model": "opencode/qwen3-coder-480b",
+			"prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+		},
+		"truth_teller_grok": {
+			"description": "Truth-Teller (Grok) - Grok perspective",
+			"mode": "subagent",
+			"model": "opencode/grok-3",
+			"prompt": "{file:~/.config/opencode/agent/truth_teller.md}"
+		},
+
+		// ── C++ Team ──────────────────────────────────────────────────────────
+		"cpp_orchestrator": {
+			"description": "C++ Team Orchestrator - C++ features, refactors, testing, docs",
+			"mode": "primary",
+			"prompt": "{file:~/.config/opencode/agent/cpp_orchestrator.md}"
+		},
+		"implementor_cpp": {
+			"description": "Implementor C++ - modern C++ implementation (C++20/23)",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/implementor_cpp.md}"
+		},
+		"tester_cpp": {
+			"description": "Tester C++ - CTest, sanitizers (ASan/UBSan/TSan), coverage",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/tester_cpp.md}"
+		},
+
+		// ── CSP Team ──────────────────────────────────────────────────────────
+		"csp_orchestrator": {
+			"description": "CSP Team Orchestrator - cloud architecture, DB migrations, Azure",
+			"mode": "primary",
+			"prompt": "{file:~/.config/opencode/agent/csp_orchestrator.md}"
+		},
+		"implementor_csp": {
+			"description": "Implementor CSP - cloud configs, DB scripts, Azure Bicep/ARM",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/implementor_csp.md}"
+		},
+		"tester_csp": {
+			"description": "Tester CSP - migration validation, schema testing",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/tester_csp.md}"
+		},
+		"senior_cloud_architect": {
+			"description": "Senior Cloud Architect - architecture design, Mermaid diagrams, NFR",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/senior-cloud-architect.md}"
+		},
+		"ms_sql_dba": {
+			"description": "MS SQL DBA - SQL Server administration, T-SQL, performance tuning",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/ms-sql-dba-agent.md}"
+		},
+		"oracle_to_postgres": {
+			"description": "Oracle→PostgreSQL Migration Expert - application migration phases",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/oracle-to-postgres-migration-expert-agent.md}"
+		},
+
+		// ── DevOps Team ───────────────────────────────────────────────────────
+		"devops_orchestrator": {
+			"description": "DevOps Team Orchestrator - IaC, CI/CD, cloud deployments",
+			"mode": "primary",
+			"prompt": "{file:~/.config/opencode/agent/devops_orchestrator.md}"
+		},
+		"implementor_devops": {
+			"description": "Implementor DevOps - Terraform HCL, Dockerfiles, GitHub Actions YAML",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/implementor_devops.md}"
+		},
+		"tester_devops": {
+			"description": "Tester DevOps - terraform plan, tfsec, checkov, YAML lint",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/tester_devops.md}"
+		},
+		"devops_expert": {
+			"description": "DevOps Expert - infinity loop, CI/CD strategy, observability, SLOs",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/devops-expert.md}"
+		},
+		"terraform": {
+			"description": "Terraform Specialist - HCP Terraform automation via MCP server",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/terraform.md}"
+		},
+		"terraform_reviewer": {
+			"description": "Terraform IaC Reviewer - state safety, blast radius, least-privilege IAM",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/terraform-iac-reviewer.md}"
+		},
+
+		// ── HR Team ───────────────────────────────────────────────────────────
+		"hr_orchestrator": {
+			"description": "HR Team Orchestrator - AI governance, compliance, triage, translation",
+			"mode": "primary",
+			"prompt": "{file:~/.config/opencode/agent/hr_orchestrator.md}"
+		},
+		"implementor_hr": {
+			"description": "Implementor HR - governance policies, audit logging, safety controls",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/implementor_hr.md}"
+		},
+		"reviewer_hr": {
+			"description": "Reviewer HR - validates governance completeness and AI safety controls",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/reviewer_hr.md}"
+		},
+		"governance_reviewer": {
+			"description": "Governance Reviewer - reviews code for missing safety and governance controls",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/governance-reviewer.md}"
+		},
+		"translator": {
+			"description": "Translator - translates content while preserving technical terms",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/translator.md}"
+		},
+		"triage": {
+			"description": "Triage Agent - GitHub issue triage, labels and owner assignment",
+			"prompt": "{file:~/.config/opencode/agent/triage.md}"
+		},
+		"duplicate_pr": {
+			"description": "Duplicate PR Detector - searches for duplicate open PRs",
+			"prompt": "{file:~/.config/opencode/agent/duplicate-pr.md}"
+		},
+
+		// ── Tech Team ─────────────────────────────────────────────────────────
+		"tech_orchestrator": {
+			"description": "Tech Team Orchestrator - general software engineering across any stack",
+			"mode": "primary",
+			"prompt": "{file:~/.config/opencode/agent/tech_orchestrator.md}"
+		},
+		"implementor_tech": {
+			"description": "Implementor Tech - features, refactors, bug fixes across any language",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/implementor_tech.md}"
+		},
+		"tester_tech": {
+			"description": "Tester Tech - test design, execution, coverage validation",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/tester_tech.md}"
+		},
+		"principal_engineer": {
+			"description": "Principal Engineer - architecture, GoF patterns, SOLID, technical debt",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/principal-software-engineer.md}"
+		},
+		"software_engineer": {
+			"description": "Software Engineer - autonomous executor with zero-confirmation policy",
+			"mode": "subagent",
+			"prompt": "{file:~/.config/opencode/agent/software-engineer-agent.md}"
+		}
 	}
 }
