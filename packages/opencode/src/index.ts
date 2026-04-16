@@ -472,12 +472,11 @@ function detectANR(): boolean {
  */
 async function selectEnvFile(): Promise<string | undefined> {
   // Search for .env files in standard locations (works for exe + dev mode on all OSes)
-  const root = import.meta.url.replace("file://", "").split("/src/")[0]
-    || (process.env.npm_package_json ? path.resolve(process.env.npm_package_json, "..") : process.cwd())
+  // 1. cwd — covers both dev mode (repo root) and end-user (exe folder)
+  // 2. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
   const dirs = [
     process.cwd(),
     path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
-    path.resolve(root, "../opencodeANR"),
   ]
 
   const files = findEnvFiles(dirs)
