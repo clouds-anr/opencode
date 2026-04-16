@@ -29,17 +29,17 @@ if [ ! -d "$TEAM_DIR" ]; then
 fi
 
 # Detect filename collisions that would overwrite shared agents
-DUPE=()
+dupes=()
 for f in "$SHARED_DIR"/*.md; do
     name="$(basename "$f")"
     if [ -f "$TEAM_DIR/$name" ]; then
-        DUPE+=("$name")
+        dupes+=("$name")
     fi
 done
 
-if [ ${#DUPE[@]} -gt 0 ]; then
+if [ ${#dupes[@]} -gt 0 ]; then
     echo "Error: Duplicate agent filenames detected:"
-    for f in "${DUPE[@]}"; do
+    for f in "${dupes[@]}"; do
         echo "  - $f"
     done
     echo ""
