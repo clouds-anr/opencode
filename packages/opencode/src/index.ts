@@ -472,10 +472,14 @@ function detectANR(): boolean {
  */
 async function selectEnvFile(): Promise<string | undefined> {
   // Search for .env files in standard locations (works for exe + dev mode on all OSes)
-  // 1. cwd — covers both dev mode (repo root) and end-user (exe folder)
-  // 2. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
+  // 1. cwd — the folder the user ran the app from (exe folder for end users)
+  // 2. monorepo root — for dev mode where bun --cwd changes cwd to packages/opencode
+  // 3. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
+  const pkg = import.meta.url.replace("file://", "").split("/src/")[0]
+  const root = pkg ? path.resolve(pkg, "../..") : undefined
   const dirs = [
     process.cwd(),
+    ...(root && root !== process.cwd() ? [root] : []),
     path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
   ]
 
