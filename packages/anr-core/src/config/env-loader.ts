@@ -95,7 +95,6 @@ const STALE_KEYS = [
   "AWS_SESSION_TOKEN",
   "AWS_REGION",
   "AWS_PROFILE",
-  "OPENCODE_AWS_PROFILE",
   "OPENCODE_AWS_REGION",
   "OPENCODE_ANR_ID_TOKEN",
   "OPENCODE_ANR_USER_EMAIL",
@@ -223,7 +222,7 @@ function parseEnvConfig(quiet = false): ANRConfig {
 
   return {
     // AWS & Bedrock
-    awsProfile: env.AWS_PROFILE || env.OPENCODE_AWS_PROFILE || defaultConfig.awsProfile || "",
+    awsProfile: env.AWS_PROFILE || defaultConfig.awsProfile || "",
     awsRegion: env.AWS_REGION || env.OPENCODE_AWS_REGION || defaultConfig.awsRegion!,
     useBedrockProvider: env.OPENCODE_USE_BEDROCK === "1",
     anthropicModel: env.ANTHROPIC_MODEL || "",
@@ -277,8 +276,6 @@ function parseEnvConfig(quiet = false): ANRConfig {
 export function validateANRConfig(config: ANRConfig): string[] {
   const errors: string[] = []
 
-  // Only require AWS config for Phase 1 (authentication)
-  if (!config.awsProfile) errors.push("AWS_PROFILE or OPENCODE_AWS_PROFILE is required")
   if (!config.awsRegion) errors.push("AWS_REGION or OPENCODE_AWS_REGION is required")
 
   return errors

@@ -471,14 +471,13 @@ function detectANR(): boolean {
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
  */
 async function selectEnvFile(): Promise<string | undefined> {
-  // Resolve the opencodeANR package directory (canonical location for env files)
-  // Prefer import.meta.url (always points to this source file) over npm_package_json
-  // which may point to the workspace root package.json when run via `bun dev:anr`
+  // Search for .env files in standard locations (works for exe + dev mode on all OSes)
   const root = import.meta.url.replace("file://", "").split("/src/")[0]
     || (process.env.npm_package_json ? path.resolve(process.env.npm_package_json, "..") : process.cwd())
   const dirs = [
+    process.cwd(),
+    path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
     path.resolve(root, "../opencodeANR"),
-    path.resolve(process.env.HOME || "~", ".config", "opencode-anr"),
   ]
 
   const files = findEnvFiles(dirs)
