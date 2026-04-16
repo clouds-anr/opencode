@@ -28,6 +28,25 @@ if [ ! -d "$TEAM_DIR" ]; then
     exit 1
 fi
 
+# Detect filename collisions that would overwrite shared agents
+DUPE=()
+for f in "$SHARED_DIR"/*.md; do
+    name="$(basename "$f")"
+    if [ -f "$TEAM_DIR/$name" ]; then
+        DUPE+=("$name")
+    fi
+done
+
+if [ ${#DUPE[@]} -gt 0 ]; then
+    echo "Error: Duplicate agent filenames detected:"
+    for f in "${DUPE[@]}"; do
+        echo "  - $f"
+    done
+    echo ""
+    echo "Resolve duplicates before installing to avoid overwriting shared agents."
+    exit 1
+fi
+
 # Create target directory if needed
 mkdir -p "$TARGET_DIR"
 
