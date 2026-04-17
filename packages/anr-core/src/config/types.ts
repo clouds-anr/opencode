@@ -5,7 +5,6 @@
 
 export interface ANRConfig {
   // AWS & Bedrock
-  awsProfile: string
   awsRegion: string
   useBedrockProvider: boolean
   anthropicModel: string

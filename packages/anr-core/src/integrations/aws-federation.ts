@@ -19,10 +19,15 @@ export async function exchangeTokenForAWSCredentials(idToken: string, config: AN
   }
 
   const region = config.awsRegion || "us-east-2"
-  const client = new CognitoIdentityClient({ region })
+  const govcloud = region.startsWith("us-gov-")
+  const client = new CognitoIdentityClient({
+    region,
+    ...(govcloud && { useFipsEndpoint: true }),
+  })
 
   try {
     // Step 1: Get identity ID using the ID token
+    // Provider name must match the JWT issuer (always amazonaws.com, even in GovCloud)
     const providerName = `cognito-idp.${region}.amazonaws.com/${config.cognitoUserPoolId}`
 
     const idResponse = await client.send(
