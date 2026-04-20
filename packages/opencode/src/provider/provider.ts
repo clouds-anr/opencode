@@ -217,19 +217,24 @@ export namespace Provider {
 
       const auth = await Auth.get("amazon-bedrock")
 
-      // Region precedence: 1) config file, 2) env var, 3) default
+      // Region precedence:
+      // ANR mode: env var wins (credentials are partition-bound)
+      // Normal:  1) config file, 2) env var, 3) default
       const configRegion = providerConfig?.options?.region
-      const envRegion = Env.get("AWS_REGION")
-      const defaultRegion = configRegion ?? envRegion ?? "us-east-1"
+      const isANR = process.env.OPENCODE_FLAVOR === "anr"
+
+      // In ANR mode, credentials are set on process.env after the Env snapshot is taken,
+      // so Env.get() returns stale values. Read directly from process.env.
+      const envRegion = isANR ? process.env.AWS_REGION : Env.get("AWS_REGION")
+      const defaultRegion = isANR ? (envRegion ?? configRegion ?? "us-east-1") : (configRegion ?? envRegion ?? "us-east-1")
 
       // Profile: config file takes precedence over env var
       const configProfile = providerConfig?.options?.profile
-      const envProfile = Env.get("AWS_PROFILE")
+      const envProfile = isANR ? undefined : Env.get("AWS_PROFILE")
       const profile = configProfile ?? envProfile
 
-      const awsAccessKeyId = Env.get("AWS_ACCESS_KEY_ID")
-      const awsSessionToken = Env.get("AWS_SESSION_TOKEN")
-      const isANR = process.env.OPENCODE_FLAVOR === "anr"
+      const awsAccessKeyId = isANR ? process.env.AWS_ACCESS_KEY_ID : Env.get("AWS_ACCESS_KEY_ID")
+      const awsSessionToken = isANR ? process.env.AWS_SESSION_TOKEN : Env.get("AWS_SESSION_TOKEN")
 
       log.info("Bedrock: Initializing provider", {
         isANR,
@@ -271,11 +276,10 @@ export namespace Provider {
         // In ANR mode with explicit credentials, use fromEnv() directly to avoid
         // conflicts with ~/.aws/config profiles (SSO) that the SDK would prefer
         // over environment credentials, causing "Multiple credential sources" + expiry errors
-        const isANR = process.env.OPENCODE_FLAVOR === "anr"
-        if (isANR && awsAccessKeyId && Env.get("AWS_SESSION_TOKEN")) {
+        if (isANR && awsAccessKeyId && awsSessionToken) {
           log.info("Bedrock: Using fromEnv() credential provider (ANR mode)", {
             hasAccessKeyId: !!awsAccessKeyId,
-            hasSessionToken: !!Env.get("AWS_SESSION_TOKEN"),
+            hasSessionToken: !!awsSessionToken,
             region: defaultRegion,
           })
           providerOptions.credentialProvider = fromEnv()
@@ -295,7 +299,7 @@ export namespace Provider {
 
       // Add custom endpoint if specified (endpoint takes precedence over baseURL)
       const endpoint = providerConfig?.options?.endpoint ?? providerConfig?.options?.baseURL
-      if (endpoint) {
+      if (endpoint && !isANR) {
         providerOptions.baseURL = endpoint
       }
 
@@ -312,18 +316,31 @@ export namespace Provider {
         autoload: true,
         options: providerOptions,
         async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
+          // Region resolution precedence (highest to lowest):
+          // ANR mode: defaultRegion always wins (credentials are partition-bound)
+          // Normal: 1. options.region from opencode.json provider config
+          //         2. defaultRegion from AWS_REGION environment variable
+          const region = isANR ? defaultRegion : (options?.region ?? defaultRegion)
+          const isGovCloud = region.startsWith("us-gov")
+
+          // In GovCloud, strip any commercial cross-region prefix (us., global., etc.)
+          // and let the GovCloud prefixing logic below handle it correctly
+          if (isGovCloud) {
+            const commercialPrefixes = ["global.", "us.", "eu.", "jp.", "apac.", "au."]
+            for (const prefix of commercialPrefixes) {
+              if (modelID.startsWith(prefix)) {
+                modelID = modelID.slice(prefix.length)
+                break
+              }
+            }
+          }
+
           // Skip region prefixing if model already has a cross-region inference profile prefix
           // Models from models.dev may already include prefixes like us., eu., global., etc.
           const crossRegionPrefixes = ["global.", "us-gov.", "us.", "eu.", "jp.", "apac.", "au."]
           if (crossRegionPrefixes.some((prefix) => modelID.startsWith(prefix))) {
             return sdk.languageModel(modelID)
           }
-
-          // Region resolution precedence (highest to lowest):
-          // 1. options.region from opencode.json provider config
-          // 2. defaultRegion from AWS_REGION environment variable
-          // 3. Default "us-east-1" (baked into defaultRegion)
-          const region = options?.region ?? defaultRegion
 
           let regionPrefix = region.split("-")[0]
 
