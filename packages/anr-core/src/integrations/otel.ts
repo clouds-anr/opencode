@@ -19,7 +19,7 @@ import { validateContext, printContextReport } from "../util/metrics-validator"
 import { contextTracer } from "../util/context-tracer"
 import { createExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer"
 
-const logDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr", "logs")
+const logDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".opencode", "logs")
 const logFile = resolve(logDir, "otel-metrics.log")
 const debugMode = process.env.OPENCODE_DEBUG_OTEL === "1" || process.env.OPENCODE_DEBUG === "1"
 

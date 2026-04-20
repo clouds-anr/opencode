@@ -49,19 +49,25 @@ const ANR_ENV_MARKERS: &[&str] = &["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "
 
 /// Detect ANR configuration by scanning standard locations for .env files
 /// containing ANR-specific keys. Mirrors the search logic in anr-core's
-/// `loadANRConfig()`: CWD, then `~/.config/opencode-anr/`.
+/// `loadANRConfig()`: <cwd>/.opencode/, ~/.opencode/, /etc/opencode/.
 pub fn detect_anr_config() -> bool {
     let home = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         Ok(h) => h,
         Err(_) => return false,
     };
 
-    let search_dirs: Vec<std::path::PathBuf> = vec![
-        std::env::current_dir().unwrap_or_default(),
-        std::path::PathBuf::from(&home)
-            .join(".config")
-            .join("opencode-anr"),
+    let mut search_dirs: Vec<std::path::PathBuf> = vec![
+        std::env::current_dir().unwrap_or_default().join(".opencode"),
+        std::path::PathBuf::from(&home).join(".opencode"),
     ];
+
+    #[cfg(unix)]
+    search_dirs.push(std::path::PathBuf::from("/etc/opencode"));
+    #[cfg(windows)]
+    search_dirs.push(
+        std::path::PathBuf::from(std::env::var("PROGRAMDATA").unwrap_or_else(|_| "C:\\ProgramData".to_string()))
+            .join("opencode"),
+    );
 
     for dir in search_dirs {
         if !dir.is_dir() {

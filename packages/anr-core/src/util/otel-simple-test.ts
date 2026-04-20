@@ -10,7 +10,7 @@ import { Resource } from "@opentelemetry/resources"
 import { appendFileSync, mkdirSync, existsSync, writeFileSync } from "fs"
 import { resolve } from "path"
 
-const logDir = resolve(process.env.HOME || "/tmp", ".config", "opencode-anr", "logs")
+const logDir = resolve(process.env.HOME || "/tmp", ".opencode", "logs")
 const logFile = resolve(logDir, "otel-simple-test.log")
 
 function log(msg: string, data?: any) {

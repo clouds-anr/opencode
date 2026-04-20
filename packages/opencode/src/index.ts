@@ -442,7 +442,18 @@ function detectANR(): boolean {
   if (process.env.OPENCODE_FLAVOR === "anr") return true
   const home = process.env.HOME || process.env.USERPROFILE
   if (!home) return false
-  const dirs = [process.cwd(), path.join(home, ".config", "opencode-anr")]
+  const global = process.platform === "win32"
+    ? path.resolve(process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")
+    : "/etc/opencode"
+  // In dev mode, cwd may be packages/opencode — also check repo root
+  const pkg = Bun.fileURLToPath(import.meta.url).split(path.sep + "src" + path.sep)[0]
+  const root = pkg ? path.resolve(pkg, "../..") : undefined
+  const dirs = [
+    path.join(process.cwd(), ".opencode"),
+    ...(root && root !== process.cwd() ? [path.join(root, ".opencode")] : []),
+    path.join(home, ".opencode"),
+    global,
+  ]
   for (const dir of dirs) {
     if (!existsSync(dir)) continue
     for (const name of readdirSync(dir)) {
@@ -465,16 +476,22 @@ function detectANR(): boolean {
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
  */
 async function selectEnvFile(): Promise<string | undefined> {
-  // Search for .env files in standard locations (works for exe + dev mode on all OSes)
-  // 1. cwd — the folder the user ran the app from (exe folder for end users)
-  // 2. monorepo root — for dev mode where bun --cwd changes cwd to packages/opencode
-  // 3. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
+  // Search for .env files in standard .opencode locations (3-tier):
+  // 1. Project-level: <cwd>/.opencode/ — developer overrides
+  //    (+ monorepo root for dev mode where cwd is packages/opencode)
+  // 2. User-level:    ~/.opencode/ — personal config / exe users
+  // 3. Global-level:  /etc/opencode/ or C:\ProgramData\opencode\ — enterprise
+  const home = process.env.HOME || process.env.USERPROFILE || "~"
   const pkg = Bun.fileURLToPath(import.meta.url).split(path.sep + "src" + path.sep)[0]
   const root = pkg ? path.resolve(pkg, "../..") : undefined
+  const global = process.platform === "win32"
+    ? path.resolve(process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")
+    : "/etc/opencode"
   const dirs = [
-    process.cwd(),
-    ...(root && root !== process.cwd() ? [root] : []),
-    path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
+    path.join(process.cwd(), ".opencode"),
+    ...(root && root !== process.cwd() ? [path.join(root, ".opencode")] : []),
+    path.resolve(home, ".opencode"),
+    global,
   ]
 
   const files = findEnvFiles(dirs)
