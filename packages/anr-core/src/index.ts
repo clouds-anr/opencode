@@ -19,13 +19,6 @@ export {
 // Authentication
 export { authenticateWithOIDC, refreshOIDCTokens, type OIDCTokens } from "./integrations/oidc-auth"
 export { exchangeTokenForAWSCredentials } from "./integrations/aws-federation"
-export {
-  authenticateWithCognito,
-  areCredentialsExpired,
-  ensureValidCredentials,
-  setAWSCredentialsEnv,
-  type CognitoCredentials,
-} from "./integrations/cognito-sso"
 
 // Telemetry & Observability
 export {

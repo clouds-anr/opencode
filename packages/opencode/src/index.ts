@@ -173,7 +173,6 @@ async function initializeANR(envFile?: string): Promise<void> {
 
   // Authenticate with OIDC
   console.error("🔐 Authenticating...")
-  process.stderr.write("")
   let tokens
   try {
     tokens = await authenticateWithOIDC(config)
@@ -181,21 +180,18 @@ async function initializeANR(envFile?: string): Promise<void> {
     console.error("❌ Authentication failed:", err instanceof Error ? err.message : err)
     process.exit(1)
   }
-  console.error("✅ Authenticated\n")
-  process.stderr.write("")
+  console.error("✅ Authenticated")
   console.error("📍 Debug: Received tokens from OIDC")
   console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
   console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
   console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
-  console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s\n`)
-  process.stderr.write("")
+  console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s`)
 
   // Build telemetry context
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
 
   // Exchange token for AWS credentials
   console.error("💱 Exchanging token for AWS credentials...")
-  process.stderr.write("")
   let awsCredentials
   try {
     awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
@@ -203,14 +199,12 @@ async function initializeANR(envFile?: string): Promise<void> {
     console.error("❌ AWS credential exchange failed:", err instanceof Error ? err.message : err)
     process.exit(1)
   }
-  console.error("✅ AWS credentials obtained\n")
-  process.stderr.write("")
+  console.error("✅ AWS credentials obtained")
   console.error("📍 Debug: AWS credentials exchanged")
   console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
   console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
   console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
-  console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}\n`)
-  process.stderr.write("")
+  console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}`)
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -267,7 +261,7 @@ async function initializeANR(envFile?: string): Promise<void> {
   console.error(`   - AWS_ACCESS_KEY_ID set: ${!!process.env.AWS_ACCESS_KEY_ID}`)
   console.error(`   - AWS_SECRET_ACCESS_KEY set: ${!!process.env.AWS_SECRET_ACCESS_KEY}`)
   console.error(`   - AWS_SESSION_TOKEN set: ${!!process.env.AWS_SESSION_TOKEN}`)
-  console.error(`   - AWS_REGION: ${process.env.AWS_REGION}\n`)
+  console.error(`   - AWS_REGION: ${process.env.AWS_REGION}`)
 
   // Set models API endpoint if configured
   if (config.modelsApiEndpoint) {
@@ -471,13 +465,16 @@ function detectANR(): boolean {
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
  */
 async function selectEnvFile(): Promise<string | undefined> {
-  // Resolve the opencodeANR package directory (canonical location for env files)
-  const root = process.env.npm_package_json
-    ? path.resolve(process.env.npm_package_json, "..")
-    : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
+  // Search for .env files in standard locations (works for exe + dev mode on all OSes)
+  // 1. cwd — the folder the user ran the app from (exe folder for end users)
+  // 2. monorepo root — for dev mode where bun --cwd changes cwd to packages/opencode
+  // 3. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
+  const pkg = Bun.fileURLToPath(import.meta.url).split(path.sep + "src" + path.sep)[0]
+  const root = pkg ? path.resolve(pkg, "../..") : undefined
   const dirs = [
-    path.resolve(root, "../opencodeANR"),
-    path.resolve(process.env.HOME || "~", ".config", "opencode-anr"),
+    process.cwd(),
+    ...(root && root !== process.cwd() ? [root] : []),
+    path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
   ]
 
   const files = findEnvFiles(dirs)

@@ -430,7 +430,7 @@ async fn initialize(app: AppHandle) {
     let password = uuid::Uuid::new_v4().to_string();
 
     tracing::info!("Spawning sidecar on {url}");
-    let (child, health_check) =
+    let (child, health_check, needs_sqlite_migration) =
         server::spawn_local_server(app.clone(), hostname.to_string(), port, password.clone());
 
     // Make sidecar credentials available immediately (before health check completes)

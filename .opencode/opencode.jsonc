@@ -14,5 +14,59 @@
 	"tools": {
 		"github-triage": false,
 		"github-pr-search": false
+	},
+	// Agents live in .opencode/agent/ — skills live in .opencode/skills/
+	// Use @orchestrator as the main entry point for any task.
+	"agent": {
+		// ── Core agents ───────────────────────────────────────────────────────
+		"orchestrator": {
+			"description": "Orchestrator - coordinates all work, delegates to specialists",
+			"mode": "primary",
+			"prompt": "{file:agent/orchestrator.md}"
+		},
+		"researcher": {
+			"description": "Researcher + Planner - deep codebase analysis, actionable plans",
+			"mode": "subagent",
+			"prompt": "{file:agent/researcher.md}"
+		},
+		"implementor": {
+			"description": "Implementor - features, fixes, and refactors across any language or domain",
+			"mode": "subagent",
+			"prompt": "{file:agent/implementor.md}"
+		},
+		"tester": {
+			"description": "Tester - test design, execution, and regression validation",
+			"mode": "subagent",
+			"prompt": "{file:agent/tester.md}"
+		},
+		"documentation": {
+			"description": "Documentation - PlantUML diagrams, ADRs, API docs, release notes",
+			"mode": "subagent",
+			"prompt": "{file:agent/documentation.md}"
+		},
+		"truth_teller": {
+			"description": "Truth-Teller (default) - challenges assumptions and risky plans",
+			"mode": "subagent",
+			"model": "opencode/claude-opus-4-5",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_opus": {
+			"description": "Truth-Teller (Opus) - Claude Opus perspective",
+			"mode": "subagent",
+			"model": "opencode/claude-opus-4-5",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_qwen": {
+			"description": "Truth-Teller (Qwen) - Qwen3 Coder perspective",
+			"mode": "subagent",
+			"model": "opencode/qwen3-coder-480b",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_grok": {
+			"description": "Truth-Teller (Grok) - Grok perspective",
+			"mode": "subagent",
+			"model": "opencode/grok-3",
+			"prompt": "{file:agent/truth_teller.md}"
+		}
 	}
 }
