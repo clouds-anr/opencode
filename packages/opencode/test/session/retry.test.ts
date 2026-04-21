@@ -125,6 +125,11 @@ describe("session.retry.retryable", () => {
 
     expect(SessionRetry.retryable(error)).toBeUndefined()
   })
+
+  test("does not retry QuotaExceededError", () => {
+    const error = { name: "QuotaExceededError", data: { message: "Quota exceeded." } } as ReturnType<NamedError["toObject"]>
+    expect(SessionRetry.retryable(error)).toBeUndefined()
+  })
 })
 
 describe("session.message-v2.fromError", () => {
