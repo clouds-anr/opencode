@@ -321,8 +321,13 @@ async function initializeANR(envFile?: string): Promise<void> {
       process.env.OPENCODE_ANR_ID_TOKEN || tokens.idToken,
     )
   } catch (err) {
-    console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)
-    process.exit(1)
+    if (config.quotaFailMode === "open") {
+      console.error("⚠️  Quota service unavailable — continuing with limited tracking.")
+    } else {
+      console.error("❌ Unable to verify quota (service unavailable). Access denied for safety.")
+      console.error("   Contact your administrator if this persists.")
+      process.exit(1)
+    }
   }
 
   // Audit the quota check result
@@ -331,14 +336,28 @@ async function initializeANR(envFile?: string): Promise<void> {
     monthly: quotaResult?.usage?.monthlyUsagePercent,
   })
 
-  if (!quotaResult || !quotaResult.usage.allowed) {
+  if (quotaResult && !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
+    if (quotaResult.policy.dailyTokenLimit > 0) {
+      console.error(`   Daily:   ${quotaResult.usage.dailyTokens.toLocaleString()} / ${quotaResult.policy.dailyTokenLimit.toLocaleString()} tokens (${Math.round(quotaResult.usage.dailyUsagePercent)}%)`)
+    }
+    if (quotaResult.policy.monthlyTokenLimit > 0) {
+      console.error(`   Monthly: ${quotaResult.usage.monthlyTokens.toLocaleString()} / ${quotaResult.policy.monthlyTokenLimit.toLocaleString()} tokens (${Math.round(quotaResult.usage.monthlyUsagePercent)}%)`)
+    }
+    if (quotaResult.usage.dailyResetInfo) console.error(`   ${quotaResult.usage.dailyResetInfo}`)
+    if (quotaResult.usage.monthlyResetInfo) console.error(`   ${quotaResult.usage.monthlyResetInfo}`)
+    console.error("   Contact your administrator for limit increases.")
     await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
     if (config.enableTelemetry) {
       trackSessionEnd(telemetryContext.userId, 0)
       await shutdownOTEL()
     }
     process.exit(1)
+  }
+
+  if (!quotaResult) {
+    // quotaResult is null — fail-open mode already logged a warning above
+    console.error("⚠️  No quota data available — usage will not be tracked.")
   }
 
   if (quotaResult?.usage) {

@@ -18,7 +18,7 @@ import { Config } from "@/config/config"
 import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
-import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision, trackCommit, trackActiveTime, checkQuota } from "@opencode-ai/anr-core"
+import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision, trackCommit, trackActiveTime, checkQuota, QuotaExceededError } from "@opencode-ai/anr-core"
 import { refresh as refreshANRCredentials } from "@/auth/anr-refresh"
 
 export namespace SessionProcessor {
@@ -93,10 +93,7 @@ export namespace SessionProcessor {
             process.env.OPENCODE_ANR_QUOTA_MONTHLY_PERCENT = String(result.usage.monthlyUsagePercent)
           }
           if (result && !result.usage.allowed) {
-            const reason = result.usage.warningLevel === "critical"
-              ? "Quota limit exceeded. Cannot proceed with model invocation."
-              : "Quota check failed. Please review your usage."
-            throw new Error(reason)
+            throw new QuotaExceededError(result.usage, result.policy)
           }
         }
 
