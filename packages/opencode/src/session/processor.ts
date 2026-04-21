@@ -2,6 +2,7 @@ import { MessageV2 } from "./message-v2"
 import { Log } from "@/util/log"
 import { Identifier } from "@/id/id"
 import { Session } from "."
+import { Instance } from "@/project/instance"
 import { SessionID, PartID } from "./schema"
 import { ProviderID } from "@/provider/schema"
 import { Agent } from "@/agent/agent"
@@ -381,6 +382,7 @@ export namespace SessionProcessor {
                         usage.tokens.cache.write,
                         context || undefined,
                         cost,
+                        Instance.project.id,
                       )
 
                       // Push metrics to collector now instead of waiting for

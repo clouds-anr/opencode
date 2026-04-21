@@ -286,6 +286,7 @@ async function initializeANR(envFile?: string): Promise<void> {
   if (telemetryContext.osVersion) process.env.OPENCODE_ANR_OS_VERSION = telemetryContext.osVersion
   if (telemetryContext.terminalType) process.env.OPENCODE_ANR_TERMINAL_TYPE = telemetryContext.terminalType
   if (telemetryContext.sessionId) process.env.OPENCODE_ANR_SESSION_ID = telemetryContext.sessionId
+  if (telemetryContext.projectId) process.env.OPENCODE_ANR_PROJECT_ID = telemetryContext.projectId
   if (telemetryContext.department) process.env.OPENCODE_ANR_DEPARTMENT = telemetryContext.department
   if (telemetryContext.teamId) process.env.OPENCODE_ANR_TEAM_ID = telemetryContext.teamId
   if (telemetryContext.costCenter) process.env.OPENCODE_ANR_COST_CENTER = telemetryContext.costCenter
