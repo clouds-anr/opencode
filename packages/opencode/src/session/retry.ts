@@ -61,6 +61,8 @@ export namespace SessionRetry {
   export function retryable(error: ReturnType<NamedError["toObject"]>) {
     // context overflow errors should not be retried
     if (MessageV2.ContextOverflowError.isInstance(error)) return undefined
+    // quota exceeded errors should not be retried — user must wait for reset
+    if (error.name === "QuotaExceededError") return undefined
     if (MessageV2.APIError.isInstance(error)) {
       if (!error.data.isRetryable) return undefined
       if (error.data.responseBody?.includes("FreeUsageLimitError"))

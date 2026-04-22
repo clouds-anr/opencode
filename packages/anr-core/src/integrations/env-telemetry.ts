@@ -23,6 +23,7 @@ export function reconstructTelemetryContextFromEnv(): TelemetryContext | null {
     hostArch: undefined, // Not passed via env to child process
     terminalType: process.env.OPENCODE_ANR_TERMINAL_TYPE || undefined,
     sessionId: process.env.OPENCODE_ANR_SESSION_ID || undefined,
+    projectId: process.env.OPENCODE_ANR_PROJECT_ID || undefined,
     department: process.env.OPENCODE_ANR_DEPARTMENT || undefined,
     teamId: process.env.OPENCODE_ANR_TEAM_ID || undefined,
     costCenter: process.env.OPENCODE_ANR_COST_CENTER || undefined,

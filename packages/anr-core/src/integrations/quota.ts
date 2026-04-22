@@ -24,6 +24,39 @@ export interface QuotaUsage {
   warningLevel: "normal" | "warning" | "critical" // yellow at 80%, red at 90%
   allowed: boolean
   reason?: string
+  dailyResetInfo?: string
+  monthlyResetInfo?: string
+}
+
+export class QuotaExceededError extends Error {
+  readonly usage: QuotaUsage
+  readonly policy: QuotaPolicy
+  constructor(usage: QuotaUsage, policy: QuotaPolicy) {
+    const lines = ["Quota exceeded."]
+    if (policy.dailyTokenLimit > 0) {
+      lines.push(`  Daily: ${usage.dailyTokens.toLocaleString()} / ${policy.dailyTokenLimit.toLocaleString()} tokens (${Math.round(usage.dailyUsagePercent)}%)`)
+    }
+    if (policy.monthlyTokenLimit > 0) {
+      lines.push(`  Monthly: ${usage.monthlyTokens.toLocaleString()} / ${policy.monthlyTokenLimit.toLocaleString()} tokens (${Math.round(usage.monthlyUsagePercent)}%)`)
+    }
+    if (usage.dailyResetInfo) lines.push(`  ${usage.dailyResetInfo}`)
+    if (usage.monthlyResetInfo) lines.push(`  ${usage.monthlyResetInfo}`)
+    lines.push("  Contact your administrator for limit increases.")
+    super(lines.join("\n"))
+    this.name = "QuotaExceededError"
+    this.usage = usage
+    this.policy = policy
+  }
+}
+
+export class QuotaUnavailableError extends Error {
+  constructor(mode: "open" | "closed") {
+    const msg = mode === "closed"
+      ? "Unable to verify quota (service unavailable). Access denied for safety. Contact your administrator."
+      : "Quota service temporarily unavailable. Continuing with limited tracking."
+    super(msg)
+    this.name = "QuotaUnavailableError"
+  }
 }
 
 export interface QuotaCheckRequest {
@@ -51,6 +84,22 @@ function calculateWarningLevel(dailyPercent: number, monthlyPercent: number): "n
   if (maxPercent >= 90) return "critical"
   if (maxPercent >= 80) return "warning"
   return "normal"
+}
+
+export function dailyResetInfo(): string {
+  const now = new Date()
+  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+  const diff = midnight.getTime() - now.getTime()
+  const hours = Math.floor(diff / 3_600_000)
+  const mins = Math.floor((diff % 3_600_000) / 60_000)
+  return `Daily quota resets in ${hours}h ${mins}m (midnight UTC).`
+}
+
+export function monthlyResetInfo(): string {
+  const now = new Date()
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+  const days = Math.ceil((next.getTime() - now.getTime()) / 86_400_000)
+  return `Monthly quota resets in ${days} day${days === 1 ? "" : "s"} (1st of next month UTC).`
 }
 
 export async function checkQuota(
@@ -199,6 +248,8 @@ function parseLambdaQuotaResponse(data: unknown): QuotaCheckResponse | null {
         monthlyUsagePercent: monthlyPercent,
         warningLevel: calculateWarningLevel(dailyPercent, monthlyPercent),
         reason: (d.reason as string) || "unknown",
+        dailyResetInfo: dailyPercent >= 80 ? dailyResetInfo() : undefined,
+        monthlyResetInfo: monthlyPercent >= 80 ? monthlyResetInfo() : undefined,
       },
       models,
     }

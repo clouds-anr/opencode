@@ -59,6 +59,10 @@ export { runOTELTestHarness, type TestHarnessResult } from "./util/otel-test-har
 export {
   checkQuota,
   getWarningColor,
+  dailyResetInfo,
+  monthlyResetInfo,
+  QuotaExceededError,
+  QuotaUnavailableError,
   type QuotaPolicy,
   type QuotaUsage,
   type QuotaCheckRequest,

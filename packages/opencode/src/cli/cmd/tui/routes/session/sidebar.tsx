@@ -3,6 +3,7 @@ import { createMemo, For, Show, Switch, Match } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useTheme } from "../../context/theme"
 import { useQuota } from "../../context/quota"
+import { dailyResetInfo, monthlyResetInfo } from "@opencode-ai/anr-core"
 import { Locale } from "@/util/locale"
 import path from "path"
 import type { AssistantMessage } from "@opencode-ai/sdk/v2"
@@ -187,10 +188,20 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                   </box>
                 </Show>
                 <Show when={quota.effectiveWarningLevel === "warning"}>
-                  <text fg={theme.warning}>⚠️ Approaching quota limit (80%)</text>
+                  <text fg={theme.warning}>⚠️ Approaching quota limit</text>
                 </Show>
-                <Show when={quota.effectiveWarningLevel === "critical"}>
-                  <text fg={theme.error}>🚫 Quota limit exceeded (90%+)</text>
+                <Show when={quota.effectiveWarningLevel === "critical" && Math.max(quota.effectiveDailyPercent, quota.effectiveMonthlyPercent) < 100}>
+                  <text fg={theme.error}>⚠️ Nearing quota limit</text>
+                </Show>
+                <Show when={Math.max(quota.effectiveDailyPercent, quota.effectiveMonthlyPercent) >= 100}>
+                  <text fg={theme.error}>🚫 Quota exceeded</text>
+                  <Show when={quota.effectiveDailyPercent >= 100}>
+                    <text fg={theme.textMuted}>   {dailyResetInfo()}</text>
+                  </Show>
+                  <Show when={quota.effectiveMonthlyPercent >= 100}>
+                    <text fg={theme.textMuted}>   {monthlyResetInfo()}</text>
+                  </Show>
+                  <text fg={theme.textMuted}>   Contact your administrator for limit increases.</text>
                 </Show>
               </box>
             </Show>

@@ -15,7 +15,7 @@ import { initializeOTEL, shutdownOTEL } from "../integrations/otel"
 import type { TelemetryContext } from "../integrations/otel"
 import { metrics } from "@opentelemetry/api"
 
-const LOG = resolve(process.env.HOME || "/tmp", ".config", "opencode-anr", "logs", "otel-metrics.log")
+const LOG = resolve(process.env.HOME || "/tmp", ".opencode", "logs", "otel-metrics.log")
 const C = { r: "\x1b[0m", g: "\x1b[32m", rd: "\x1b[31m", y: "\x1b[33m", c: "\x1b[36m", d: "\x1b[2m", b: "\x1b[1m" }
 const wantAuth = process.argv.includes("--auth")
 

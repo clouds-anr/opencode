@@ -286,6 +286,7 @@ async function initializeANR(envFile?: string): Promise<void> {
   if (telemetryContext.osVersion) process.env.OPENCODE_ANR_OS_VERSION = telemetryContext.osVersion
   if (telemetryContext.terminalType) process.env.OPENCODE_ANR_TERMINAL_TYPE = telemetryContext.terminalType
   if (telemetryContext.sessionId) process.env.OPENCODE_ANR_SESSION_ID = telemetryContext.sessionId
+  if (telemetryContext.projectId) process.env.OPENCODE_ANR_PROJECT_ID = telemetryContext.projectId
   if (telemetryContext.department) process.env.OPENCODE_ANR_DEPARTMENT = telemetryContext.department
   if (telemetryContext.teamId) process.env.OPENCODE_ANR_TEAM_ID = telemetryContext.teamId
   if (telemetryContext.costCenter) process.env.OPENCODE_ANR_COST_CENTER = telemetryContext.costCenter
@@ -320,8 +321,13 @@ async function initializeANR(envFile?: string): Promise<void> {
       process.env.OPENCODE_ANR_ID_TOKEN || tokens.idToken,
     )
   } catch (err) {
-    console.error("❌ Quota check failed:", err instanceof Error ? err.message : err)
-    process.exit(1)
+    if (config.quotaFailMode === "open") {
+      console.error("⚠️  Quota service unavailable — continuing with limited tracking.")
+    } else {
+      console.error("❌ Unable to verify quota (service unavailable). Access denied for safety.")
+      console.error("   Contact your administrator if this persists.")
+      process.exit(1)
+    }
   }
 
   // Audit the quota check result
@@ -330,14 +336,28 @@ async function initializeANR(envFile?: string): Promise<void> {
     monthly: quotaResult?.usage?.monthlyUsagePercent,
   })
 
-  if (!quotaResult || !quotaResult.usage.allowed) {
+  if (quotaResult && !quotaResult.usage.allowed) {
     console.error("❌ Quota exceeded. Access denied.")
+    if (quotaResult.policy.dailyTokenLimit > 0) {
+      console.error(`   Daily:   ${quotaResult.usage.dailyTokens.toLocaleString()} / ${quotaResult.policy.dailyTokenLimit.toLocaleString()} tokens (${Math.round(quotaResult.usage.dailyUsagePercent)}%)`)
+    }
+    if (quotaResult.policy.monthlyTokenLimit > 0) {
+      console.error(`   Monthly: ${quotaResult.usage.monthlyTokens.toLocaleString()} / ${quotaResult.policy.monthlyTokenLimit.toLocaleString()} tokens (${Math.round(quotaResult.usage.monthlyUsagePercent)}%)`)
+    }
+    if (quotaResult.usage.dailyResetInfo) console.error(`   ${quotaResult.usage.dailyResetInfo}`)
+    if (quotaResult.usage.monthlyResetInfo) console.error(`   ${quotaResult.usage.monthlyResetInfo}`)
+    console.error("   Contact your administrator for limit increases.")
     await logSessionEnd(config, telemetryContext.userId, 0, telemetryContext)
     if (config.enableTelemetry) {
       trackSessionEnd(telemetryContext.userId, 0)
       await shutdownOTEL()
     }
     process.exit(1)
+  }
+
+  if (!quotaResult) {
+    // quotaResult is null — fail-open mode already logged a warning above
+    console.error("⚠️  No quota data available — usage will not be tracked.")
   }
 
   if (quotaResult?.usage) {
@@ -442,7 +462,18 @@ function detectANR(): boolean {
   if (process.env.OPENCODE_FLAVOR === "anr") return true
   const home = process.env.HOME || process.env.USERPROFILE
   if (!home) return false
-  const dirs = [process.cwd(), path.join(home, ".config", "opencode-anr")]
+  const global = process.platform === "win32"
+    ? path.resolve(process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")
+    : "/etc/opencode"
+  // In dev mode, cwd may be packages/opencode — also check repo root
+  const pkg = Bun.fileURLToPath(import.meta.url).split(path.sep + "src" + path.sep)[0]
+  const root = pkg ? path.resolve(pkg, "../..") : undefined
+  const dirs = [
+    path.join(process.cwd(), ".opencode"),
+    ...(root && root !== process.cwd() ? [path.join(root, ".opencode")] : []),
+    path.join(home, ".opencode"),
+    global,
+  ]
   for (const dir of dirs) {
     if (!existsSync(dir)) continue
     for (const name of readdirSync(dir)) {
@@ -465,16 +496,22 @@ function detectANR(): boolean {
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
  */
 async function selectEnvFile(): Promise<string | undefined> {
-  // Search for .env files in standard locations (works for exe + dev mode on all OSes)
-  // 1. cwd — the folder the user ran the app from (exe folder for end users)
-  // 2. monorepo root — for dev mode where bun --cwd changes cwd to packages/opencode
-  // 3. ~/.config/opencode-anr/ — secondary location for generate-env.ts output
+  // Search for .env files in standard .opencode locations (3-tier):
+  // 1. Project-level: <cwd>/.opencode/ — developer overrides
+  //    (+ monorepo root for dev mode where cwd is packages/opencode)
+  // 2. User-level:    ~/.opencode/ — personal config / exe users
+  // 3. Global-level:  /etc/opencode/ or C:\ProgramData\opencode\ — enterprise
+  const home = process.env.HOME || process.env.USERPROFILE || "~"
   const pkg = Bun.fileURLToPath(import.meta.url).split(path.sep + "src" + path.sep)[0]
   const root = pkg ? path.resolve(pkg, "../..") : undefined
+  const global = process.platform === "win32"
+    ? path.resolve(process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")
+    : "/etc/opencode"
   const dirs = [
-    process.cwd(),
-    ...(root && root !== process.cwd() ? [root] : []),
-    path.resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr"),
+    path.join(process.cwd(), ".opencode"),
+    ...(root && root !== process.cwd() ? [path.join(root, ".opencode")] : []),
+    path.resolve(home, ".opencode"),
+    global,
   ]
 
   const files = findEnvFiles(dirs)

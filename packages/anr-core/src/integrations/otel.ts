@@ -19,7 +19,7 @@ import { validateContext, printContextReport } from "../util/metrics-validator"
 import { contextTracer } from "../util/context-tracer"
 import { createExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer"
 
-const logDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr", "logs")
+const logDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".opencode", "logs")
 const logFile = resolve(logDir, "otel-metrics.log")
 const debugMode = process.env.OPENCODE_DEBUG_OTEL === "1" || process.env.OPENCODE_DEBUG === "1"
 
@@ -79,6 +79,9 @@ export interface TelemetryContext {
   terminalType?: string
   sessionId?: string
   
+  // Project context
+  projectId?: string
+
   // Organization context (from config)
   department?: string
   teamId?: string
@@ -193,6 +196,7 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     if (telemetryContext.hostArch) resourceAttrs["host.arch"] = telemetryContext.hostArch
     if (telemetryContext.terminalType) resourceAttrs["terminal.type"] = telemetryContext.terminalType
     if (telemetryContext.sessionId) resourceAttrs["session.id"] = telemetryContext.sessionId
+    if (telemetryContext.projectId) resourceAttrs["project.id"] = telemetryContext.projectId
 
     // Add organization context
     if (telemetryContext.department) resourceAttrs["department"] = telemetryContext.department
@@ -229,6 +233,7 @@ export function initializeOTEL(config: ANRConfig, context?: TelemetryContext): v
     if (telemetryContext.department) exporterHeaders["x-department"] = telemetryContext.department
     if (telemetryContext.teamId) exporterHeaders["x-team-id"] = telemetryContext.teamId
     if (telemetryContext.costCenter) exporterHeaders["x-cost-center"] = telemetryContext.costCenter
+    if (telemetryContext.projectId) exporterHeaders["x-project-id"] = telemetryContext.projectId
     if (telemetryContext.organization) exporterHeaders["x-organization"] = telemetryContext.organization
     if (telemetryContext.location) exporterHeaders["x-location"] = telemetryContext.location
     if (telemetryContext.role) exporterHeaders["x-role"] = telemetryContext.role
@@ -476,7 +481,7 @@ export function trackCommand(commandName: string, duration: number): void {
  * Track a model invocation with token usage and context attributes
  * Context can be passed explicitly or will use stored context
  */
-export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, reasoningTokens: number = 0, cacheReadTokens: number = 0, cacheWriteTokens: number = 0, context?: TelemetryContext, cost: number = 0): void {
+export function trackModelCall(modelId: string, inputTokens: number, outputTokens: number, reasoningTokens: number = 0, cacheReadTokens: number = 0, cacheWriteTokens: number = 0, context?: TelemetryContext, cost: number = 0, projectId?: string): void {
   const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
   
   try {
@@ -526,7 +531,8 @@ export function trackModelCall(modelId: string, inputTokens: number, outputToken
     // department, team.id, organization, cost_center, user.* come from
     // HTTP headers via the collector's attributes processor +
     // resource_to_telemetry_conversion.
-    const modelAttr = { model: modelId }
+    const modelAttr: Record<string, string> = { model: modelId }
+    if (projectId) modelAttr["project.id"] = projectId
 
     logToFile(`Recording metrics with model attr:`, modelAttr)
 

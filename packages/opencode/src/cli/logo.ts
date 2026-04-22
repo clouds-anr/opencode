@@ -22,7 +22,11 @@ const anrLogo = {
   ],
 }
 
-const isANR = process.env.OPENCODE_FLAVOR === "anr"
-export const logo = isANR ? anrLogo : standardLogo
+const isANR = () => process.env.OPENCODE_FLAVOR === "anr"
+export const logo = new Proxy({} as typeof anrLogo, {
+  get(_, prop) {
+    return isANR() ? (anrLogo as any)[prop] : (standardLogo as any)[prop]
+  },
+})
 
 export const marks = "_^~"

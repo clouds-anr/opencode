@@ -10,7 +10,7 @@ console.log("=".repeat(60))
 const { readFileSync, existsSync } = await import("fs")
 const { resolve } = await import("path")
 
-const logFile = resolve(process.env.HOME || "/tmp", ".config", "opencode-anr", "logs", "otel-metrics.log")
+const logFile = resolve(process.env.HOME || "/tmp", ".opencode", "logs", "otel-metrics.log")
 
 if (!existsSync(logFile)) {
   console.log("❌ No log file found at:", logFile)

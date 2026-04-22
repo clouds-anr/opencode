@@ -14,7 +14,8 @@ export type EnvFileInfo = {
   display: string
 }
 
-const CONFIG_DIR = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr")
+const home = process.env.HOME || process.env.USERPROFILE || "~"
+const CONFIG_DIR = resolve(home, ".opencode")
 const LAST_ENV_FILE = join(CONFIG_DIR, "last-env.txt")
 
 /**
@@ -147,17 +148,24 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
       console.warn(`ANR config file not found: ${resolved}`)
     }
   } else {
-    // Try to load from default locations
+    // Try to load from default locations — 3-tier .opencode search:
+    // 1. Project-level: <cwd>/.opencode/
+    //    (+ monorepo root for dev mode where cwd is packages/opencode)
+    // 2. User-level:    ~/.opencode/
+    // 3. Global-level:  /etc/opencode/ (Mac/Linux) or C:\ProgramData\opencode\ (Windows)
     const cwd = process.cwd()
-    const configHome = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".config", "opencode-anr")
-    const npmPkgJson = process.env.npm_package_json
-    const rootPath = npmPkgJson
-      ? resolve(npmPkgJson, "..")
-      : import.meta.url.replace("file://", "").split("/src/")[0] || process.cwd()
-    const packageDir = resolve(rootPath || process.cwd())
-
-    // Search for .env or .env.* files in multiple locations
-    const searchPaths = [cwd, packageDir, configHome]
+    const rootPath = import.meta.url.replace("file://", "").split("/src/")[0] || cwd
+    const root = resolve(rootPath, "../..")
+    const userDir = resolve(process.env.HOME || process.env.USERPROFILE || "~", ".opencode")
+    const global = process.platform === "win32"
+      ? resolve(process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")
+      : "/etc/opencode"
+    const searchPaths = [
+      resolve(cwd, ".opencode"),
+      ...(root !== cwd ? [resolve(root, ".opencode")] : []),
+      userDir,
+      global,
+    ]
     let loaded = false
 
     for (const dir of searchPaths) {
