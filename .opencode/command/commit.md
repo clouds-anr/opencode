@@ -1,6 +1,6 @@
 ---
 description: git commit and push
-model: opencode/kimi-k2.5
+model: amazon-bedrock/amazon.nova-lite-v1:0
 subtask: true
 ---
 
