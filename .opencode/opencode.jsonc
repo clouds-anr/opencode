@@ -62,10 +62,10 @@
 			"model": "amazon-bedrock/amazon.nova-pro-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
-		"truth_teller_llama": {
-			"description": "Truth-Teller (Llama) - Meta Llama perspective",
+		"truth_teller_lite": {
+			"description": "Truth-Teller (Lite) - Amazon Nova Lite perspective",
 			"mode": "subagent",
-			"model": "amazon-bedrock/meta.llama3-70b-instruct-v1:0",
+			"model": "amazon-bedrock/amazon.nova-lite-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		}
 	}
