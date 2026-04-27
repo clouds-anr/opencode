@@ -47,25 +47,25 @@
 		"truth_teller": {
 			"description": "Truth-Teller (default) - challenges assumptions and risky plans",
 			"mode": "subagent",
-			"model": "opencode/claude-opus-4-5",
+			"model": "amazon-bedrock/us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
-		"truth_teller_opus": {
-			"description": "Truth-Teller (Opus) - Claude Opus perspective",
+		"truth_teller_sonnet": {
+			"description": "Truth-Teller (Sonnet) - Claude Sonnet perspective",
 			"mode": "subagent",
-			"model": "opencode/claude-opus-4-5",
+			"model": "amazon-bedrock/us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
-		"truth_teller_qwen": {
-			"description": "Truth-Teller (Qwen) - Qwen3 Coder perspective",
+		"truth_teller_nova": {
+			"description": "Truth-Teller (Nova) - Amazon Nova perspective",
 			"mode": "subagent",
-			"model": "opencode/qwen3-coder-480b",
+			"model": "amazon-bedrock/amazon.nova-pro-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
-		"truth_teller_grok": {
-			"description": "Truth-Teller (Grok) - Grok perspective",
+		"truth_teller_lite": {
+			"description": "Truth-Teller (Lite) - Amazon Nova Lite perspective",
 			"mode": "subagent",
-			"model": "opencode/grok-3",
+			"model": "amazon-bedrock/amazon.nova-lite-v1:0",
 			"prompt": "{file:agent/truth_teller.md}"
 		}
 	}

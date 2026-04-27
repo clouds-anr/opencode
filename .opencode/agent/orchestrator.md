@@ -63,9 +63,9 @@ Every token you consume on research is a token you can't use for coordination. Y
 | **@tester** | Tester | Test design, test execution, coverage, regression validation |
 | **@documentation** | Documentation | PlantUML diagrams, ADR updates, API docs, release notes |
 | **@truth_teller** | Truth-Teller (default) | Quick reality checks, single-model feedback |
-| **@truth_teller_opus** | Truth-Teller (Opus) | Part of consensus trio — Claude's perspective |
-| **@truth_teller_qwen** | Truth-Teller (Qwen) | Part of consensus trio — Qwen's perspective |
-| **@truth_teller_grok** | Truth-Teller (Grok) | Part of consensus trio — Grok's perspective |
+| **@truth_teller_sonnet** | Truth-Teller (Sonnet) | Part of consensus trio — Claude's perspective |
+| **@truth_teller_nova** | Truth-Teller (Nova) | Part of consensus trio — Amazon Nova perspective |
+| **@truth_teller_llama** | Truth-Teller (Llama) | Part of consensus trio — Meta Llama perspective |
 
 ### Built-in Agents (Simple Tasks)
 For simple, well-defined tasks, prefer built-in agents:
@@ -235,9 +235,9 @@ Roast this. What's dumb about it? What would you delete?
 ### How to Run Consensus
 ```
 # Launch all three in PARALLEL (single message, multiple tool calls)
-@truth_teller_opus: [question/assessment request]
-@truth_teller_qwen: [same question/assessment request]
-@truth_teller_grok: [same question/assessment request]
+@truth_teller_sonnet: [question/assessment request]
+@truth_teller_nova: [same question/assessment request]
+@truth_teller_llama: [same question/assessment request]
 ```
 
 ### Synthesizing Consensus

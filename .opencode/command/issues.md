@@ -1,6 +1,6 @@
 ---
 description: "find issue(s) on github"
-model: opencode/claude-haiku-4-5
+model: amazon-bedrock/amazon.nova-lite-v1:0
 ---
 
 Search through existing issues in anomalyco/opencode using the gh cli to find issues matching this query:
