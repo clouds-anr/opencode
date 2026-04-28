@@ -323,10 +323,10 @@ export namespace Provider {
           const region = isANR ? defaultRegion : (options?.region ?? defaultRegion)
           const isGovCloud = region.startsWith("us-gov")
 
-          // ANR mode: DynamoDB is the source of truth for model names.
-          // Model IDs from the table already include the correct prefix (e.g. us-gov.anthropic.claude-...)
-          // or no prefix (e.g. amazon.nova-lite-v1:0) — use them verbatim.
-          if (isANR) {
+          // ANR mode (GovCloud only): DynamoDB model IDs already include the correct prefix
+          // (e.g. us-gov.anthropic.claude-...) — use them verbatim.
+          // Commercial ANR falls through to normal prefix logic below.
+          if (isANR && isGovCloud) {
             return sdk.languageModel(modelID)
           }
 
