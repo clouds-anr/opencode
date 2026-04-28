@@ -1022,6 +1022,10 @@ export function Prompt(props: PromptProps) {
                     {local.model.parsed().model}
                   </text>
                   <text fg={theme.textMuted}>{local.model.parsed().provider}</text>
+                  <Show when={process.env.DISPLAY_NAME}>
+                    <text fg={theme.textMuted}>·</text>
+                    <text fg={theme.textMuted}>{process.env.DISPLAY_NAME}</text>
+                  </Show>
                   <Show when={showVariant()}>
                     <text fg={theme.textMuted}>·</text>
                     <text>
