@@ -15,7 +15,13 @@ import { Filesystem } from "../util/filesystem"
 
 export namespace ModelsDev {
   const log = Log.create({ service: "models.dev" })
-  const filepath = path.join(Global.Path.cache, "models.json")
+
+  function cache() {
+    const endpoint = Flag.OPENCODE_API_ENDPOINT
+    if (!endpoint) return path.join(Global.Path.cache, "models.json")
+    const hash = Bun.hash(endpoint).toString(36)
+    return path.join(Global.Path.cache, `models-${hash}.json`)
+  }
 
   export const Model = z.object({
     id: z.string(),
@@ -139,7 +145,7 @@ export namespace ModelsDev {
   export const Data = lazy(async () => {
     if (Flag.OPENCODE_API_ENDPOINT) {
       // When API endpoint is configured, ONLY use that endpoint
-      const cached = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
+      const cached = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? cache()).catch(() => {})
       if (cached) {
         // Validate cache is from API endpoint (should have amazon-bedrock provider for ANR)
         // If cache looks like models.dev format (has many providers), invalidate it
@@ -165,7 +171,7 @@ export namespace ModelsDev {
             providerCount: Object.keys(models).length,
           })
           // Cache the result
-          await Filesystem.write(filepath, JSON.stringify(models))
+          await Filesystem.write(cache(), JSON.stringify(models))
           return models
         } else if (policy.models && typeof policy.models === "object") {
           // Direct format - use it as-is
@@ -174,14 +180,14 @@ export namespace ModelsDev {
             providerCount: Object.keys(models).length,
           })
           // Cache the result
-          await Filesystem.write(filepath, JSON.stringify(models))
+          await Filesystem.write(cache(), JSON.stringify(models))
           return models
         }
       }
       log.warn("API endpoint configured but no models returned, using empty set")
       return {}
     }
-    const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
+    const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? cache()).catch(() => {})
     if (result) return result
     // @ts-ignore
     const snapshot = await import("./models-snapshot")
@@ -222,7 +228,7 @@ export namespace ModelsDev {
           log.warn("API endpoint returned policy without models field")
           return
         }
-        await Filesystem.write(filepath, JSON.stringify(modelsData))
+        await Filesystem.write(cache(), JSON.stringify(modelsData))
         ModelsDev.Data.reset()
       } else {
         log.warn("API endpoint refresh returned no data")
@@ -241,7 +247,7 @@ export namespace ModelsDev {
       })
     })
     if (result && result.ok) {
-      await Filesystem.write(filepath, await result.text())
+      await Filesystem.write(cache(), await result.text())
       ModelsDev.Data.reset()
       log.info("Successfully refreshed models from models.dev")
     }
