@@ -89,6 +89,7 @@ sqlfluff lint --dialect postgres
 - IaC changes: never destroy resources without explicit approval
 - DB migrations: always write rollback scripts alongside forward migrations
 - Idempotency: migrations and infra scripts must be safe to run multiple times
+- **File paths in tool calls**: always use forward slashes (`/`) in `filePath` arguments, even on Windows. Backslashes in JSON cause parse failures. Use relative paths from the project root wherever possible (e.g., `packages/app/RUNBOOK.md` not `C:\Users\...\RUNBOOK.md`).
 
 ## Build and Test Discipline
 
