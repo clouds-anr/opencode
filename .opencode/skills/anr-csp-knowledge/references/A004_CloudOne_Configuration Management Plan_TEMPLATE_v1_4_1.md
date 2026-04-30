@@ -1,15 +1,8 @@
-
-
-
-
-
-
-
 # Cloud One Configuration Management Plan — CDRL A004
 
 **Document type:** Template — replace `{Missions Application}` with the actual program name.
 
-**Purpose:** Required CDRL deliverable for all programs migrating to Cloud One. The CMP establishes and maintains the integrity of work products through configuration identification, control, status accounting, and audits. Every migrating program must produce and maintain this document.
+**Purpose:** Required CDRL deliverable for all programs migrating to Cloud One. The CMP establishes and maintains the integrity of work products through configuration identification, control, configuration status accounting, and audits. Every migrating program must produce and maintain this document.
 
 **Key tools:** C1 uses **Artifactory** as the artifact repository for application software, infrastructure scripts, and documentation. **TELOS Xacta** is used for security baseline tracking.
 
