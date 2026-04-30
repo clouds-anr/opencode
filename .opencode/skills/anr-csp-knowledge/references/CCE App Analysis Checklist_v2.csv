@@ -1,0 +1,60 @@
+ID,Item,Slide Reference,Completed?,Vendor Comments
+1,Use latest version of the app analysis template,---,No,
+2,Run spell check against the final presentation ,---,No,
+3,"Guidance: Treat this like a Scope document and document assumptions, risks and dependencies appropriately",---,No,
+4,Confirm whether the application currently has an ATO,6,No,
+5,Document the Impact Level (IL) of the application,6,No,
+6,"Include all relevant types of files. This doesn't apply to COTS. If COTS, please specify on this slide",8,No,
+7,Includes # of files for each type,8,No,
+8,Include # of lines of code for each file type,8,No,
+9,"Irrelevant files (3rd party libraries, external dependencies, etc.) should not be included on this slide",8,No,
+10,Confirm current architecture diagram is the latest from the Mission App Team,9,No,
+11,"Confirm all current state deployment components include the version (O/S, DB, any frameworks, etc...)",10,No,
+12,"If known, include info on the tool-sets and technologies that the MA team is used to working with / supporting in the current state",10,No,
+13,Try to understand the Roadmap for the App - How long they plan to keep this App - Retirement date?,12,No,
+14,Think about Alternatives to refactoring - Use of COTS Products etc.,14-16,No,
+15,"Discuss with the Mission App Team whether there will be a code freeze, or ongoing development, during the migration to CCE. This needs to be confirmed in the presentation. ",15,No,
+16,"If applicable, discuss a plan with the Mission App Team to merge code changes after migration to CCE",15,No,
+17,"Communicate to the Mission App Team that procuring a dev-lab isn't funded by CCE. App analysis should state where refactoring will be conducted (vendor lab, etc.) and should also state that the MA team will eventually have their own lab. ",15,No,
+18,Includes discussion of GCDS SAML integration,15,No,
+19,"Includes details for how application will authorize users, either by IV-USER/IV-GROUP or through custom controls",15,No,
+20,"Any trading partners (file, queue, DB Link etc...) must be fully explained in the migration approach.  This includes cloud to cloud communication, any web-service integration, ESB, and DB Links",16,No,
+21,"If applicable, utilization of ESB needs to be discussed with Eric Mertz prior to the presentation",16,No,
+22,"If applicable, confirm test data set is not operational data",16,No,
+23,Confirm any cloud tools planning to be utilized in the migration align with the IL of the app,17,No,
+24,"All cloud tools mentioned in the deck should be supported by CCE. Those that aren't need to be funded by the Mission App Team. This should be clearly stated in the deck. (i.e. Fortify, SonarQube, etc.)",17,No,
+25,Ensure Data migration approach is compliant with GCDS guardrails,17,No,
+26,Ensure that no VPN / Direct-connect dependencies exist in the data migration plan,17,No,
+27,"Ensure that data migration plan includes cutover considerations.  If data set is large, plan should include initial load and incremental delta-based updates.",17,No,
+28,Are we doing any static code scans and remediation? Don't do anything more than what the MAO team does today. Remember this is a refactoring job.,17,No,
+29,"Review the standard content on this slide with the MA Team, and receive approval they are on board with the approach. ",19-20,No,
+30,"Review the standard set of assumptions documented on this slide to the MA Team, and receive approval they are on board with these assumptions.  ",22,No,
+31,Allocate a 30 day burn-in phase into the schedule,"29, 30",No,
+32,Allocate a standard 2-week UAT period into the schedule. ,"29, 30",No,
+33,"Schedule does not include specific dates, only time ranges (# of weeks, sprints, etc.)","29, 30",No,
+34,"Schedule includes all key milestones including: 
+- Refactor Complete
+- Migrate App to Integration
+- Deploy app to CCE Test Environment
+- Complete Testing in Test
+- Complete UAT in Test Environment
+- Receive Mission App ATO
+- Complete Testing in Prod
+- Complete Cutover Activities
+- Knowledge Transfer Completion Agreement: Review and Obtain Sign-off (end of burn-in period)",30,No,
+35,"Schedule includes a line item for security / hardening, especially with IaaS systems",30,No,
+36,"Schedule includes sufficient detail about the steps in the migration, particular the refactor phase",30,No,
+37,"If applicable, the data migration task should account for initial load, and incremental delta-based updates in the schedule, and the costs. ",30,No,
+38,Schedule includes time and cost for authentication and authorization,"29, 30",No,
+39,Cost includes total projected hours for all portions of the migration,31,No,
+40,Analysis deck does NOT include total dollar estimate. The Budgetary Estimate is distributed to ONLY Leidos ,31,No,
+41,Budgetary Estimate is an exact dollar estimate. Please do not include a price range,31,No,
+42,Estimated cost includes DevLab environment,31,No,
+43,"If the application is infrequently updated, the analysis should consider dynamic scaling (down) of pre-prod environments. ",32-34,No,
+44,Estimated services and instances match migration and data migration plans,32-35,No,
+45,"Add Azure Utilization Disclaimer (Azure migrations only):
+- The Azure utilization numbers represent our best estimation of the cost of running Azure government resources required for the application given the design specified in previous sections.
+- This estimation is based on a limited analysis of the application and our experience operating applications in Azure CCE.
+- Azure government resources can be scaled vertically or horizontally based on actual system demands so consumption will vary and can be tuned to actual need.
+- Pricing for Azure DOD Regions is not published in publicly available Azure pricing resources.
+- All prices are for Azure US Government Virginia Region as of the date of the analysis as published at https://azure.microsoft.com/en-us/pricing/",32-35,No,
