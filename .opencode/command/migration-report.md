@@ -80,8 +80,9 @@ Score each category from **1–10** (10 = best/most ready). Provide a 2–4 sent
 | 8 | **Security Posture** | Auth/authz patterns, secrets in code, HTTPS enforcement, dependency vulnerability signals, input validation |
 | 9 | **C1 / GovCloud Compliance** *(when applicable)* | Port 443/HTTPS-only interface compliance; SAML/GCDS SSO readiness; C1 service catalog compatibility; Mainframe/COBOL presence; NIPRNet dependency exposure; VPC/subnet assumption risks |
 
-**Overall Score** = weighted average (Cloud Readiness 20%, Containerizability 15%, Serverless Fit 10%, Data Portability 15%, Dependency Risk 15%, Test Coverage 10%, Operational Complexity 10%, Security Posture 5%). When C1/GovCloud Compliance is scored, apply it as an additional weighted factor (15%) and reduce other weights proportionally.
+**Overall Score** = weighted average using these base weights when C1/GovCloud Compliance is **not** applicable: Cloud Readiness 20%, Containerizability 15%, Serverless Fit 10%, Data Portability 15%, Dependency Risk 15%, Test Coverage 10%, Operational Complexity 10%, Security Posture 5%.
 
+When **C1 / GovCloud Compliance** is scored, use it as a fixed 15% factor and scale every other weight by **0.85** (that is, `adjusted_weight = original_weight × 0.85`). This yields the exact adjusted weights: Cloud Readiness **17%**, Containerizability **12.75%**, Serverless Fit **8.5%**, Data Portability **12.75%**, Dependency Risk **12.75%**, Test Coverage **8.5%**, Operational Complexity **8.5%**, Security Posture **4.25%**, and C1 / GovCloud Compliance **15%**.
 > **C1 Scoring Note:** A score of 1-3 on C1/GovCloud Compliance indicates hard blockers that will prevent migration without significant remediation. Common blockers: non-443 interfaces, COBOL/Mainframe workloads, NIPRNet-only services, missing SAML support. Refer to `c1-restrictions-and-gotchas.md` for the full catalog.
 
 ---
