@@ -2,6 +2,8 @@
 description: "Audit all dependencies for vulnerabilities, EOL status, license issues, and supply-chain risk"
 ---
 
+> **If this project is migrating to Cloud One (C1)**, the dependency audit also feeds the **A004 Configuration Management Plan CDRL** — the COTS/GOTS/FOSS inventory section requires a complete list of third-party components with versions. Load the `anr-csp-knowledge` skill and reference `A004_CloudOne_Configuration Management Plan_TEMPLATE_v1_4_1.md` to frame the license inventory as a CDRL-ready artifact.
+
 Audit the dependencies of the project at: $ARGUMENTS
 
 If no path is provided, analyze the current working directory.
@@ -93,7 +95,9 @@ Flag licenses that create legal/compliance risk:
 
 ## Phase 4: Write the HTML Report
 
-Write a self-contained `dependency-audit.html` file with:
+**Filename:** Before writing, check whether `dependency-audit.html` already exists in the project root. If it does, use `dependency-audit-2.html`; if that exists too, use `dependency-audit-3.html`, and so on — never overwrite an existing file.
+
+Write a self-contained file (using the resolved filename above) with:
 
 - **Executive Summary** — total dependencies scanned, count per severity tier, top 3 actions
 - **Critical & High Findings** — each as a card with: package name, current version, issue, recommended fix
@@ -107,7 +111,7 @@ Use this color scheme:
 - Critical: `#ef4444`, High: `#f97316`, Medium: `#f59e0b`, Low: `#6b7280`, Info: `#38bdf8`
 
 After writing the file, confirm:
-- The file path where `dependency-audit.html` was written
+- The file path where the report was written (include the resolved filename)
 - Total dependencies scanned
 - Count of findings per severity tier
 - The single highest-priority remediation item

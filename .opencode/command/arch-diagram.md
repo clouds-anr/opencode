@@ -2,6 +2,8 @@
 description: "Read a codebase and generate C4-style architecture diagrams"
 ---
 
+> **If this codebase is deployed on or being migrated to Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. It will shape the Interface Inventory (port 443 compliance column, NIPRNet flags), the System Context diagram (GCDS as an external actor, C1 boundary), and the Open Questions section (interface partner C1 status, VPC boundary assumptions).
+
 Analyze the codebase at: $ARGUMENTS
 
 If no path is provided, analyze the current working directory.
@@ -80,8 +82,10 @@ Alongside the diagrams, generate:
 Types: `service`, `worker`, `function`, `job`, `database`, `cache`, `queue`, `external-api`, `cdn`, `user`
 
 ### Interface Inventory Table
-| From | To | Protocol | Port | Direction | Notes |
-|------|----|----------|------|-----------|-------|
+| From | To | Protocol | Port | Direction | Port 443 Compliant? | Notes |
+|------|----|----------|------|-----------|--------------------|
+
+*C1 context:* Flag every interface not on port 443/HTTPS as **non-compliant**. Mark interfaces to NIPRNet services as **NIPRNet dependency — verify reachability**. Note any interfaces whose partner program's C1 migration status is unknown as **Open Question**.
 
 ### Key Architectural Decisions (observed, not recommended)
 List non-obvious architectural choices visible in the code — patterns that explain structure but aren't obvious to a new engineer (e.g., "event sourcing with CQRS", "BFF pattern per client type", "saga pattern for distributed transactions").
@@ -93,7 +97,9 @@ Things the diagrams couldn't determine from the code alone — where a human rev
 
 ## Phase 4: Write the Architecture Document
 
-Write `ARCHITECTURE.md` in the analyzed directory. Requirements:
+**Filename:** Before writing, check whether `ARCHITECTURE.md` already exists in the analyzed directory. If it does, use `ARCHITECTURE-2.md`; if that exists too, use `ARCHITECTURE-3.md`, and so on — never overwrite an existing file.
+
+Write the architecture document (using the resolved filename above) in the analyzed directory. Requirements:
 
 - **Markdown** — standard CommonMark with a Table of Contents at the top
 - **Mermaid diagrams** — use fenced ` ```mermaid ` blocks; one per diagram level; each preceded by a `##` heading with the level name
@@ -102,7 +108,7 @@ Write `ARCHITECTURE.md` in the analyzed directory. Requirements:
 - **File paths**: use forward slashes in all tool call `filePath` arguments, even on Windows. Use relative paths from the project root (e.g., `packages/app/ARCHITECTURE.md`), not absolute Windows paths.
 
 After writing the file, confirm:
-- The file path where `ARCHITECTURE.md` was written
+- The file path where the architecture document was written (include the resolved filename)
 - Count of services/containers identified
 - Count of external dependencies identified
 - Count of data stores identified

@@ -2,6 +2,8 @@
 description: "Analyze a file or module and produce a prioritized refactor plan"
 ---
 
+> **If this codebase is deployed on or being migrated to Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. C1-specific issues are automatic **P1** findings regardless of general code quality: non-443/HTTPS socket connections, non-SAML authentication mechanisms, hardcoded NIPRNet endpoints, and missing GCDS integration. The skill provides the full catalog of C1 blockers and their resolution paths.
+
 Analyze the file or module at: $ARGUMENTS
 
 If no path is provided, analyze the current working directory.
@@ -49,6 +51,15 @@ Evaluate the code across these dimensions:
 
 ### 4. Code Smells
 - **God objects/files** — one thing doing everything
+
+### 7. C1 / GovCloud Compliance Findings *(apply when target is C1)*
+Treat the following as automatic **P1** findings regardless of other scoring:
+- Any TCP/HTTP connection not on port 443 — flag the file, line, and interface partner
+- Any authentication mechanism that is not SAML-compatible (custom auth, LDAP direct, OAuth-only, JWT without SAML wrapper)
+- Hardcoded IP addresses or hostnames that appear to be NIPRNet or government-internal
+- Missing GCDS integration in auth flow
+- Any `FTP`, `SFTP`, `SSH`, or raw socket usage crossing a service boundary
+- Services or libraries from the CSP that may not be in the C1 approved catalog
 - **Long parameter lists** — functions with 4+ parameters (especially booleans) are hard to call correctly
 - **Shotgun surgery** — making one change requires touching many files
 - **Feature envy** — code that operates more on another module's data than its own
@@ -100,7 +111,9 @@ Note which refactors should be done before others (e.g., "extract the interface 
 
 ## Phase 4: Write the Refactor Plan
 
-Write `refactor-plan.md` in the analyzed directory with:
+**Filename:** Before writing, check whether `refactor-plan.md` already exists in the analyzed directory. If it does, use `refactor-plan-2.md`; if that exists too, use `refactor-plan-3.md`, and so on — never overwrite an existing file.
+
+Write the refactor plan (using the resolved filename above) in the analyzed directory with:
 
 - **Summary section** — total findings by priority tier, total estimated effort, top 3 highest-value items
 - **Priority-ordered findings** — P1 first, then P2, P3, P4; each finding as a `###` subsection with the full field table
@@ -111,7 +124,7 @@ Write `refactor-plan.md` in the analyzed directory with:
 - **File paths**: use forward slashes in all tool call `filePath` arguments, even on Windows. Use relative paths from the project root, not absolute Windows paths.
 
 After writing the file, confirm:
-- The file path where `refactor-plan.md` was written
+- The file path where the refactor plan was written (include the resolved filename)
 - Total findings by priority tier
 - Estimated total effort (sum of all items)
 - The single highest-value / lowest-effort item (the best place to start)

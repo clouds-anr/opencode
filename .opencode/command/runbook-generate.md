@@ -2,6 +2,8 @@
 description: "Analyze a service and generate an operations runbook"
 ---
 
+> **If this service is deployed on Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. It will add C1-specific failure modes (GCDS SSO outage, Artifactory connectivity loss, STIG scan findings blocking deployment, C1 account policy violations), surface C1-specific configuration variables, and shape the deployment/rollback procedures to reflect Artifactory-based artifact delivery rather than direct registry pushes.
+
 Analyze the service or codebase at: $ARGUMENTS
 
 If no path is provided, analyze the current working directory.
@@ -86,6 +88,13 @@ At minimum cover:
 - Memory/CPU pressure
 - Deployment failure / bad rollout
 
+*C1-specific failure modes to add when deployed on Cloud One:*
+- GCDS/SSO outage — symptoms, fallback behavior, who to contact at C1
+- Artifactory unreachable — deployment pipeline fails, artifact pull fails
+- STIG scan findings blocking a release — what findings block vs. what can be waived
+- C1 account policy violation — service action blocked by SCP or guardrail; how to identify and escalate
+- Certificate expiry (AF-PKI) — HTTPS/SAML breaks; renewal process
+
 ### 7. Runbook Procedures
 
 #### Deploy
@@ -119,7 +128,9 @@ Any non-obvious behavior discovered during analysis that would surprise an on-ca
 
 ## Phase 3: Write the Runbook
 
-Write `RUNBOOK.md` in the analyzed directory. Requirements:
+**Filename:** Before writing, check whether `RUNBOOK.md` already exists in the analyzed directory. If it does, use `RUNBOOK-2.md`; if that exists too, use `RUNBOOK-3.md`, and so on — never overwrite an existing file.
+
+Write the runbook (using the resolved filename above) in the analyzed directory. Requirements:
 
 - **Markdown** — standard CommonMark; use fenced code blocks, tables, and `>` blockquotes for warnings
 - **Mermaid diagrams** — use fenced ` ```mermaid ` blocks (renders natively in GitHub, GitLab, and most wikis)
@@ -130,7 +141,7 @@ Write `RUNBOOK.md` in the analyzed directory. Requirements:
 - **File paths**: use forward slashes in all tool call `filePath` arguments, even on Windows. Use relative paths from the project root (e.g., `packages/app/RUNBOOK.md`), not absolute Windows paths.
 
 After writing the file, confirm:
-- The file path where `RUNBOOK.md` was written
+- The file path where the runbook was written (include the resolved filename)
 - Count of environment variables documented
 - Count of failure modes documented
 - Any critical gaps found (missing health check, no rollback mechanism, unset required config, etc.)

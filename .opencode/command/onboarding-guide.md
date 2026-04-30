@@ -103,7 +103,9 @@ Where to go when stuck — Slack channels, wiki links, team contacts (infer from
 
 ## Phase 3: Write the Onboarding Guide
 
-Write `ONBOARDING.md` in the repository root. Requirements:
+**Filename:** Before writing, check whether `ONBOARDING.md` already exists in the repository root. If it does, use `ONBOARDING-2.md`; if that exists too, use `ONBOARDING-3.md`, and so on — never overwrite an existing file.
+
+Write the onboarding guide (using the resolved filename above) in the repository root. Requirements:
 
 - **Markdown** — standard CommonMark; renders in GitHub, GitLab, Notion, and Confluence
 - **Navigable** — use a Table of Contents at the top with anchor links to each section
@@ -115,7 +117,7 @@ Write `ONBOARDING.md` in the repository root. Requirements:
 - **File paths**: use forward slashes in all tool call `filePath` arguments, even on Windows. Use relative paths from the project root (e.g., `ONBOARDING.md`), not absolute Windows paths.
 
 After writing the file, confirm:
-- The file path where `ONBOARDING.md` was written
+- The file path where the onboarding guide was written (include the resolved filename)
 - Tech stack detected
 - Count of environment variables documented
 - Any gaps found where the guide had to make assumptions (missing README, no test command found, etc.)

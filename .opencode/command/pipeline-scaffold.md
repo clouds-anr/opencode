@@ -2,6 +2,8 @@
 description: "Detect tech stack and generate a CI/CD pipeline scaffold"
 ---
 
+> **If this codebase is deployed on Cloud One (C1)**, the publish stage must target **Artifactory** (not DockerHub or a public registry) as the artifact repository. Add a STIG scan stage using ACAS tooling. Load the `anr-csp-knowledge` skill for the full Artifactory delivery process and C1 pipeline requirements.
+
 Analyze the codebase at: $ARGUMENTS
 
 If no path is provided, analyze the current working directory.
@@ -60,9 +62,12 @@ Design a pipeline with these stages (include only what's relevant to the detecte
 
 ## Phase 3: Write the Pipeline File(s)
 
-Write the pipeline file(s) to the correct location:
-- GitHub Actions → `.github/workflows/ci.yml`
-- Azure DevOps → `azure-pipelines.yml`
+**Filename:** Before writing, check whether the target file already exists:
+- GitHub Actions → `.github/workflows/ci.yml`; if exists use `ci-2.yml`, then `ci-3.yml`, etc.
+- Azure DevOps → `azure-pipelines.yml`; if exists use `azure-pipelines-2.yml`, then `azure-pipelines-3.yml`, etc.
+Never overwrite an existing pipeline file.
+
+Write the pipeline file(s) to the resolved location above.
 
 Requirements:
 - **Fully functional** — no placeholder steps; every step must run with the detected stack
@@ -73,7 +78,7 @@ Requirements:
 - **Sensible defaults** — if something can't be determined, use the most common convention for the detected stack and leave a `# TODO:` comment explaining what to customize
 
 After writing the file(s), confirm:
-- The file path(s) written
+- The file path(s) written (include the resolved filename)
 - Detected stack summary (language, package manager, test framework, build output, cloud target)
 - Stages included
 - Secrets that must be configured in the repository before the pipeline will run
