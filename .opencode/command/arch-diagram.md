@@ -2,7 +2,7 @@
 description: "Read a codebase and generate C4-style architecture diagrams"
 ---
 
-> **If this codebase is deployed on or being migrated to Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. It will shape the Interface Inventory (port 443 compliance column, NIPRNet flags), the System Context diagram (GCDS as an external actor, C1 boundary), and the Open Questions section (interface partner C1 status, VPC boundary assumptions).
+> **If this codebase is deployed on or being migrated to Cloud One (C1)**, load the `anr-csp-knowledge` skill before proceeding. It will shape the Interface Inventory (port 443 compliance column, NIPRNet flags), the System Context diagram (GCDS as an external actor, C1 boundary), and the Open Questions section (interface partner C1 status, VPC boundary assumptions).
 
 Analyze the codebase at: $ARGUMENTS
 
