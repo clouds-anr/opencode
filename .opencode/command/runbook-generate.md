@@ -2,7 +2,7 @@
 description: "Analyze a service and generate an operations runbook"
 ---
 
-> **If this service is deployed on Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. It will add C1-specific failure modes (GCDS SSO outage, Artifactory connectivity loss, STIG scan findings blocking deployment, C1 account policy violations), surface C1-specific configuration variables, and shape the deployment/rollback procedures to reflect Artifactory-based artifact delivery rather than direct registry pushes.
+> **If this service is deployed on Cloud One (C1)**, load the `anr-csp-knowledge` skill before proceeding. It will add C1-specific failure modes (GCDS SSO outage, Artifactory connectivity loss, STIG scan findings blocking deployment, C1 account policy violations), surface C1-specific configuration variables, and shape the deployment/rollback procedures to reflect Artifactory-based artifact delivery rather than direct registry pushes. **Do not load this skill for a generic DoD/Government GovCloud deployment unless the service is explicitly confirmed to run under Cloud One and use those C1-specific controls/services.**
 
 Analyze the service or codebase at: $ARGUMENTS
 
