@@ -2,7 +2,7 @@
 description: "Analyze a file or module and produce a prioritized refactor plan"
 ---
 
-> **If this codebase is deployed on or being migrated to Cloud One (C1) or any DoD/Government GovCloud platform**, load the `anr-csp-knowledge` skill before proceeding. C1-specific issues are automatic **P1** findings regardless of general code quality: non-443/HTTPS socket connections, non-SAML authentication mechanisms, hardcoded NIPRNet endpoints, and missing GCDS integration. The skill provides the full catalog of C1 blockers and their resolution paths.
+> **If this codebase is deployed on or being migrated to Cloud One (C1)**, load the `anr-csp-knowledge` skill before proceeding. C1-specific issues are automatic **P1** findings regardless of general code quality: non-443/HTTPS socket connections, non-SAML authentication mechanisms, hardcoded NIPRNet endpoints, and missing GCDS integration. The skill provides the full catalog of C1 blockers and their resolution paths.
 
 Analyze the file or module at: $ARGUMENTS
 
