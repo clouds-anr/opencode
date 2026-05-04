@@ -62,10 +62,10 @@ Design a pipeline with these stages (include only what's relevant to the detecte
 
 ## Phase 3: Write the Pipeline File(s)
 
-**Filename:** Before writing, check whether the target file already exists:
-- GitHub Actions → `.github/workflows/ci.yml`; if exists use `ci-2.yml`, then `ci-3.yml`, etc.
-- Azure DevOps → `azure-pipelines.yml`; if exists use `azure-pipelines-2.yml`, then `azure-pipelines-3.yml`, etc.
-Never overwrite an existing pipeline file.
+**Filename:** Always use the canonical pipeline file for the detected platform:
+- GitHub Actions → `.github/workflows/ci.yml`
+- Azure DevOps → `azure-pipelines.yml`
+If the target pipeline file already exists, update/replace that file in place with the newly generated scaffold. Do not create numbered variants such as `ci-2.yml`, `ci-3.yml`, `azure-pipelines-2.yml`, etc., because that would leave multiple active pipelines that trigger on the same events.
 
 Write the pipeline file(s) to the resolved location above.
 
