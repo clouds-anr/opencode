@@ -51,15 +51,6 @@ Evaluate the code across these dimensions:
 
 ### 4. Code Smells
 - **God objects/files** — one thing doing everything
-
-### 7. C1 / GovCloud Compliance Findings *(apply when target is C1)*
-Treat the following as automatic **P1** findings regardless of other scoring:
-- Any TCP/HTTP connection not on port 443 — flag the file, line, and interface partner
-- Any authentication mechanism that is not SAML-compatible (custom auth, LDAP direct, OAuth-only, JWT without SAML wrapper)
-- Hardcoded IP addresses or hostnames that appear to be NIPRNet or government-internal
-- Missing GCDS integration in auth flow
-- Any `FTP`, `SFTP`, `SSH`, or raw socket usage crossing a service boundary
-- Services or libraries from the CSP that may not be in the C1 approved catalog
 - **Long parameter lists** — functions with 4+ parameters (especially booleans) are hard to call correctly
 - **Shotgun surgery** — making one change requires touching many files
 - **Feature envy** — code that operates more on another module's data than its own
@@ -75,6 +66,15 @@ Treat the following as automatic **P1** findings regardless of other scoring:
 - **Misleading names** — variable/function names that don't match what they do
 - **Abbreviations** — overly abbreviated names that require context to decode
 - **Inconsistent conventions** — mixing naming styles in the same module
+
+### 7. C1 / GovCloud Compliance Findings *(apply when target is C1)*
+Treat the following as automatic **P1** findings regardless of other scoring:
+- Any TCP/HTTP connection not on port 443 — flag the file, line, and interface partner
+- Any authentication mechanism that is not SAML-compatible (custom auth, LDAP direct, OAuth-only, JWT without SAML wrapper)
+- Hardcoded IP addresses or hostnames that appear to be NIPRNet or government-internal
+- Missing GCDS integration in auth flow
+- Any `FTP`, `SFTP`, `SSH`, or raw socket usage crossing a service boundary
+- Services or libraries from the CSP that may not be in the C1 approved catalog
 
 ---
 
