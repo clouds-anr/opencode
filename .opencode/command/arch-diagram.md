@@ -83,7 +83,7 @@ Types: `service`, `worker`, `function`, `job`, `database`, `cache`, `queue`, `ex
 
 ### Interface Inventory Table
 | From | To | Protocol | Port | Direction | Port 443 Compliant? | Notes |
-|------|----|----------|------|-----------|--------------------|
+|------|----|----------|------|-----------|--------------------|-------|
 
 *C1 context:* Flag every interface not on port 443/HTTPS as **non-compliant**. Mark interfaces to NIPRNet services as **NIPRNet dependency — verify reachability**. Note any interfaces whose partner program's C1 migration status is unknown as **Open Question**.
 
