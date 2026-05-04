@@ -89,11 +89,12 @@ At minimum cover:
 - Deployment failure / bad rollout
 
 *C1-specific failure modes to add when deployed on Cloud One:*
-- GCDS/SSO outage — symptoms, fallback behavior, who to contact at C1
+- Use only details evidenced by the repository or loaded knowledge. For any C1/program-specific operational detail that is not supported by evidence (for example, named contacts, escalation paths, waiver criteria, or certificate renewal steps), explicitly write `Unknown / not evidenced in repo or loaded knowledge` and include a brief note to confirm it with the platform/program owner; do not invent or guess.
+- GCDS/SSO outage — symptoms, fallback behavior, and any evidenced escalation path; if no C1 contact is evidenced, mark it unknown
 - Artifactory unreachable — deployment pipeline fails, artifact pull fails
-- STIG scan findings blocking a release — what findings block vs. what can be waived
-- C1 account policy violation — service action blocked by SCP or guardrail; how to identify and escalate
-- Certificate expiry (AF-PKI) — HTTPS/SAML breaks; renewal process
+- STIG scan findings blocking a release — document only evidenced blocking criteria and waiver guidance; if specific findings or waiver rules are not evidenced, mark them unknown
+- C1 account policy violation — service action blocked by SCP or guardrail; how to identify and any evidenced escalation path; otherwise mark escalation details unknown
+- Certificate expiry (AF-PKI) — HTTPS/SAML breaks; document only the evidenced renewal process or ownership; if not evidenced, mark renewal details unknown
 
 ### 7. Runbook Procedures
 
