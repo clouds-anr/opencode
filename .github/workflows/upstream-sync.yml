@@ -30,7 +30,7 @@ jobs:
       TARGET_BRANCH: dev
     steps:
       - name: Checkout dev
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
           ref: dev
@@ -39,7 +39,7 @@ jobs:
         uses: ./.github/actions/setup-bun
 
       - name: Setup Git Committer
-        id: committer
+        id: setup-git-committer
         uses: ./.github/actions/setup-git-committer
         with:
           opencode-app-id: ${{ vars.OPENCODE_APP_ID }}
@@ -75,7 +75,7 @@ jobs:
       - name: Run typecheck
         id: typecheck
         if: steps.merge.outputs.result == 'success' && steps.diff.outputs.count != '0'
-        run: bun --cwd packages/opencode typecheck
+        run: bun typecheck
 
       - name: Run tests
         id: tests
@@ -85,7 +85,7 @@ jobs:
       - name: Create or update PR
         if: steps.merge.outputs.result == 'success' && steps.diff.outputs.count != '0' && steps.typecheck.outcome == 'success' && steps.tests.outcome == 'success'
         env:
-          GH_TOKEN: ${{ steps.committer.outputs.token }}
+          GH_TOKEN: ${{ steps.setup-git-committer.outputs.token }}
         run: |
           date=$(date +%Y-%m-%d)
           body="Automated upstream sync from \`sst/opencode\` — $date.
@@ -108,7 +108,7 @@ jobs:
       - name: Open issue on merge conflict
         if: always() && steps.merge.outputs.result == 'conflict'
         env:
-          GH_TOKEN: ${{ steps.committer.outputs.token }}
+          GH_TOKEN: ${{ steps.setup-git-committer.outputs.token }}
         run: |
           gh issue create \
             --title "⚠️ Upstream sync conflict — $(date +%Y-%m-%d)" \
@@ -124,7 +124,7 @@ jobs:
       - name: Open issue on validation failure
         if: always() && (steps.typecheck.outcome == 'failure' || steps.tests.outcome == 'failure')
         env:
-          GH_TOKEN: ${{ steps.committer.outputs.token }}
+          GH_TOKEN: ${{ steps.setup-git-committer.outputs.token }}
         run: |
           gh issue create \
             --title "⚠️ Upstream sync validation failed — $(date +%Y-%m-%d)" \
