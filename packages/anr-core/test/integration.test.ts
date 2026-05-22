@@ -274,6 +274,7 @@ describe("wired pipeline: env file discovery → config load → validate", () =
     rmSync(TMP, { recursive: true, force: true })
     mkdirSync(resolve(TMP, ".opencode"), { recursive: true })
     writeFileSync(resolve(TMP, ".opencode/.env.govcloud"), [
+      "AWS_REGION=us-gov-west-1",
       "OPENCODE_AWS_REGION=us-gov-west-1",
       "OPENCODE_USE_BEDROCK=1",
       "ANTHROPIC_MODEL=us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -289,6 +290,7 @@ describe("wired pipeline: env file discovery → config load → validate", () =
       "CLIENT_ID=govcloud-client",
     ].join("\n"))
     writeFileSync(resolve(TMP, ".opencode/.env.commercial"), [
+      "AWS_REGION=us-east-1",
       "OPENCODE_AWS_REGION=us-east-1",
       "OPENCODE_USE_BEDROCK=1",
       "ANTHROPIC_MODEL=us.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -335,6 +337,7 @@ describe("wired pipeline: env file discovery → config load → validate", () =
     rmSync(TMP, { recursive: true, force: true })
     mkdirSync(resolve(TMP, ".opencode"), { recursive: true })
     writeFileSync(resolve(TMP, ".opencode/.env.single"), [
+      "AWS_REGION=us-gov-west-1",
       "OPENCODE_AWS_REGION=us-gov-west-1",
       "OPENCODE_USE_BEDROCK=1",
       "ANTHROPIC_MODEL=us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
