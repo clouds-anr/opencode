@@ -1,0 +1,72 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"provider": {
+		"opencode": {
+			"options": {}
+		}
+	},
+	"permission": {
+		"edit": {
+			"packages/opencode/migration/*": "deny"
+		}
+	},
+	"mcp": {},
+	"tools": {
+		"github-triage": false,
+		"github-pr-search": false
+	},
+	// Agents live in .opencode/agent/ — skills live in .opencode/skills/
+	// Use @ammo_team_lead as the main entry point for any task.
+	"agent": {
+		// ── Core agents ───────────────────────────────────────────────────────
+		"ammo_team_lead": {
+			"description": "AMMO Team Lead - coordinates all work, delegates to specialists",
+			"mode": "primary",
+			"prompt": "{file:agent/ammo_team_lead.md}"
+		},
+		"researcher": {
+			"description": "Researcher + Planner - deep codebase analysis, actionable plans",
+			"mode": "subagent",
+			"prompt": "{file:agent/researcher.md}"
+		},
+		"implementor": {
+			"description": "Implementor - features, fixes, and refactors across any language or domain",
+			"mode": "subagent",
+			"prompt": "{file:agent/implementor.md}"
+		},
+		"tester": {
+			"description": "Tester - test design, execution, and regression validation",
+			"mode": "subagent",
+			"prompt": "{file:agent/tester.md}"
+		},
+		"documentation": {
+			"description": "Documentation - PlantUML diagrams, ADRs, API docs, release notes",
+			"mode": "subagent",
+			"prompt": "{file:agent/documentation.md}"
+		},
+		"truth_teller": {
+			"description": "Truth-Teller (default) - challenges assumptions and risky plans",
+			"mode": "subagent",
+			"model": "amazon-bedrock/us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_sonnet": {
+			"description": "Truth-Teller (Sonnet) - Claude Sonnet perspective",
+			"mode": "subagent",
+			"model": "amazon-bedrock/us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_nova": {
+			"description": "Truth-Teller (Nova) - Amazon Nova perspective",
+			"mode": "subagent",
+			"model": "amazon-bedrock/amazon.nova-pro-v1:0",
+			"prompt": "{file:agent/truth_teller.md}"
+		},
+		"truth_teller_lite": {
+			"description": "Truth-Teller (Lite) - Amazon Nova Lite perspective",
+			"mode": "subagent",
+			"model": "amazon-bedrock/amazon.nova-lite-v1:0",
+			"prompt": "{file:agent/truth_teller.md}"
+		}
+	}
+}
