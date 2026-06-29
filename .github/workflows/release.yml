@@ -29,10 +29,31 @@ permissions:
   packages: write
 
 jobs:
+  # Release gate (clouds-anr/opencode#307, phase 5): no release is cut unless the
+  # deterministic test gate is green for this exact commit. `version` creates the
+  # draft GitHub release/tag and every build job depends on it, so a red gate
+  # yields no tag, no binaries, no release. Direct job dependency — no fragile
+  # cross-workflow workflow_run polling. Intentionally typecheck + `bun turbo
+  # test` only (not Playwright e2e or the multi-OS smoke matrix) to keep release
+  # blocking deterministic and fast.
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+      - uses: ./.github/actions/setup-bun
+      - name: Typecheck (full workspace)
+        run: bun turbo typecheck
+      - name: Run tests (full workspace)
+        run: GITHUB_ACTIONS=false bun turbo test
+
   # ---------------------------------------------------------------------------
   # 1. Version: derive from git tags, create a draft GitHub release
   # ---------------------------------------------------------------------------
   version:
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
