@@ -148,11 +148,25 @@ jobs:
   # Binary smoke + config-layer validation: prove the *compiled* CLI actually
   # launches AND that the committed .opencode config loads against it — not just
   # that the source typechecks/tests. Catches "built executable ships broken" and
-  # config/schema drift (clouds-anr/opencode#307, phases 1 & 2). Linux-only for
-  # now; expand to a macOS/Windows matrix once the flow is proven.
+  # config/schema drift (clouds-anr/opencode#307, phases 1 & 2).
+  #
+  # Smoke (build + --version/--help) runs on the full Linux/macOS/Windows matrix
+  # (phase 1b). The .opencode config-layer validation stays Linux-only for now
+  # (a later phase can widen it). fail-fast:false so one OS failing still reports
+  # the others.
   cli-smoke:
-    name: cli-smoke + config (linux)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: cli-smoke + config (${{ matrix.settings.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - name: linux
+            host: blacksmith-4vcpu-ubuntu-2404
+          - name: macos
+            host: macos-26
+          - name: windows
+            host: blacksmith-4vcpu-windows-2025
+    runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
         shell: bash
@@ -183,7 +197,8 @@ jobs:
           OPENCODE_DISABLE_SHARE: "1"
         run: |
           set -euo pipefail
-          bin="$(find packages/opencode/dist -maxdepth 3 -type f -name opencode | head -1)"
+          # Linux/macOS produce `opencode`; Windows produces `opencode.exe`.
+          bin="$(find packages/opencode/dist -maxdepth 3 -type f \( -name opencode -o -name opencode.exe \) | head -1)"
           if [ -z "$bin" ]; then
             echo "::error::built opencode binary not found under packages/opencode/dist"
             ls -R packages/opencode/dist || true
@@ -215,6 +230,7 @@ jobs:
       # the network on a fresh checkout. This validates config parse + schema,
       # not the ANR auth runtime or external plugin modules.
       - name: Validate .opencode config layer
+        if: runner.os == 'Linux'
         env:
           OPENCODE_FLAVOR: oss
           OPENCODE_DISABLE_SHARE: "1"
@@ -222,7 +238,8 @@ jobs:
           OPENCODE_DISABLE_AUTOUPDATE: "1"
         run: |
           set -euo pipefail
-          bin="$(find packages/opencode/dist -maxdepth 3 -type f -name opencode | head -1)"
+          # Linux/macOS produce `opencode`; Windows produces `opencode.exe`.
+          bin="$(find packages/opencode/dist -maxdepth 3 -type f \( -name opencode -o -name opencode.exe \) | head -1)"
           [ -n "$bin" ] || { echo "::error::built opencode binary not found"; exit 1; }
 
           echo "== opencode.jsonc + resolved schema (agents/commands/mcp) =="
