@@ -97,6 +97,38 @@ describe("DatabaseMigration", () => {
     )
   })
 
+  // Upgrade smoke test (clouds-anr/opencode#307, phase 3): the individual
+  // migration tests above each exercise one migration in isolation. This proves
+  // the *whole* chain replays cleanly in order — an existing install upgrading
+  // across every version, where the final step applies the newest (e.g. just-
+  // synced) migration on top of the N-1 state — and that the incremental path
+  // converges on the same schema as a fresh install. Catches a synced migration
+  // that fails on accumulated state or diverges from schema.gen.
+  test("replays the full migration chain on an existing database and matches a fresh install", async () => {
+    const tableNames = (build: (db: EffectDrizzleSqlite.EffectSQLiteDatabase) => Effect.Effect<void, unknown>) =>
+      run(
+        Effect.gen(function* () {
+          const db = yield* makeDb
+          yield* build(db)
+          const tables = (
+            yield* db.all<{ name: string }>(
+              sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'migration' ORDER BY name`,
+            )
+          ).map((row) => row.name)
+          const migrationCount = (yield* db.get<{ count: number }>(sql`SELECT count(*) as count FROM migration`))?.count
+          return { tables, migrationCount }
+        }),
+      )
+
+    // Each db uses its own in-memory connection (one per run()), so the two
+    // upgrade paths cannot contaminate each other.
+    const upgraded = await tableNames((db) => DatabaseMigration.applyOnly(db, migrations))
+    const fresh = await tableNames((db) => DatabaseMigration.apply(db))
+
+    expect(upgraded.migrationCount).toBe(migrations.length)
+    expect(upgraded.tables).toEqual(fresh.tables)
+  })
+
   test("rejects a non-empty database without a session table", async () => {
     await expect(
       run(
