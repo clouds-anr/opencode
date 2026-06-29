@@ -7,10 +7,15 @@ import { SessionTodo } from "../src/session-todo"
 import { SessionV1 } from "../src/session-v1"
 import { WorkspaceEvent } from "../src/workspace-event"
 
+// NOTE (ANR): the counts below were inherited from upstream at 55/85/32 but were
+// already stale there — upstream registered the `session.next.revert.{staged,
+// cleared,committed}` events into the manifest inventory without updating these
+// assertions, so the test is red on upstream/dev too. We carry the same source,
+// so the real surface here is 58/88/35. Updated to match; worth upstreaming the fix.
 describe("public event manifest", () => {
   test("owns the complete public event surface", () => {
-    expect(EventManifest.ServerDefinitions.length).toBe(55)
-    expect(EventManifest.Definitions.length).toBe(85)
+    expect(EventManifest.ServerDefinitions.length).toBe(58)
+    expect(EventManifest.Definitions.length).toBe(88)
     expect(SessionV1.Event.Definitions).toEqual([
       SessionV1.Event.Created,
       SessionV1.Event.Updated,
@@ -23,8 +28,8 @@ describe("public event manifest", () => {
       SessionV1.Event.Diff,
       SessionV1.Event.Error,
     ])
-    expect(EventManifest.Latest.size).toBe(85)
-    expect(EventManifest.Durable.size).toBe(32)
+    expect(EventManifest.Latest.size).toBe(88)
+    expect(EventManifest.Durable.size).toBe(35)
   })
 
   test("uses canonical definitions for current public events", () => {
@@ -42,7 +47,8 @@ describe("public event manifest", () => {
     expect(Reference.Event.Definitions).toEqual([Reference.Event.Updated])
     expect(EventManifest.Latest.has("ide.installed")).toBe(false)
     expect(IdeEvent.Definitions).toEqual([IdeEvent.Installed])
-    expect(EventManifest.Definitions.slice(40, 43)).toEqual([
+    // Shifted from 40-42 to 43-45: the session.next.revert.* events now occupy 40-42.
+    expect(EventManifest.Definitions.slice(43, 46)).toEqual([
       SessionV1.Event.PartDelta,
       SessionV1.Event.Diff,
       SessionV1.Event.Error,
