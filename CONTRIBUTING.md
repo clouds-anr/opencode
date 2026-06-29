@@ -201,6 +201,21 @@ For non-UI changes (bug fixes, new features, refactors), explain **how you verif
 - What did you test?
 - How can a reviewer reproduce/confirm the fix?
 
+### Testing & CI gates
+
+Tests are wired into the gates that decide whether code is safe to merge, sync, or release (clouds-anr/opencode#307). Before pushing:
+
+- **Run locally:** `bun turbo typecheck` and `bun turbo test` (every package with a `test` script runs under Turbo — no hand-maintained allow-list). Do not run tests from the repo root.
+- **Pre-push hook:** runs `bun typecheck` plus `bun turbo test --affected` for the packages your push touches.
+
+What CI enforces:
+
+- **`test.yml`** runs the full `bun turbo test` (Linux + Windows), the app e2e suite, a **CLI binary smoke test** (`--version`/`--help`) across Linux/macOS/Windows, an offline **`.opencode/` config-layer validation** (Linux), and a **desktop smoke** (Linux: desktop unit tests + `electron-vite build`, no app launch).
+- **Upstream sync** (`sync-upstream.sh`) only marks a sync safe to merge when **both** the full-workspace typecheck **and** `bun turbo test` pass.
+- **Releases** (`release.yml` and `publish.yml`) will not cut a tag or produce artifacts unless the typecheck + `bun turbo test` gate is green for that commit.
+
+Migrations get extra coverage: the full migration chain is replayed in `packages/core/test/database-migration.test.ts`, so a new migration that breaks an upgrade or diverges from the declared schema fails the gate.
+
 ### No AI-Generated Walls of Text
 
 Long, AI-generated PR descriptions and issues are not acceptable and may be ignored. Respect the maintainers' time:

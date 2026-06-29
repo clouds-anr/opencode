@@ -266,3 +266,43 @@ jobs:
           '
 
           echo "Config-layer validation passed."
+
+  # Desktop smoke test (clouds-anr/opencode#307, phase 4): prove the Electron
+  # app's main/renderer logic passes and that it bundles (electron-vite build),
+  # WITHOUT launching the packaged app — launch verification needs a display
+  # server + signing and is the flakiest part, so it's intentionally out of scope.
+  # Linux-only and isolated in its own job (and deliberately NOT wired into
+  # `bun turbo test`) so Electron/desktop flakiness can't destabilize the core
+  # unit/test gate.
+  desktop-smoke:
+    name: desktop-smoke (linux)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      # Main + renderer unit tests (mocked Electron; no app launch).
+      - name: Run desktop unit tests
+        timeout-minutes: 15
+        working-directory: packages/desktop
+        run: bun test
+
+      # Compile/bundle main, preload, and renderer. Proves the app builds; does
+      # not package an installer or launch it.
+      - name: Build desktop app (electron-vite build)
+        timeout-minutes: 20
+        working-directory: packages/desktop
+        run: bun run build

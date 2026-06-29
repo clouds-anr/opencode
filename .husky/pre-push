@@ -18,3 +18,6 @@ if (process.versions.bun !== expectedBunVersion) {
 }
 '
 bun typecheck
+# Run tests for packages affected by the pushed changes (clouds-anr/opencode#307,
+# phase 9). Falls back to the full suite when turbo can't determine a base.
+bun turbo test --affected
