@@ -11,7 +11,8 @@
 #        c. bun.lock is reconciled with `bun install` if it was touched.
 #      Anything still unresolved -> escalate (stop, leave for a human).
 #   4. Validate the merged result with a FULL-workspace typecheck (catches
-#      semantic breaks that no textual rule can see).
+#      semantic breaks that no textual rule can see) followed by the
+#      FULL-workspace test suite (catches breaks that still compile).
 #   5. Persist any newly-recorded rerere resolutions back to the store so the
 #      next run remembers them.
 #
@@ -25,6 +26,7 @@
 #     --upstream-ref REF     upstream ref to sync from (default: dev)
 #     --target-commit SHA    merge only up to this upstream commit (testing)
 #     --no-typecheck         skip the full-workspace typecheck (faster local loops)
+#     --no-test              skip the full-workspace test suite (faster local loops)
 #
 set -euo pipefail
 
@@ -39,6 +41,7 @@ MAX_BATCHES=0            # 0 = unlimited
 TARGET_COMMIT=""
 DO_PUSH=0
 DO_TYPECHECK=1
+DO_TEST=1
 RR_STORE="${RR_STORE:-.sync/rr-cache}"   # persisted rerere memory (committed/shared)
 RESOLVE_SCRIPT="$(dirname "$0")/resolve-conflicts.sh"
 SUMMARY_FILE="${SUMMARY_FILE:-/tmp/sync-upstream-summary.md}"
@@ -51,6 +54,7 @@ while [ $# -gt 0 ]; do
     --upstream-ref) UPSTREAM_REF="$2"; shift ;;
     --target-commit) TARGET_COMMIT="$2"; shift ;;
     --no-typecheck) DO_TYPECHECK=0 ;;
+    --no-test) DO_TEST=0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -218,6 +222,20 @@ if [ "$DO_TYPECHECK" -eq 1 ]; then
   fi
 fi
 
+# ---- validation: full-workspace test suite (behavioral-break gate) -----------
+# A clean typecheck only proves the merged tree compiles; it can still be broken
+# at runtime (an upstream API whose behavior changed under an ANR caller). Run the
+# whole test suite to catch that. Skipped when typecheck already failed — the sync
+# is escalating anyway and the tests likely won't even load.
+TESTS_OK="skipped"
+if [ "$DO_TEST" -eq 1 ] && [ "$TYPECHECK_OK" != "failed" ]; then
+  log "Validate: full-workspace tests"
+  if bun turbo test; then TESTS_OK="passed"; else
+    TESTS_OK="failed"
+    log "TESTS FAILED — behavioral break; escalating for manual review"
+  fi
+fi
+
 # ---- persist newly-recorded resolutions back to the store --------------------
 log "Persist rerere memory"
 if [ -n "$(ls -A .git/rr-cache 2>/dev/null || true)" ]; then
@@ -238,12 +256,14 @@ log "Summary"
 SAFE=1
 [ "${#ALL_ESCALATED[@]}" -gt 0 ] && SAFE=0
 [ "$TYPECHECK_OK" = "failed" ] && SAFE=0
+[ "$TESTS_OK" = "failed" ] && SAFE=0
 NEEDS_REVIEW_OUT="$([ "$NEEDS_REVIEW" -eq 1 ] && echo yes || echo no)"
 SAFE_OUT="$([ "$SAFE" -eq 1 ] && echo yes || echo no)"
 {
   echo "batches=$batch"
   echo "head=$(git rev-parse --short HEAD)"
   echo "typecheck=$TYPECHECK_OK"
+  echo "tests=$TESTS_OK"
   echo "needs_review=$NEEDS_REVIEW_OUT"
   echo "escalated=${ALL_ESCALATED[*]:-none}"
   echo "safe_to_push=$SAFE_OUT"
@@ -256,6 +276,7 @@ if [ -n "${SYNC_GITHUB_OUTPUT:-}" ]; then
     echo "result=ok"
     echo "head=$(git rev-parse --short HEAD)"
     echo "typecheck=$TYPECHECK_OK"
+    echo "tests=$TESTS_OK"
     echo "needs_review=$NEEDS_REVIEW_OUT"
     echo "safe_to_push=$SAFE_OUT"
     echo "escalated=${ALL_ESCALATED[*]:-none}"
