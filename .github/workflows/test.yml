@@ -145,12 +145,13 @@ jobs:
             packages/app/e2e/test-results
             packages/app/e2e/playwright-report
 
-  # Binary smoke test: prove the *compiled* CLI actually launches, not just that
-  # the source typechecks/tests. Catches "built executable ships broken" — the
-  # failure mode behind recent bad releases (clouds-anr/opencode#307, phase 1).
-  # Linux-only for now; expand to a macOS/Windows matrix once the flow is proven.
+  # Binary smoke + config-layer validation: prove the *compiled* CLI actually
+  # launches AND that the committed .opencode config loads against it — not just
+  # that the source typechecks/tests. Catches "built executable ships broken" and
+  # config/schema drift (clouds-anr/opencode#307, phases 1 & 2). Linux-only for
+  # now; expand to a macOS/Windows matrix once the flow is proven.
   cli-smoke:
-    name: cli-smoke (linux)
+    name: cli-smoke + config (linux)
     runs-on: blacksmith-4vcpu-ubuntu-2404
     defaults:
       run:
@@ -205,3 +206,46 @@ jobs:
             || { echo "::error::--help produced no recognizable output"; exit 1; }
 
           echo "CLI smoke test passed."
+
+      # Phase 2 (#307): validate the .opencode config layer loads against the
+      # built binary — opencode.jsonc, agents, commands, and skills must parse
+      # and pass schema with no errors. OPENCODE_FLAVOR=oss + --pure keep this
+      # fully offline: otherwise .opencode/.env* auto-enables ANR mode (browser/
+      # AWS auth + an interactive env-file picker), and plugin loading could hit
+      # the network on a fresh checkout. This validates config parse + schema,
+      # not the ANR auth runtime or external plugin modules.
+      - name: Validate .opencode config layer
+        env:
+          OPENCODE_FLAVOR: oss
+          OPENCODE_DISABLE_SHARE: "1"
+          OPENCODE_DISABLE_MODELS_FETCH: "1"
+          OPENCODE_DISABLE_AUTOUPDATE: "1"
+        run: |
+          set -euo pipefail
+          bin="$(find packages/opencode/dist -maxdepth 3 -type f -name opencode | head -1)"
+          [ -n "$bin" ] || { echo "::error::built opencode binary not found"; exit 1; }
+
+          echo "== opencode.jsonc + resolved schema (agents/commands/mcp) =="
+          "$bin" debug config --pure | bun -e '
+            const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            for (const k of ["agent", "command"]) {
+              if (!(k in j)) { console.error("::error::resolved config missing key: " + k); process.exit(1); }
+            }
+            const cmds = Object.keys(j.command || {}).length;
+            if (cmds === 0) { console.error("::error::no commands resolved from .opencode/command"); process.exit(1); }
+            console.log(`config OK — ${Object.keys(j.agent).length} agents, ${cmds} commands`);
+          '
+
+          echo "== agents load (.opencode/agent/*.md via Agent service) =="
+          agents="$("$bin" agent list --pure)"
+          [ -n "$agents" ] || { echo "::error::agent list produced no output"; exit 1; }
+          echo "agents OK"
+
+          echo "== skills load (.opencode/skills/* via Skill service) =="
+          "$bin" debug skill --pure | bun -e '
+            const j = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            if (!Array.isArray(j) || j.length === 0) { console.error("::error::no skills loaded"); process.exit(1); }
+            console.log(`skills OK — ${j.length} loaded`);
+          '
+
+          echo "Config-layer validation passed."
