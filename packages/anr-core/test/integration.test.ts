@@ -74,8 +74,7 @@ describe("integration points exist in opencode package", () => {
     "auth/anr-refresh.ts",             // Credential refresh module
     "session/processor.ts",            // Session hooks for tracking
     "provider/provider.ts",            // Model ID passthrough
-    "cli/cmd/tui/worker.ts",           // Worker OTEL re-init
-    "cli/cmd/tui/context/quota.tsx",   // Quota TUI display
+    "cli/tui/worker.ts",               // Worker OTEL re-init
     "cli/cmd/debug/otel.ts",           // Debug commands
   ]
 
@@ -141,10 +140,21 @@ describe("critical code patterns are present", () => {
   })
 
   test("worker.ts re-initializes OTEL in worker process", async () => {
-    const content = await Bun.file(resolve(OPENCODE_SRC, "cli/cmd/tui/worker.ts")).text()
+    const content = await Bun.file(resolve(OPENCODE_SRC, "cli/tui/worker.ts")).text()
     expect(content).toContain("initializeOTEL")
     expect(content).toContain("reconstructTelemetryContextFromEnv")
     expect(content).toContain("OPENCODE_ENABLE_TELEMETRY")
+  })
+
+  // The quota display moved out of a dedicated TUI file (cli/cmd/tui/context/
+  // quota.tsx, removed upstream) into index.ts, which now runs the quota check
+  // and exports quotaInfo for the TUI to read. Validate the feature at its
+  // current source instead of the deleted file.
+  test("index.ts sources the quota check and exposes quota info to the TUI", async () => {
+    const content = await Bun.file(resolve(OPENCODE_SRC, "index.ts")).text()
+    expect(content).toContain("checkQuota")
+    expect(content).toContain("quotaInfo")
+    expect(content).toContain("Quota:")
   })
 
   test("anr-refresh.ts exports required interface", async () => {
