@@ -144,3 +144,64 @@ jobs:
           path: |
             packages/app/e2e/test-results
             packages/app/e2e/playwright-report
+
+  # Binary smoke test: prove the *compiled* CLI actually launches, not just that
+  # the source typechecks/tests. Catches "built executable ships broken" — the
+  # failure mode behind recent bad releases (clouds-anr/opencode#307, phase 1).
+  # Linux-only for now; expand to a macOS/Windows matrix once the flow is proven.
+  cli-smoke:
+    name: cli-smoke (linux)
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      # --single builds a single native binary for the current platform only
+      # (no cross-compile matrix), which is all the smoke test needs.
+      - name: Build CLI binary
+        timeout-minutes: 20
+        run: bun packages/opencode/script/build.ts --single
+
+      # Offline checks only — no auth, no provider calls, no network-dependent
+      # prompts. --version and --help exercise startup and command wiring.
+      - name: Smoke test the binary
+        env:
+          OPENCODE_DISABLE_SHARE: "1"
+        run: |
+          set -euo pipefail
+          bin="$(find packages/opencode/dist -maxdepth 3 -type f -name opencode | head -1)"
+          if [ -z "$bin" ]; then
+            echo "::error::built opencode binary not found under packages/opencode/dist"
+            ls -R packages/opencode/dist || true
+            exit 1
+          fi
+          chmod +x "$bin"
+          echo "Binary: $bin"
+
+          echo "== opencode --version =="
+          version="$("$bin" --version)"
+          echo "$version"
+          echo "$version" | grep -qE '[0-9]+\.[0-9]+\.[0-9]+' \
+            || { echo "::error::--version did not print a semver-like string"; exit 1; }
+
+          # --help prints to stderr (and exits 0), so capture both streams.
+          echo "== opencode --help =="
+          help="$("$bin" --help 2>&1)"
+          echo "$help"
+          echo "$help" | grep -qi "opencode" \
+            || { echo "::error::--help produced no recognizable output"; exit 1; }
+
+          echo "CLI smoke test passed."
