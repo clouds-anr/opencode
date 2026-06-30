@@ -194,14 +194,24 @@ while IFS= read -r file; do
 
   case "$strategy" in
     ours)
-      git checkout --ours -- "$file"
-      git add "$file"
+      if git cat-file -e "HEAD:$file" 2>/dev/null; then
+        git checkout --ours -- "$file"
+        git add "$file"
+      else
+        # HEAD deleted this file; "ours" = keep it deleted.
+        git rm -f -- "$file" 2>/dev/null || true
+      fi
       resolved_files+=("$file")
       resolved_details+=("$file (ours)")
       ;;
     theirs)
-      git checkout --theirs -- "$file"
-      git add "$file"
+      if git cat-file -e "MERGE_HEAD:$file" 2>/dev/null; then
+        git checkout --theirs -- "$file"
+        git add "$file"
+      else
+        # Upstream deleted this file; "theirs" = remove it.
+        git rm -f -- "$file" 2>/dev/null || true
+      fi
       resolved_files+=("$file")
       resolved_details+=("$file (theirs, no local modification history detected)")
       ;;
