@@ -68,6 +68,9 @@ jobs:
       # anything else indicates a human pushed to the branch and the run must halt to
       # avoid destroying that work.  An open PR is NOT a reason to skip — the run will
       # update the existing PR in place.
+      # NOTE: dry_run bypasses this guard (a dry run never pushes, so there is nothing
+      # to overwrite). Do not treat a passing dry run as proof that a live run would
+      # safely update the sync branch.
       - name: Check for manual divergence on sync branch
         id: guard
         env:
@@ -130,10 +133,10 @@ jobs:
           # may be blocked from creating PRs by org policy. Falls back to GITHUB_TOKEN.
           GH_TOKEN: ${{ steps.committer.outputs.token || github.token }}
           SAFE: ${{ steps.sync.outputs.safe_to_push }}
-          REVIEW: ${{ steps.sync.outputs.needs_review }}
           ESCALATED: ${{ steps.sync.outputs.escalated }}
           TYPECHECK: ${{ steps.sync.outputs.typecheck }}
-          TESTS: ${{ steps.sync.outputs.tests }}
+          TEST: ${{ steps.sync.outputs.test }}
+          COMMITS_BEHIND: ${{ steps.sync.outputs.commits_behind }}
           HEAD_SHA: ${{ steps.sync.outputs.head }}
         run: |
           set -euo pipefail
@@ -142,14 +145,10 @@ jobs:
           if [ "$SAFE" = "yes" ]; then
             title="chore(sync): upstream sync $date — ready for review"
             body=$(cat <<EOF
-          Automated incremental upstream sync ($date).
+          Automated full upstream sync ($date) — merged \`$COMMITS_BEHIND\` upstream commit(s).
 
-          Validation passed ✅
-          - Typecheck (full workspace): **$TYPECHECK**
-          - Tests (full workspace): **$TESTS**
-
-          Conflicts were resolved automatically via remembered resolutions
-          (git rerere) and conflict-rules.conf.
+          Validation passed ✅ (typecheck: $TYPECHECK, tests: $TEST). Conflicts were resolved
+          automatically via remembered resolutions (git rerere) and conflict-rules.conf.
 
           Tip of branch: \`$HEAD_SHA\`. Ready for review and merge into \`$TARGET_BRANCH\`.
           EOF
@@ -158,10 +157,12 @@ jobs:
           else
             title="chore(sync): upstream sync $date — NEEDS MANUAL REVIEW"
             body=$(cat <<EOF
-          Automated incremental upstream sync ($date) needs a human.
+          Automated full upstream sync ($date) needs a human.
+
+          Attempted to merge \`$COMMITS_BEHIND\` upstream commit(s).
 
           - Typecheck (full workspace): **$TYPECHECK**
-          - Tests (full workspace): **$TESTS**
+          - Unit tests: **$TEST**
           - Files left with conflict markers (textual): \`$ESCALATED\`
 
           A \`failed\` typecheck means a *semantic* break — code that merged cleanly
