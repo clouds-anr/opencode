@@ -190,7 +190,13 @@ jobs:
           existing="$(gh pr list --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
             --state open --json number --jq '.[0].number' || true)"
           if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title "$title" --body "$body" --add-label "$label" || true
+            if [ "$SAFE" = "yes" ]; then
+              gh pr edit "$existing" --title "$title" --body "$body" \
+                --add-label "upstream-sync" --remove-label "needs-manual-review" 2>/dev/null || true
+            else
+              gh pr edit "$existing" --title "$title" --body "$body" \
+                --add-label "needs-manual-review" --remove-label "upstream-sync" 2>/dev/null || true
+            fi
             echo "Updated PR #$existing"
           else
             gh pr create --base "$TARGET_BRANCH" --head "$SYNC_BRANCH" \
