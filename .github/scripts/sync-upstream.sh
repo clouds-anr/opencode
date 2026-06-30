@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Incremental upstream sync with remembered conflict resolutions.
+# Full upstream sync with remembered conflict resolutions.
 #
 # Pipeline per run:
 #   1. Restore the persisted rerere cache (remembered hunk resolutions).
-#   2. Fetch upstream and merge it into a sync branch in bounded batches.
-#   3. For each batch's conflicts:
+#   2. Fetch upstream and merge ALL pending commits into a sync branch in one pass.
+#   3. For any conflicts:
 #        a. rerere auto-replays any resolution we've recorded before (zero touch).
 #        b. resolve-conflicts.sh applies conflict-rules.conf (ours/theirs/escalate).
-#        c. bun.lock is reconciled with `bun install` if it was touched.
+#        c. bun.lock is reconciled with `bun install` after the merge.
 #      Anything still unresolved -> escalate (stop, leave for a human).
 #   4. Validate the merged result with a FULL-workspace typecheck (catches
 #      semantic breaks that no textual rule can see) followed by the
@@ -21,8 +21,6 @@
 # Usage:
 #   .github/scripts/sync-upstream.sh [options]
 #     --push                 push the sync branch when everything is clean+green
-#     --batch-size N         commits per merge batch (default: 70)
-#     --max-batches N        stop after N batches (default: unlimited)
 #     --upstream-ref REF     upstream ref to sync from (default: dev)
 #     --target-commit SHA    merge only up to this upstream commit (testing)
 #     --no-typecheck         skip the full-workspace typecheck (faster local loops)
@@ -36,8 +34,6 @@ UPSTREAM_REPO="${UPSTREAM_REPO:-https://github.com/sst/opencode.git}"
 UPSTREAM_REF="dev"
 TARGET_BRANCH="${TARGET_BRANCH:-dev}"
 SYNC_BRANCH="${SYNC_BRANCH:-sync/upstream}"
-BATCH_SIZE=70
-MAX_BATCHES=0            # 0 = unlimited
 TARGET_COMMIT=""
 DO_PUSH=0
 DO_TYPECHECK=1
@@ -49,8 +45,6 @@ SUMMARY_FILE="${SUMMARY_FILE:-/tmp/sync-upstream-summary.md}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --push) DO_PUSH=1 ;;
-    --batch-size) BATCH_SIZE="$2"; shift ;;
-    --max-batches) MAX_BATCHES="$2"; shift ;;
     --upstream-ref) UPSTREAM_REF="$2"; shift ;;
     --target-commit) TARGET_COMMIT="$2"; shift ;;
     --no-typecheck) DO_TYPECHECK=0 ;;
@@ -98,108 +92,74 @@ info "syncing toward ${UPSTREAM_TIP:0:9}"
 log "Prepare sync branch"
 git checkout -B "$SYNC_BRANCH" "$TARGET_BRANCH" --quiet
 PENDING="$(git rev-list --count "${SYNC_BRANCH}..${UPSTREAM_TIP}")"
-info "$PENDING upstream commit(s) to merge (batch size $BATCH_SIZE)"
+info "$PENDING upstream commit(s) to merge in one pass"
 if [ "$PENDING" -eq 0 ]; then
   echo "Already up to date."
   [ -n "${SYNC_GITHUB_OUTPUT:-}" ] && printf 'result=uptodate\nsafe_to_push=no\nneeds_review=no\n' >> "$SYNC_GITHUB_OUTPUT"
   exit 0
 fi
 
-# ---- batched merge loop ------------------------------------------------------
-ALL_RESOLVED=()
+# ---- single-pass merge -------------------------------------------------------
 ALL_ESCALATED=()
 NEEDS_REVIEW=0
-batch=0
-while true; do
-  remaining="$(git rev-list --count "HEAD..${UPSTREAM_TIP}")"
-  [ "$remaining" -eq 0 ] && break
-  batch=$((batch + 1))
-  needs_review_batch=0
-  if [ "$MAX_BATCHES" -ne 0 ] && [ "$batch" -gt "$MAX_BATCHES" ]; then
-    info "reached --max-batches $MAX_BATCHES; stopping early"
-    break
-  fi
 
-  # pick the batch target: BATCH_SIZE commits ahead on the first-parent path,
-  # or the tip if fewer remain.
-  if [ "$remaining" -le "$BATCH_SIZE" ]; then
-    target="$UPSTREAM_TIP"
-  else
-    target="$(git rev-list --reverse --first-parent "HEAD..${UPSTREAM_TIP}" | sed -n "${BATCH_SIZE}p")"
-  fi
-  log "Batch $batch -> ${target:0:9}  ($(git log -1 --format='%s' "$target"))"
+log "Merge upstream -> ${UPSTREAM_TIP:0:9}  ($(git log -1 --format='%s' "$UPSTREAM_TIP"))"
 
-  # --no-commit so we always commit ourselves AFTER restoring workflow files,
-  # ensuring no commit (even a clean merge) modifies .github/workflows.
-  set +e
-  git merge --no-edit --no-ff --no-commit "$target"
-  merge_rc=$?
-  set -e
-  # A clean --no-commit merge exits 0 with staged changes and MERGE_HEAD set;
-  # a conflicted merge exits non-zero. Both are handled below.
+# --no-commit so we always commit ourselves AFTER restoring workflow files,
+# ensuring no commit (even a clean merge) modifies .github/workflows.
+set +e
+git merge --no-edit --no-ff --no-commit "$UPSTREAM_TIP"
+merge_rc=$?
+set -e
+# A clean --no-commit merge exits 0 with staged changes and MERGE_HEAD set;
+# a conflicted merge exits non-zero. Both are handled below.
 
-  if [ "$merge_rc" -ne 0 ]; then
-    # rerere (autoupdate) has already staged any remembered resolutions.
-    # Hand whatever remains to the rule engine.
-    if git diff --name-only --diff-filter=U | grep -q .; then
-      info "unresolved after rerere; applying conflict-rules.conf"
-      RESOLVE_OUT="/tmp/resolve-out-$batch"
-      GITHUB_OUTPUT="$RESOLVE_OUT" SUMMARY_FILE="/tmp/resolve-summary-$batch.md" \
-        bash "$RESOLVE_SCRIPT" || true
-      # shellcheck disable=SC1090
-      can_complete="$(grep '^can_complete_merge=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2)"
-      esc="$(grep '^escalated_files=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2-)"
-      if [ "$can_complete" != "true" ]; then
-        # Don't abort. Keep all the auto-resolved + rerere-replayed work and
-        # commit the partial merge with conflict markers left ONLY in the
-        # escalated files, so the branch is pushable and a review PR shows a
-        # human exactly what to finish. Stop merging further batches after this.
-        [ -n "$esc" ] && ALL_ESCALATED+=("$esc")
-        NEEDS_REVIEW=1
-        needs_review_batch=1
-        log "ESCALATION — keeping partial merge for review (markers remain in escalated files)"
-        info "escalated: $esc"
-        git add -u   # stage escalated files as-is (with their conflict markers)
-      fi
+if [ "$merge_rc" -ne 0 ]; then
+  # rerere (autoupdate) has already staged any remembered resolutions.
+  # Hand whatever remains to the rule engine.
+  if git diff --name-only --diff-filter=U | grep -q .; then
+    info "unresolved after rerere; applying conflict-rules.conf"
+    RESOLVE_OUT="/tmp/resolve-out"
+    GITHUB_OUTPUT="$RESOLVE_OUT" SUMMARY_FILE="/tmp/resolve-summary.md" \
+      bash "$RESOLVE_SCRIPT" || true
+    # shellcheck disable=SC1090
+    can_complete="$(grep '^can_complete_merge=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2)"
+    esc="$(grep '^escalated_files=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2-)"
+    if [ "$can_complete" != "true" ]; then
+      # Keep the partial merge with conflict markers left ONLY in the escalated
+      # files so the branch is pushable and a review PR shows a human exactly
+      # what to finish.
+      [ -n "$esc" ] && ALL_ESCALATED+=("$esc")
+      NEEDS_REVIEW=1
+      log "ESCALATION — keeping partial merge for review (markers remain in escalated files)"
+      info "escalated: $esc"
+      git add -u   # stage escalated files as-is (with their conflict markers)
     fi
   fi
+fi
 
-  # NOTE: bun.lock is reconciled ONCE after the whole batch loop (below), not
-  # per-batch. A per-batch check is unreliable because when bun.lock resolves to
-  # "ours" the staged blob equals HEAD and looks unchanged, even though upstream
-  # bumped package.json and the lockfile really does need regenerating.
+# Safety: conflict markers must never survive outside of an escalation.
+# Exclude .sync/rr-cache: rerere preimage files legitimately contain markers.
+if [ "$NEEDS_REVIEW" -eq 0 ] && \
+   git grep -lE "^(<<<<<<<|=======|>>>>>>>)" -- . ':!bun.lock' ':!.sync/rr-cache' >/dev/null 2>&1; then
+  echo "Conflict markers present but no escalation recorded — aborting for safety." >&2
+  git merge --abort 2>/dev/null || true
+  exit 4
+fi
 
-  # safety: OUTSIDE an escalation, markers must never survive (guards against a
-  # stale rerere replay leaving a half-resolved file). Exclude .sync/rr-cache:
-  # rerere *preimage* files legitimately contain conflict markers (that's what a
-  # recorded conflict IS), so scanning them would always false-positive.
-  if [ "$needs_review_batch" -eq 0 ] && \
-     git grep -lE "^(<<<<<<<|=======|>>>>>>>)" -- . ':!bun.lock' ':!.sync/rr-cache' >/dev/null 2>&1; then
-    echo "Conflict markers present but no escalation recorded — aborting for safety." >&2
-    git merge --abort 2>/dev/null || true
-    exit 4
-  fi
+# Keep our workflow files. The push App token cannot create or update
+# .github/workflows/* (GitHub rejects such a push), and our policy is
+# .github/workflows/*:ours anyway. Force-restore the whole dir to the target
+# branch so no pushed commit modifies a workflow file.
+git rm -rf --quiet --ignore-unmatch .github/workflows >/dev/null 2>&1 || true
+git checkout "$TARGET_BRANCH" -- .github/workflows 2>/dev/null || true
+git add -A .github/workflows 2>/dev/null || true
 
-  # Keep our workflow files in EVERY commit. The push App token cannot create or
-  # update .github/workflows/* (GitHub rejects such a push), and our policy is
-  # .github/workflows/*:ours anyway. Force-restore the whole dir to the target
-  # branch so no pushed commit modifies a workflow file (covers upstream add/edit/
-  # delete). Per-batch to be safe against per-commit push checks.
-  git rm -rf --quiet --ignore-unmatch .github/workflows >/dev/null 2>&1 || true
-  git checkout "$TARGET_BRANCH" -- .github/workflows 2>/dev/null || true
-  git add -A .github/workflows 2>/dev/null || true
-
-  # complete the batch merge (rerere records any new resolutions on commit)
-  if ! git diff --cached --quiet || [ -f .git/MERGE_HEAD ]; then
-    git commit --no-edit --no-verify
-  fi
-  info "batch $batch committed: $(git rev-parse --short HEAD)"
-
-  if [ "$needs_review_batch" -eq 1 ]; then
-    info "review required — halting the batch loop here"
-    break
-  fi
-done
+# Complete the merge (rerere records any new resolutions on commit)
+if ! git diff --cached --quiet || [ -f .git/MERGE_HEAD ]; then
+  git commit --no-edit --no-verify
+fi
+info "merged to: $(git rev-parse --short HEAD)"
 
 # ---- reconcile the lockfile once against the final merged manifests ----------
 log "Reconcile lockfile"
@@ -260,7 +220,7 @@ SAFE=1
 NEEDS_REVIEW_OUT="$([ "$NEEDS_REVIEW" -eq 1 ] && echo yes || echo no)"
 SAFE_OUT="$([ "$SAFE" -eq 1 ] && echo yes || echo no)"
 {
-  echo "batches=$batch"
+  echo "commits_behind=$PENDING"
   echo "head=$(git rev-parse --short HEAD)"
   echo "typecheck=$TYPECHECK_OK"
   echo "tests=$TESTS_OK"
