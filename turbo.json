@@ -12,6 +12,9 @@
       "dependsOn": ["^build"],
       "outputs": [],
       "passThroughEnv": ["*"]
+    },
+    "@opencode-ai/web#test": {
+      "dependsOn": []
     }
   }
 }
