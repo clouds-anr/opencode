@@ -570,7 +570,10 @@ export async function main(argv?: string[]) {
 
   // Check if running in ANR mode
   const anrMode =
-    process.env.OPENCODE_FLAVOR === "anr" && !process.argv.includes("--help") && !process.argv.includes("--version")
+    process.env.OPENCODE_FLAVOR === "anr" &&
+    !process.argv.includes("--help") &&
+    !process.argv.includes("--version") &&
+    !process.argv.includes("generate")
 
   // Parse --env-file before ANR init so the config loader can use it
   const envIdx = process.argv.indexOf("--env-file")
