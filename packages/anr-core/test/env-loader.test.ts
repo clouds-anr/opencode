@@ -74,7 +74,10 @@ FEDERATION_TYPE=cognito
 COGNITO_USER_POOL_ID=us-east-2_commercialpool
 `.trim()
 
-beforeEach(setupTmpDir)
+beforeEach(() => {
+  setupTmpDir()
+  clearStaleEnv()
+})
 afterEach(() => {
   rmSync(TMP, { recursive: true, force: true })
   process.env.HOME = HOME_BACKUP
