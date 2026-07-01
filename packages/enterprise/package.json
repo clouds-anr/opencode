@@ -10,7 +10,8 @@
     "build": "vite build",
     "build:cloudflare": "OPENCODE_DEPLOYMENT_TARGET=cloudflare vite build",
     "start": "vite start",
-    "shell-prod": "sst shell --target Teams --stage production"
+    "shell-prod": "sst shell --target Teams --stage production",
+    "test": "bun test --timeout 30000"
   },
   "dependencies": {
     "@opencode-ai/core": "workspace:*",

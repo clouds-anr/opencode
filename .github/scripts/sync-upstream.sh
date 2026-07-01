@@ -12,7 +12,9 @@
 #      Anything still unresolved -> escalate (stop, leave for a human).
 #   4. Validate the merged result with a FULL-workspace typecheck (catches
 #      semantic breaks that no textual rule can see).
-#   5. Persist any newly-recorded rerere resolutions back to the store so the
+#   5. Validate the merged result with a FULL-workspace test run (catches
+#      runtime behavior regressions invisible to typechecking).
+#   6. Persist any newly-recorded rerere resolutions back to the store so the
 #      next run remembers them.
 #
 # Default is a DRY RUN: it resolves, validates, and reports, but never pushes.
@@ -218,6 +220,16 @@ if [ "$DO_TYPECHECK" -eq 1 ]; then
   fi
 fi
 
+# ---- validation: full-workspace tests (runtime-behavior gate) ----------------
+TESTS_OK="skipped"
+if [ "$DO_TYPECHECK" -eq 1 ]; then
+  log "Validate: full-workspace tests"
+  if bun turbo test; then TESTS_OK="passed"; else
+    TESTS_OK="failed"
+    log "TESTS FAILED — semantic break in runtime behavior; escalating for manual review"
+  fi
+fi
+
 # ---- persist newly-recorded resolutions back to the store --------------------
 log "Persist rerere memory"
 if [ -n "$(ls -A .git/rr-cache 2>/dev/null || true)" ]; then
@@ -238,12 +250,14 @@ log "Summary"
 SAFE=1
 [ "${#ALL_ESCALATED[@]}" -gt 0 ] && SAFE=0
 [ "$TYPECHECK_OK" = "failed" ] && SAFE=0
+[ "$TESTS_OK" = "failed" ] && SAFE=0
 NEEDS_REVIEW_OUT="$([ "$NEEDS_REVIEW" -eq 1 ] && echo yes || echo no)"
 SAFE_OUT="$([ "$SAFE" -eq 1 ] && echo yes || echo no)"
 {
   echo "batches=$batch"
   echo "head=$(git rev-parse --short HEAD)"
   echo "typecheck=$TYPECHECK_OK"
+  echo "tests=$TESTS_OK"
   echo "needs_review=$NEEDS_REVIEW_OUT"
   echo "escalated=${ALL_ESCALATED[*]:-none}"
   echo "safe_to_push=$SAFE_OUT"
@@ -256,6 +270,7 @@ if [ -n "${SYNC_GITHUB_OUTPUT:-}" ]; then
     echo "result=ok"
     echo "head=$(git rev-parse --short HEAD)"
     echo "typecheck=$TYPECHECK_OK"
+    echo "tests=$TESTS_OK"
     echo "needs_review=$NEEDS_REVIEW_OUT"
     echo "safe_to_push=$SAFE_OUT"
     echo "escalated=${ALL_ESCALATED[*]:-none}"

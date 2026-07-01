@@ -143,6 +143,34 @@ bun run --cwd packages/desktop package
 
 Please try to follow the [style guide](./AGENTS.md)
 
+### Running Tests
+
+Tests **cannot** be run from the repo root. Always run them via Turbo or from within a package directory:
+
+```bash
+# Run the entire test suite (all packages)
+bun turbo test
+
+# Run tests for a single package
+bun --cwd packages/opencode test
+bun --cwd packages/anr-core test
+```
+
+The `bun turbo test` pipeline covers every package that has a `test` script, including fork-specific packages such as `anr-core`, `tui`, `llm`, `desktop`, `enterprise`, `cli`, `http-recorder`, `effect-drizzle-sqlite`, and the `console/*` packages. These tests are the canonical regression set for upstream-sync protection.
+
+### Release Gate
+
+Every release is gated by a layered CI pipeline that must pass before any artifact is published:
+
+| Layer | What it proves | When it runs |
+|---|---|---|
+| **Static** — `bun turbo typecheck` | Code compiles | Pre-push, PR, upstream-sync, publish-gate |
+| **Unit** — `bun turbo test` (all packages) | Pure logic correct | PR, upstream-sync, publish-gate |
+| **HttpApi exerciser** | Server contract | PR, publish-gate |
+| **App e2e** — Playwright | Web app functional | PR, publish-gate |
+
+`publish.yml` will not produce any artifact unless `test.yml` has passed for the same commit SHA.
+
 ### Setting up a Debugger
 
 Bun debugging is currently rough around the edges. We hope this guide helps you get set up and avoid some pain points.

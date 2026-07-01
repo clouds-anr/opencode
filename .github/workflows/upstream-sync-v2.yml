@@ -113,7 +113,7 @@ jobs:
             args="$args --push"
           fi
           # The script appends machine-readable results (safe_to_push, needs_review,
-          # escalated, typecheck, head) to $SYNC_GITHUB_OUTPUT.
+          # escalated, typecheck, tests, head) to $SYNC_GITHUB_OUTPUT.
           SYNC_GITHUB_OUTPUT="$GITHUB_OUTPUT" bash .github/scripts/sync-upstream.sh $args
 
       - name: Open / update the sync PR
@@ -126,6 +126,7 @@ jobs:
           REVIEW: ${{ steps.sync.outputs.needs_review }}
           ESCALATED: ${{ steps.sync.outputs.escalated }}
           TYPECHECK: ${{ steps.sync.outputs.typecheck }}
+          TESTS: ${{ steps.sync.outputs.tests }}
           HEAD_SHA: ${{ steps.sync.outputs.head }}
         run: |
           set -euo pipefail
@@ -136,7 +137,7 @@ jobs:
             body=$(cat <<EOF
           Automated incremental upstream sync ($date).
 
-          Validation passed ✅ (full-workspace typecheck). Conflicts were resolved
+          Validation passed ✅ (full-workspace typecheck + tests). Conflicts were resolved
           automatically via remembered resolutions (git rerere) and conflict-rules.conf.
 
           Tip of branch: \`$HEAD_SHA\`. Ready for review and merge into \`$TARGET_BRANCH\`.
@@ -149,14 +150,17 @@ jobs:
           Automated incremental upstream sync ($date) needs a human.
 
           - Typecheck (full workspace): **$TYPECHECK**
+          - Tests (full workspace): **$TESTS**
           - Files left with conflict markers (textual): \`$ESCALATED\`
 
           A \`failed\` typecheck means a *semantic* break — code that merged cleanly
           but no longer compiles (an ANR file using an upstream API that changed).
-          Check the workflow log's "Validate" step for the exact errors; those files
+          A \`failed\` test run means a *runtime behavior* break — code that compiles
+          but produces wrong results (e.g. an ANR-specific test assertion fails).
+          Check the workflow log's "Validate" steps for the exact errors; those files
           have NO conflict markers.
 
-          To finish: resolve the conflict file(s) above and fix any typecheck errors
+          To finish: resolve the conflict file(s) above and fix any typecheck/test errors
           **locally with rerere enabled** so the fix is remembered next time:
 
           \`\`\`

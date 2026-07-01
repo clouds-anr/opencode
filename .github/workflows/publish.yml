@@ -30,9 +30,43 @@ permissions:
   id-token: write
   contents: write
   packages: write
+  actions: read
 
 jobs:
+  test-gate:
+    name: Require passing tests for this SHA
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.repository == 'anomalyco/opencode'
+    permissions:
+      actions: read
+    steps:
+      - name: Check test.yml success for this SHA
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const sha = context.sha;
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'test.yml',
+              head_sha: sha,
+              per_page: 10,
+            });
+            const passing = runs.workflow_runs.find(
+              r => r.head_sha === sha && r.conclusion === 'success'
+            );
+            if (!passing) {
+              core.setFailed(
+                `No successful test.yml run found for SHA ${sha}. ` +
+                'All tests must pass before publishing. ' +
+                'Wait for the test workflow to complete and re-run publish if needed.'
+              );
+            } else {
+              core.info(`test.yml run #${passing.run_number} passed for SHA ${sha}`);
+            }
+
   version:
+    needs: test-gate
     runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.repository == 'anomalyco/opencode'
     steps:
