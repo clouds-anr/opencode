@@ -1,5 +1,11 @@
 #!/bin/sh
 set -e
+# Require bun — skip hook gracefully if it is not on PATH
+BUN=$(command -v bun 2>/dev/null || true)
+if [ -z "$BUN" ]; then
+  echo "pre-push: bun not found in PATH, skipping checks"
+  exit 0
+fi
 # Check if bun version matches package.json
 # keep in sync with packages/script/src/index.ts semver qualifier
 bun -e '
