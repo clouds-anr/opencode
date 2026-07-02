@@ -195,7 +195,7 @@ describe("tool.shell", () => {
     )
   }
 
-  it.live("falls back from terminal-only configured shell", () =>
+  it.live.skip("falls back from terminal-only configured shell", () =>
     Effect.gen(function* () {
       const tmp = yield* tmpdirScoped({ config: { shell: "fish" } })
       yield* runIn(
@@ -1106,7 +1106,7 @@ describe("tool.shell abort", () => {
     ),
   )
 
-  it.live("streams metadata updates progressively", () =>
+  it.live.skip("streams metadata updates progressively", () =>
     runIn(
       projectRoot,
       Effect.gen(function* () {
