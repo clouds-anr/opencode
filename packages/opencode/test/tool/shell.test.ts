@@ -184,7 +184,7 @@ describe("tool.shell", () => {
           command: "echo test",
         })
         expect(result.metadata.exit).toBe(0)
-        expect(result.metadata.output).toContain("test")
+        expect(result.output).toContain("test")
       }),
     ),
   )
