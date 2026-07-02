@@ -183,8 +183,10 @@ describe("MoveSession", () => {
     }),
   )
 
-  it.live("moves nested session changes without cleaning unrelated files", () =>
-    Effect.gen(function* () {
+  it.live(
+    "moves nested session changes without cleaning unrelated files",
+    () =>
+      Effect.gen(function* () {
       const root = yield* Effect.acquireRelease(
         Effect.promise(() => tmpdir()),
         (dir) => Effect.promise(() => dir[Symbol.asyncDispose]()),
@@ -253,5 +255,6 @@ describe("MoveSession", () => {
       expect(yield* Effect.promise(() => fs.readFile(path.join(source, "tracked.txt"), "utf8"))).toBe("unrelated\n")
       expect(yield* Effect.promise(() => fs.readFile(path.join(source, "untracked.txt"), "utf8"))).toBe("unrelated\n")
     }),
+    process.env.CI ? 30_000 : 10_000,
   )
 })
