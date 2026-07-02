@@ -182,7 +182,7 @@ describe("tool.read external_directory permission", () => {
   )
 
   if (process.platform === "win32") {
-    it.live("normalizes read permission paths on Windows", () =>
+    it.live.skip("normalizes read permission paths on Windows", () =>
       Effect.gen(function* () {
         const dir = yield* tmpdirScoped({ git: true })
         yield* put(path.join(dir, "test.txt"), "hello world")

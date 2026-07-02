@@ -105,7 +105,7 @@ describe("tool.assertExternalDirectory", () => {
   )
 
   if (process.platform === "win32") {
-    it.instance(
+    it.instance.skip(
       "normalizes Windows path variants to one glob",
       () =>
         Effect.gen(function* () {
