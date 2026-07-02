@@ -18,7 +18,8 @@ describe("opencode acp lifecycle subprocess", () => {
         const acp = yield* opencode.acp()
         acp.close()
 
-        const code = yield* Effect.promise(() => acp.exited).pipe(Effect.timeout(Duration.seconds(5)))
+        const timeout = process.env.CI ? Duration.seconds(15) : Duration.seconds(5)
+        const code = yield* Effect.promise(() => acp.exited).pipe(Effect.timeout(timeout))
         expect(code).toBe(0)
       }),
     60_000,

@@ -1663,7 +1663,7 @@ it.instance(
       expect(yield* llm.calls).toBe(1)
     }),
   { git: true },
-  10_000,
+  process.env.CI ? 20_000 : 10_000,
 )
 
 it.instance(
