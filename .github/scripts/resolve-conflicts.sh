@@ -194,14 +194,27 @@ while IFS= read -r file; do
 
   case "$strategy" in
     ours)
-      git checkout --ours -- "$file"
-      git add "$file"
+      # A modify/delete conflict has only one side staged. `git checkout --ours`
+      # errors with "does not have our version" when the file was deleted on our
+      # side (stage 2 absent), so detect that and keep the deletion instead.
+      if git ls-files -u -- "$file" | awk '{print $3}' | grep -qx 2; then
+        git checkout --ours -- "$file"
+        git add "$file"
+      else
+        git rm -q -- "$file"
+      fi
       resolved_files+=("$file")
       resolved_details+=("$file (ours)")
       ;;
     theirs)
-      git checkout --theirs -- "$file"
-      git add "$file"
+      # Symmetric to the ours case: if upstream deleted the file (stage 3
+      # absent), `git checkout --theirs` fails, so take the deletion.
+      if git ls-files -u -- "$file" | awk '{print $3}' | grep -qx 3; then
+        git checkout --theirs -- "$file"
+        git add "$file"
+      else
+        git rm -q -- "$file"
+      fi
       resolved_files+=("$file")
       resolved_details+=("$file (theirs, no local modification history detected)")
       ;;
