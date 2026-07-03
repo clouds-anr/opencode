@@ -182,6 +182,7 @@ describe("tool.read external_directory permission", () => {
   )
 
   if (process.platform === "win32") {
+    // ANR-SKIP: flaky in GitHub CI due to timeout/race condition
     it.live.skip("normalizes read permission paths on Windows", () =>
       Effect.gen(function* () {
         const dir = yield* tmpdirScoped({ git: true })

@@ -105,6 +105,7 @@ describe("tool.assertExternalDirectory", () => {
   )
 
   if (process.platform === "win32") {
+    // ANR-SKIP: flaky in GitHub CI due to timeout/race condition
     it.instance.skip(
       "normalizes Windows path variants to one glob",
       () =>
