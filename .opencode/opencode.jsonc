@@ -83,7 +83,7 @@
 		"anr_truth_teller": {
 			"description": "ANR Truth-Teller - challenges risky ANRCode plans before implementation",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
 			"prompt": "{file:agent/anr_truth_teller.md}"
 		},
 		"truth_teller": {
