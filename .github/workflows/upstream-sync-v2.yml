@@ -78,7 +78,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          existing="$(gh pr list --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
             --state open --json number --jq '.[0].number' || true)"
           if [ -n "$existing" ] && [ "$DRY_RUN" != "true" ]; then
             echo "Open sync PR #$existing already in flight — skipping to avoid overwriting it."
@@ -191,14 +191,14 @@ jobs:
             label="needs-manual-review"
           fi
 
-          existing="$(gh pr list --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
             --state open --json number --jq '.[0].number' || true)"
           if [ -n "$existing" ]; then
-            gh pr edit "$existing" --title "$title" --body "$body" --add-label "$label" || true
+            gh pr edit "$existing" --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" --add-label "$label" || true
             echo "Updated PR #$existing"
           else
-            gh pr create --base "$TARGET_BRANCH" --head "$SYNC_BRANCH" \
+            gh pr create --repo "$GITHUB_REPOSITORY" --base "$TARGET_BRANCH" --head "$SYNC_BRANCH" \
               --title "$title" --body "$body" --label "$label" || \
-            gh pr create --base "$TARGET_BRANCH" --head "$SYNC_BRANCH" \
+            gh pr create --repo "$GITHUB_REPOSITORY" --base "$TARGET_BRANCH" --head "$SYNC_BRANCH" \
               --title "$title" --body "$body"
           fi
