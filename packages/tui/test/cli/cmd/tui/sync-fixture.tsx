@@ -47,19 +47,6 @@ export async function mount(override?: FetchHandler, state?: string) {
   const app = await testRender(() => (
     <TestTuiContexts paths={state ? { state } : undefined}>
       <ArgsProvider>
-<<<<<<< HEAD
-        <ExitProvider exit={() => {}}>
-          <KVProvider>
-            <SDKProvider url="http://test" directory={directory} fetch={calls.fetch} events={events.source}>
-              <ProjectProvider>
-                <SyncProvider>
-                  <Probe />
-                </SyncProvider>
-              </ProjectProvider>
-            </SDKProvider>
-          </KVProvider>
-        </ExitProvider>
-=======
         <KVProvider>
           <SDKProvider url="http://test" directory={directory} fetch={calls.fetch} events={events.source}>
             <ProjectProvider>
@@ -71,7 +58,6 @@ export async function mount(override?: FetchHandler, state?: string) {
             </ProjectProvider>
           </SDKProvider>
         </KVProvider>
->>>>>>> e7c59b17a8f4c0a6d79473622f8dad7b471a532d
       </ArgsProvider>
     </TestTuiContexts>
   ))
