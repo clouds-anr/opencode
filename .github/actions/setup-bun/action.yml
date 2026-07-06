@@ -35,6 +35,7 @@ runs:
 
     - name: Restore Bun dependencies
       id: bun-cache
+      continue-on-error: true # actions/cache post-step can throw a benign "Index was out of range" on some runners; never fail the job on cache teardown
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ steps.cache.outputs.dir }}
@@ -72,6 +73,7 @@ runs:
 
     - name: Save Bun dependencies
       if: steps.bun-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+      continue-on-error: true # cache save is best-effort; never fail the job if the runner cache backend errors
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ${{ steps.cache.outputs.dir }}
