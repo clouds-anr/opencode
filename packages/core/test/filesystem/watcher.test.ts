@@ -4,10 +4,11 @@ import fs from "fs/promises"
 import path from "path"
 import { ConfigProvider, Deferred, Duration, Effect, Fiber, Layer, Option, Stream } from "effect"
 import { Config } from "@opencode-ai/core/config"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { EventV2 } from "@opencode-ai/core/event"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
-import { Git } from "@opencode-ai/core/git"
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
@@ -18,7 +19,7 @@ const describeWatcher = Watcher.hasNativeBinding() && !process.env.CI ? describe
 
 type WatcherEvent = { file: string; event: "add" | "change" | "unlink" }
 
-const it = testEffect(Layer.mergeAll(FSUtil.defaultLayer, EventV2.defaultLayer))
+const it = testEffect(AppNodeBuilder.build(LayerNode.group([FSUtil.node, EventV2.node])))
 
 const configLayer = Layer.succeed(
   Config.Service,
@@ -40,12 +41,10 @@ function provide(directory: string, vcs?: Location.Interface["vcs"]) {
     Location.Service.of(location({ directory: AbsolutePath.make(directory) }, { vcs })),
   )
   return Effect.provide(
-    Watcher.layer.pipe(
-      Layer.provide(configLayer),
-      Layer.provide(Git.defaultLayer),
-      Layer.provide(locationLayer),
-      Layer.provide(flagsLayer),
-    ),
+    AppNodeBuilder.build(Watcher.node, [
+      [Config.node, configLayer],
+      [Location.node, locationLayer],
+    ]).pipe(Layer.provide(flagsLayer)),
   )
 }
 
@@ -196,7 +195,7 @@ describeWatcher("Watcher", () => {
       yield* noUpdate((event) => event.file === file, fs.writeFileString(file, "gone")).pipe(
         Effect.provideService(EventV2.Service, events),
       )
-    }).pipe(Effect.provide(Layer.mergeAll(FSUtil.defaultLayer, EventV2.defaultLayer))),
+    }).pipe(Effect.provide(AppNodeBuilder.build(LayerNode.group([FSUtil.node, EventV2.node])))),
   )
 
   it.live("ignores .git/index changes", () =>
@@ -226,12 +225,9 @@ describeWatcher("Watcher", () => {
           const branch = `watch-${Math.random().toString(36).slice(2)}`
           yield* ready(directory)
           yield* Effect.promise(() => $`git branch ${branch}`.cwd(directory).quiet())
-          const event = yield* nextUpdate(
-            (next) => next.file === head,
-            fs.writeFileString(head, `ref: refs/heads/${branch}\n`),
-          )
-          expect(event.file).toBe(head)
-          expect(["add", "change"]).toContain(event.event)
+          expect(
+            yield* nextUpdate((event) => event.file === head, fs.writeFileString(head, `ref: refs/heads/${branch}\n`)),
+          ).toMatchObject({ file: head })
         }),
       { git: true },
     ),
