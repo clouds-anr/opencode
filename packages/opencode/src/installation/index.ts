@@ -225,12 +225,13 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
         // downloaded release that can be upgraded in-place via GitHub releases.
         // A non-writable binary is likely managed by a system-level package manager
         // we don't recognise, so leave it untouched.
-        const canWrite = yield* Effect.try({
-          try: () => {
+        const canWrite = yield* Effect.sync(() => {
+          try {
             fs.accessSync(process.execPath, fs.constants.W_OK)
             return true
-          },
-          catch: () => false,
+          } catch {
+            return false
+          }
         })
         if (canWrite) return "standalone" as Method
 
