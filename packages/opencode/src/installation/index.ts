@@ -8,13 +8,18 @@ import { errorMessage } from "@/util/error"
 import { ChildProcess } from "effect/unstable/process"
 import { AppProcess } from "@opencode-ai/core/process"
 import path from "path"
+import fs from "fs"
+import os from "os"
 import { EventV2 } from "@opencode-ai/core/event"
 import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import semver from "semver"
 import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { NpmConfig } from "@opencode-ai/core/npm-config"
 
-export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
+// Repository used for release checks and standalone binary upgrades
+const RELEASE_REPO = "clouds-anr/opencode"
+
+export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "standalone" | "unknown"
 
 export type ReleaseType = "patch" | "minor" | "major"
 
@@ -215,6 +220,20 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
           }
         }
 
+        // If no package manager claims this binary, check whether the current user
+        // can write to the executable.  A writable binary is a standalone / manually
+        // downloaded release that can be upgraded in-place via GitHub releases.
+        // A non-writable binary is likely managed by a system-level package manager
+        // we don't recognise, so leave it untouched.
+        const canWrite = yield* Effect.try({
+          try: () => {
+            fs.accessSync(process.execPath, fs.constants.W_OK)
+            return true
+          },
+          catch: () => false,
+        })
+        if (canWrite) return "standalone" as Method
+
         return "unknown" as Method
       }),
       latest: Effect.fn("Installation.latest")(function* (installMethod?: Method) {
@@ -267,7 +286,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
         }
 
         const response = yield* httpOk.execute(
-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+          HttpClientRequest.get(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`).pipe(
             HttpClientRequest.acceptJson,
           ),
         )
@@ -317,6 +336,63 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProce
           case "scoop":
             upgradeResult = yield* run(["scoop", "install", `opencode@${target}`])
             break
+          case "standalone": {
+            // Standalone (manually downloaded) binary: download the release asset from the
+            // ANR repository and replace the current executable in-place.
+            if (process.platform === "win32") {
+              const arch = process.arch === "arm64" ? "arm64" : "x64"
+              return yield* new UpgradeFailedError({
+                stderr: [
+                  "Automatic upgrade of standalone binaries is not supported on Windows.",
+                  `Please download opencode-windows-${arch}.zip from:`,
+                  `  https://github.com/${RELEASE_REPO}/releases/tag/v${target}`,
+                  `and replace the current binary at: ${process.execPath}`,
+                ].join("\n"),
+              })
+            }
+            const platform = process.platform // darwin | linux
+            const arch = process.arch // x64 | arm64
+            const assetName = `opencode-${platform}-${arch}`
+            const downloadUrl = `https://github.com/${RELEASE_REPO}/releases/download/v${target}/${assetName}`
+            const binaryResponse = yield* httpOk.execute(HttpClientRequest.get(downloadUrl)).pipe(
+              Effect.mapError(
+                (err) =>
+                  new UpgradeFailedError({
+                    stderr: `Failed to download update from ${downloadUrl}: ${errorMessage(err)}`,
+                  }),
+              ),
+            )
+            const binaryBody = yield* binaryResponse.arrayBuffer.pipe(
+              Effect.mapError(
+                (err) =>
+                  new UpgradeFailedError({
+                    stderr: `Failed to read update download: ${errorMessage(err)}`,
+                  }),
+              ),
+            )
+            const tmpPath = path.join(os.tmpdir(), `opencode-update-${Date.now()}`)
+            yield* Effect.try({
+              try: () => {
+                fs.writeFileSync(tmpPath, new Uint8Array(binaryBody))
+                fs.chmodSync(tmpPath, 0o755)
+                try {
+                  // Atomic rename works when tmp and execPath are on the same filesystem
+                  fs.renameSync(tmpPath, process.execPath)
+                } catch {
+                  // Cross-filesystem fallback: copy then clean up
+                  fs.copyFileSync(tmpPath, process.execPath)
+                  fs.chmodSync(process.execPath, 0o755)
+                  fs.rmSync(tmpPath, { force: true })
+                }
+              },
+              catch: (err) =>
+                new UpgradeFailedError({
+                  stderr: `Failed to install update to ${process.execPath}: ${err instanceof Error ? err.message : String(err)}`,
+                }),
+            })
+            upgradeResult = { code: 0, stdout: "", stderr: "" }
+            break
+          }
           default:
             return yield* new UpgradeFailedError({ stderr: `Unknown installation method: ${m}` })
         }

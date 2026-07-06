@@ -58,13 +58,32 @@ function testLayer(
 
 describe("installation", () => {
   describe("latest", () => {
-    testEffect(testLayer(() => jsonResponse({ tag_name: "v1.2.3" }))).effect(
-      "reads release version from GitHub releases",
-      () =>
-        Effect.gen(function* () {
-          const result = yield* Installation.use.latest("unknown")
-          expect(result).toBe("1.2.3")
-        }),
+    const githubCalls: string[] = []
+    testEffect(
+      testLayer((request) => {
+        githubCalls.push(request.url)
+        return jsonResponse({ tag_name: "v1.2.3" })
+      }),
+    ).effect("reads release version from GitHub releases for unknown method", () =>
+      Effect.gen(function* () {
+        const result = yield* Installation.use.latest("unknown")
+        expect(result).toBe("1.2.3")
+        expect(githubCalls.some((url) => url.includes("clouds-anr/opencode"))).toBe(true)
+      }),
+    )
+
+    const standaloneCalls: string[] = []
+    testEffect(
+      testLayer((request) => {
+        standaloneCalls.push(request.url)
+        return jsonResponse({ tag_name: "v1.5.7" })
+      }),
+    ).effect("reads release version from ANR GitHub releases for standalone method", () =>
+      Effect.gen(function* () {
+        const result = yield* Installation.use.latest("standalone")
+        expect(result).toBe("1.5.7")
+        expect(standaloneCalls.some((url) => url.includes("clouds-anr/opencode"))).toBe(true)
+      }),
     )
 
     testEffect(testLayer(() => jsonResponse({ tag_name: "v4.0.0-beta.1" }))).effect(
@@ -224,6 +243,21 @@ describe("installation", () => {
     ).effect("falls back to sh when bash is unavailable during curl upgrade", () =>
       Effect.gen(function* () {
         yield* Installation.use.upgrade("curl", "9.9.9")
+      }),
+    )
+
+    const standaloneDownloadCalls: string[] = []
+    testEffect(
+      testLayer((request) => {
+        standaloneDownloadCalls.push(request.url)
+        return new Response("", { status: 404 })
+      }),
+    ).effect("standalone upgrade reports failure with ANR download URL when asset is missing", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Installation.use.upgrade("standalone", "9.9.9"))
+        expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
+        expect(error.stderr).toContain("clouds-anr/opencode")
+        expect(standaloneDownloadCalls.some((url) => url.includes("clouds-anr/opencode"))).toBe(true)
       }),
     )
   })

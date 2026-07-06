@@ -17,7 +17,7 @@ export const UpgradeCommand = {
         alias: "m",
         describe: "installation method to use",
         type: "string",
-        choices: ["curl", "npm", "pnpm", "bun", "brew", "choco", "scoop"],
+        choices: ["curl", "npm", "pnpm", "bun", "brew", "choco", "scoop", "standalone"],
       })
   },
   handler: async (args: { target?: string; method?: string }) => {
@@ -28,7 +28,7 @@ export const UpgradeCommand = {
     const detectedMethod = await Installation.method()
     const method = (args.method as Installation.Method) ?? detectedMethod
     if (method === "unknown") {
-      prompts.log.error(`opencode is installed to ${process.execPath} and may be managed by a package manager`)
+      prompts.log.error(`opencode is installed to ${process.execPath} and was not installed by a recognised package manager`)
       const install = await prompts.select({
         message: "Install anyways?",
         options: [
