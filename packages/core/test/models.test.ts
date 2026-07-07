@@ -17,15 +17,26 @@ import path from "path"
 // bun process.
 const ORIGINAL_MODELS_PATH = Flag.OPENCODE_MODELS_PATH
 const ORIGINAL_DISABLE_FETCH = Flag.OPENCODE_DISABLE_MODELS_FETCH
+const ORIGINAL_MODELS_URL = Flag.OPENCODE_MODELS_URL
+const ORIGINAL_API_ENDPOINT = process.env.OPENCODE_API_ENDPOINT
 beforeAll(() => {
   Flag.OPENCODE_MODELS_PATH = undefined
   Flag.OPENCODE_DISABLE_MODELS_FETCH = true
+  Flag.OPENCODE_MODELS_URL = undefined
+  delete process.env.OPENCODE_API_ENDPOINT
 })
 afterAll(() => {
   Flag.OPENCODE_MODELS_PATH = ORIGINAL_MODELS_PATH
   Flag.OPENCODE_DISABLE_MODELS_FETCH = ORIGINAL_DISABLE_FETCH
+  Flag.OPENCODE_MODELS_URL = ORIGINAL_MODELS_URL
+  if (ORIGINAL_API_ENDPOINT === undefined) delete process.env.OPENCODE_API_ENDPOINT
+  else process.env.OPENCODE_API_ENDPOINT = ORIGINAL_API_ENDPOINT
 })
 
+// ModelsDev chooses `models-<hash>.json` whenever OPENCODE_MODELS_URL or
+// OPENCODE_API_ENDPOINT is set. If either leaks in from the outer test shell,
+// this suite writes/removes `models.json` while the service reads a different
+// cache file populated by real catalogs, causing cross-test contamination.
 const cacheFile = path.join(Global.Path.cache, "models.json")
 
 const fixture: Record<string, ModelsDev.Provider> = {
