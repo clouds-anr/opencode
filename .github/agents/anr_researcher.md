@@ -5,18 +5,15 @@ description: >-
 mode: subagent
 temperature: 0.2
 tools:
-  read: true
-  glob: true
-  grep: true
-  list: true
-  task: false
-  webfetch: true
-  todoread: true
-  todowrite: true
-  write: false
-  edit: false
-  bash: true
-  skill: true
+  - read
+  - glob
+  - grep
+  - list
+  - webfetch
+  - todoread
+  - todowrite
+  - bash
+  - skill
 permission:
   bash:
     "ls *": allow

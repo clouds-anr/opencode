@@ -5,19 +5,14 @@ description: >-
 mode: primary
 temperature: 0.2
 tools:
-  read: true
-  glob: false
-  grep: false
-  list: true
-  task: true
-  webfetch: false
-  todoread: true
-  todowrite: true
-  write: false
-  edit: false
-  bash: true
-  question: true
-  skill: true
+  - read
+  - list
+  - task
+  - todoread
+  - todowrite
+  - bash
+  - question
+  - skill
 permission:
   bash:
     "ls *": allow
