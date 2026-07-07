@@ -54,37 +54,37 @@
 			"description": "ANR Team Lead - coordinates all ANRCode work, delegates to ANR specialists",
 			"mode": "primary",
 			"model": "amazon-bedrock/anthropic.claude-sonnet-4-6",
-			"prompt": "{file:../.github/agents/anr_team_lead.md}"
+			"prompt": "{file:agent/anr_team_lead.md}"
 		},
 		"anr_researcher": {
 			"description": "ANR Researcher - ANRCode codebase analysis and implementation planning",
 			"mode": "subagent",
 			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:../.github/agents/anr_researcher.md}"
+			"prompt": "{file:agent/anr_researcher.md}"
 		},
 		"anr_implementor": {
 			"description": "ANR Implementor - ANRCode changes, branch management, and PR creation",
 			"mode": "subagent",
 			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:../.github/agents/anr_implementor.md}"
+			"prompt": "{file:agent/anr_implementor.md}"
 		},
 		"anr_tester": {
 			"description": "ANR Tester - validates ANRCode changes against opencode test conventions",
 			"mode": "subagent",
 			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:../.github/agents/anr_tester.md}"
+			"prompt": "{file:agent/anr_tester.md}"
 		},
 		"anr_documentarian": {
 			"description": "ANR Documentarian - enforces ANRCode documentation patterns and ADRs",
 			"mode": "subagent",
 			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:../.github/agents/anr_documentarian.md}"
+			"prompt": "{file:agent/anr_documentarian.md}"
 		},
 		"anr_truth_teller": {
 			"description": "ANR Truth-Teller - challenges risky ANRCode plans before implementation",
 			"mode": "subagent",
 			"model": "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-			"prompt": "{file:../.github/agents/anr_truth_teller.md}"
+			"prompt": "{file:agent/anr_truth_teller.md}"
 		},
 		"truth_teller": {
 			"description": "Truth-Teller (default) - challenges assumptions and risky plans",
