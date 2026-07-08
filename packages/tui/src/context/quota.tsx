@@ -28,17 +28,9 @@ export interface QuotaInfo {
   allowed: boolean
 }
 
-function readQuotaEnv(): QuotaInfo {
-  const env = process.env
-
-  logQuota("🔍 Checking process.env for quota vars:", {
-    OPENCODE_ANR_QUOTA_DAILY_LIMIT: env.OPENCODE_ANR_QUOTA_DAILY_LIMIT,
-    OPENCODE_ANR_QUOTA_MONTHLY_LIMIT: env.OPENCODE_ANR_QUOTA_MONTHLY_LIMIT,
-    OPENCODE_ANR_QUOTA_DAILY_TOKENS: env.OPENCODE_ANR_QUOTA_DAILY_TOKENS,
-    OPENCODE_ANR_QUOTA_MONTHLY_TOKENS: env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS,
-  })
-
-  const info = {
+/** Parse quota fields from a plain env-var map (injectable in tests). */
+export function parseQuotaEnvVars(env: Record<string, string | undefined>): QuotaInfo {
+  return {
     dailyTokens: parseInt(env.OPENCODE_ANR_QUOTA_DAILY_TOKENS || "0"),
     monthlyTokens: parseInt(env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS || "0"),
     dailyLimit: parseInt(env.OPENCODE_ANR_QUOTA_DAILY_LIMIT || "0"),
@@ -49,6 +41,49 @@ function readQuotaEnv(): QuotaInfo {
     warningColor: (env.OPENCODE_ANR_QUOTA_WARNING_COLOR || "green") as "green" | "yellow" | "red",
     allowed: env.OPENCODE_ANR_QUOTA_ALLOWED !== "false",
   }
+}
+
+/** Effective token count = base tokens from last API refresh + untracked local delta. */
+export function computeEffectiveTokens(base: number, localDelta: number): number {
+  return base + localDelta
+}
+
+/** Effective usage percent for a single dimension (daily or monthly). Returns 0 when no limit is set. */
+export function computeEffectivePercent(tokens: number, localDelta: number, limit: number): number {
+  return limit > 0 ? Math.round(((tokens + localDelta) / limit) * 100) : 0
+}
+
+/** Derive warning level from effective daily and monthly percentages. */
+export function computeWarningLevel(dailyPercent: number, monthlyPercent: number): "normal" | "warning" | "critical" {
+  const max = Math.max(dailyPercent, monthlyPercent)
+  if (max >= 90) return "critical"
+  if (max >= 80) return "warning"
+  return "normal"
+}
+
+/** Map warning level to the corresponding display color. */
+export function computeWarningColor(level: "normal" | "warning" | "critical"): "green" | "yellow" | "red" {
+  if (level === "critical") return "red"
+  if (level === "warning") return "yellow"
+  return "green"
+}
+
+/** Progress bar fill width (out of maxWidth cells); always at least 1 cell wide. */
+export function progressBarWidth(percent: number, maxWidth: number): number {
+  return Math.max(1, Math.round((percent / 100) * maxWidth))
+}
+
+function readQuotaEnv(): QuotaInfo {
+  const env = process.env
+
+  logQuota("🔍 Checking process.env for quota vars:", {
+    OPENCODE_ANR_QUOTA_DAILY_LIMIT: env.OPENCODE_ANR_QUOTA_DAILY_LIMIT,
+    OPENCODE_ANR_QUOTA_MONTHLY_LIMIT: env.OPENCODE_ANR_QUOTA_MONTHLY_LIMIT,
+    OPENCODE_ANR_QUOTA_DAILY_TOKENS: env.OPENCODE_ANR_QUOTA_DAILY_TOKENS,
+    OPENCODE_ANR_QUOTA_MONTHLY_TOKENS: env.OPENCODE_ANR_QUOTA_MONTHLY_TOKENS,
+  })
+
+  const info = parseQuotaEnvVars(env)
 
   logQuota("📋 Quota env vars loaded:", {
     dailyLimit: info.dailyLimit,
@@ -108,19 +143,10 @@ async function refreshQuotaFromAPI(): Promise<QuotaInfo | null> {
 
     logQuota("📊 Quota parsed:", { dailyTokens, monthlyTokens, dailyLimit, monthlyLimit })
 
-    const dailyPercent = dailyLimit > 0 ? Math.round((dailyTokens / dailyLimit) * 100) : 0
-    const monthlyPercent = monthlyLimit > 0 ? Math.round((monthlyTokens / monthlyLimit) * 100) : 0
-
-    // Determine warning level
-    const maxPercent = Math.max(dailyPercent, monthlyPercent)
-    let warningLevel: "normal" | "warning" | "critical" = "normal"
-    if (maxPercent >= 90) warningLevel = "critical"
-    else if (maxPercent >= 80) warningLevel = "warning"
-
-    // Determine color
-    let warningColor: "green" | "yellow" | "red" = "green"
-    if (warningLevel === "critical") warningColor = "red"
-    else if (warningLevel === "warning") warningColor = "yellow"
+    const dailyPercent = computeEffectivePercent(dailyTokens, 0, dailyLimit)
+    const monthlyPercent = computeEffectivePercent(monthlyTokens, 0, monthlyLimit)
+    const warningLevel = computeWarningLevel(dailyPercent, monthlyPercent)
+    const warningColor = computeWarningColor(warningLevel)
 
     return {
       dailyTokens,
@@ -207,26 +233,18 @@ export const { use: useQuota, provider: QuotaProvider } = createSimpleContext<Qu
       if (refreshTimer) clearTimeout(refreshTimer)
     })
 
-    const effectiveDailyTokens = createMemo(() => quota.dailyTokens + localDelta())
-    const effectiveMonthlyTokens = createMemo(() => quota.monthlyTokens + localDelta())
+    const effectiveDailyTokens = createMemo(() => computeEffectiveTokens(quota.dailyTokens, localDelta()))
+    const effectiveMonthlyTokens = createMemo(() => computeEffectiveTokens(quota.monthlyTokens, localDelta()))
     const effectiveDailyPercent = createMemo(() =>
-      quota.dailyLimit > 0 ? Math.round((effectiveDailyTokens() / quota.dailyLimit) * 100) : 0,
+      computeEffectivePercent(quota.dailyTokens, localDelta(), quota.dailyLimit),
     )
     const effectiveMonthlyPercent = createMemo(() =>
-      quota.monthlyLimit > 0 ? Math.round((effectiveMonthlyTokens() / quota.monthlyLimit) * 100) : 0,
+      computeEffectivePercent(quota.monthlyTokens, localDelta(), quota.monthlyLimit),
     )
-    const effectiveWarningLevel = createMemo(() => {
-      const max = Math.max(effectiveDailyPercent(), effectiveMonthlyPercent())
-      if (max >= 90) return "critical" as const
-      if (max >= 80) return "warning" as const
-      return "normal" as const
-    })
-    const effectiveWarningColor = createMemo(() => {
-      const level = effectiveWarningLevel()
-      if (level === "critical") return "red" as const
-      if (level === "warning") return "yellow" as const
-      return "green" as const
-    })
+    const effectiveWarningLevel = createMemo(() =>
+      computeWarningLevel(effectiveDailyPercent(), effectiveMonthlyPercent()),
+    )
+    const effectiveWarningColor = createMemo(() => computeWarningColor(effectiveWarningLevel()))
 
     // Return a reactive object that merges the API store with computed effective values
     const [result, setResult] = createStore<QuotaContext>({

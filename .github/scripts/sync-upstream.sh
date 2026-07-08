@@ -102,7 +102,7 @@ PENDING="$(git rev-list --count "${SYNC_BRANCH}..${UPSTREAM_TIP}")"
 info "$PENDING upstream commit(s) to merge (batch size $BATCH_SIZE)"
 if [ "$PENDING" -eq 0 ]; then
   echo "Already up to date."
-  [ -n "${SYNC_GITHUB_OUTPUT:-}" ] && printf 'result=uptodate\nsafe_to_push=no\nneeds_review=no\ntests=skipped\ntypecheck=skipped\nanr_risk=no\n' >> "$SYNC_GITHUB_OUTPUT"
+  [ -n "${SYNC_GITHUB_OUTPUT:-}" ] && printf 'result=uptodate\nsafe_to_push=no\nneeds_review=no\ntests=skipped\ntypecheck=skipped\nanr_risk=no\nanr_skip_risk=no\n' >> "$SYNC_GITHUB_OUTPUT"
   exit 0
 fi
 
@@ -277,6 +277,32 @@ else
   info "no ANR-critical areas touched"
 fi
 
+# ---- ANR-SKIP marker scan ----------------------------------------------------
+# `ANR-SKIP` is an in-line marker placed above ANR-introduced flaky test.skip
+# calls (see .github/conflict-rules.conf "Protected in-file content markers").
+# Path rules cannot protect it because the marker lives INSIDE files upstream
+# also edits. Here we inspect the merged diff (vs the target branch) for any
+# added/removed line carrying the marker: if an upstream change touches an
+# annotated skip, a human must confirm the skip is preserved. Keep this token in
+# sync with conflict-rules.conf.
+ANR_SKIP_MARKER="ANR-SKIP"
+log "ANR-SKIP marker scan"
+# Diff lines that were added (^+) or removed (^-) and carry the marker; ignore
+# the diff header lines (+++/---).
+ANR_SKIP_TOUCHED="$(git diff "$TARGET_BRANCH..HEAD" 2>/dev/null \
+  | grep -E '^[+-]' \
+  | grep -vE '^[+-]{3} ' \
+  | grep -F "$ANR_SKIP_MARKER" || true)"
+ANR_SKIP_RISK="no"
+if [ -n "$ANR_SKIP_TOUCHED" ]; then
+  ANR_SKIP_RISK="yes"
+  NEEDS_REVIEW=1
+  info "ANR-SKIP annotated line(s) changed by this sync — manual review required"
+  printf '%s\n' "$ANR_SKIP_TOUCHED" | sed '/^$/d' | sed 's/^/   skip-diff: /' || true
+else
+  info "no ANR-SKIP annotated lines touched"
+fi
+
 # ---- report ------------------------------------------------------------------
 log "Summary"
 SAFE=1
@@ -286,6 +312,9 @@ SAFE=1
 # An ANR-critical escalation is never auto-safe; it always needs a human even if
 # the other gates are green (they cannot prove ANR behavior is intact by hunk).
 [ -n "$ANR_ESCALATED" ] && SAFE=0
+# A touched ANR-SKIP annotation is never auto-safe: a flaky skip may have been
+# silently un-skipped by the merge; a human must confirm it survived.
+[ "$ANR_SKIP_RISK" = "yes" ] && SAFE=0
 NEEDS_REVIEW_OUT="$([ "$NEEDS_REVIEW" -eq 1 ] && echo yes || echo no)"
 [ -n "$ANR_ESCALATED" ] && NEEDS_REVIEW_OUT="yes"
 SAFE_OUT="$([ "$SAFE" -eq 1 ] && echo yes || echo no)"
@@ -300,6 +329,7 @@ ANR_TOUCHED_CSV="$(printf '%s' "$ANR_TOUCHED" | sed '/^$/d' | paste -sd ',' - 2>
   echo "escalated=${ALL_ESCALATED[*]:-none}"
   echo "anr_risk=$ANR_RISK"
   echo "anr_touched=${ANR_TOUCHED_CSV:-none}"
+  echo "anr_skip_risk=$ANR_SKIP_RISK"
   echo "safe_to_push=$SAFE_OUT"
 } | tee "$SUMMARY_FILE"
 
@@ -316,6 +346,7 @@ if [ -n "${SYNC_GITHUB_OUTPUT:-}" ]; then
     echo "escalated=${ALL_ESCALATED[*]:-none}"
     echo "anr_risk=$ANR_RISK"
     echo "anr_touched=${ANR_TOUCHED_CSV:-none}"
+    echo "anr_skip_risk=$ANR_SKIP_RISK"
   } >> "$SYNC_GITHUB_OUTPUT"
 fi
 

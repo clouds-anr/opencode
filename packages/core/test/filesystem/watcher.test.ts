@@ -15,6 +15,7 @@ import { location } from "../fixture/location"
 import { tmpdir } from "../fixture/tmpdir"
 import { testEffect } from "../lib/effect"
 
+// ANR-SKIP: flaky in GitHub CI due to timeout/race condition
 const describeWatcher = Watcher.hasNativeBinding() && !process.env.CI ? describe : describe.skip
 
 type WatcherEvent = { file: string; event: "add" | "change" | "unlink" }

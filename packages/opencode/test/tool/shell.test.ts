@@ -181,8 +181,8 @@ const mustTruncate = (result: {
 }
 
 describe("tool.shell", () => {
-  // Skipped: flaky race between exitCode resolution and stream drain on fast CI runners
   for (const item of shells) {
+    // ANR-SKIP: flaky in GitHub CI due to timeout/race condition
     it.live.skip(`basic [${item.label}]`, () =>
       withShell(
         item,
@@ -200,6 +200,7 @@ describe("tool.shell", () => {
     )
   }
 
+  // ANR-SKIP: flaky in GitHub CI due to timeout/race condition
   it.live.skip("falls back from terminal-only configured shell", () =>
     Effect.gen(function* () {
       const tmp = yield* tmpdirScoped({ config: { shell: "fish" } })
@@ -1111,6 +1112,7 @@ describe("tool.shell abort", () => {
     ),
   )
 
+  // ANR-SKIP: flaky in GitHub CI due to timeout/race condition
   it.live.skip("streams metadata updates progressively", () =>
     runIn(
       projectRoot,

@@ -5,7 +5,7 @@ import { dailyResetInfo, monthlyResetInfo } from "@opencode-ai/anr-core"
 
 const id = "internal:sidebar-quota"
 
-function getQuotaColor(percent: number): "green" | "yellow" | "red" {
+export function getQuotaColor(percent: number): "green" | "yellow" | "red" {
   if (percent >= 90) return "red"
   if (percent >= 80) return "yellow"
   return "green"
