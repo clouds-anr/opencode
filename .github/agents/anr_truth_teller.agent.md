@@ -1,42 +1,16 @@
 ---
+name: anr_truth_teller
 description: >-
   ANR Truth-Teller - challenges risky ANRCode plans before implementation,
   especially around upstream divergence, compliance drift, and hidden assumptions.
-mode: subagent
-temperature: 0.8
+user-invocable: false
 tools:
-  read: true
-  glob: true
-  grep: true
-  list: true
-  task: false
-  webfetch: true
-  todoread: true
-  todowrite: false
-  write: false
-  edit: false
-  bash: true
-  skill: true
-permission:
-  bash:
-    "ls *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "find *": allow
-    "tree *": allow
-    "rg *": allow
-    "grep *": allow
-    "git status": allow
-    "git log *": allow
-    "git diff *": allow
-    "git show *": allow
-    "git branch *": allow
-    "gh issue view *": allow
-    "gh issue list *": allow
-    "gh pr view *": allow
-    "gh pr list *": allow
-    "*": deny
+  - read-file
+  - codebase-search
+  - file-search
+  - fetch
+  - run-in-terminal
+  - github
 ---
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->

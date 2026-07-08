@@ -1,39 +1,18 @@
 ---
+name: anr_documentarian
 description: >-
   ANR Documentarian - enforces ANRCode documentation patterns and updates
   architecture docs, ADRs, API notes, and change-marker guidance.
-mode: subagent
-temperature: 0.2
+user-invocable: false
 tools:
-  read: true
-  glob: true
-  grep: true
-  list: true
-  task: false
-  webfetch: true
-  todoread: true
-  todowrite: true
-  write: true
-  edit: true
-  bash: true
-  skill: true
-permission:
-  bash:
-    "ls *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "find *": allow
-    "tree *": allow
-    "rg *": allow
-    "grep *": allow
-    "git status": allow
-    "git log *": allow
-    "git diff *": allow
-    "git show *": allow
-    "plantuml *": allow
-    "java -jar *plantuml*.jar *": allow
-    "*": deny
+  - read-file
+  - create-file
+  - replace-string-in-file
+  - insert-edit-into-file
+  - codebase-search
+  - file-search
+  - fetch
+  - run-in-terminal
 ---
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->
