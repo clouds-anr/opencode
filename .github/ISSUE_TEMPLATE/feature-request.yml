@@ -2,9 +2,6 @@ name: Feature request
 title: '[Feature]: '
 labels:
   - feature
-  - frontend
-  - react
-  - typescript
 assignees: []
 description: Submit an idea for this project
 
@@ -12,15 +9,28 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Instructions
+        ## Before You Submit
 
-        Please fill out each section as thoroughly as possible. This template is designed for architectural rigor and clarity.
+        Please provide concrete details so maintainers can estimate scope and implementation risk.
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: Classify the feature request.
+      options:
+        - New Feature
+        - Enhancement to Existing Behavior
+        - Developer Experience Improvement
+        - UI/UX Improvement
+    validations:
+      required: true
 
   - type: dropdown
     id: priority
     attributes:
       label: Priority
-      description: Set priority based on impact—High for user-facing features.
+      description: Set based on user impact and urgency.
       options:
         - High
         - Medium
@@ -29,18 +39,53 @@ body:
       required: true
 
   - type: input
-    id: component
+    id: package-area
     attributes:
-      label: Component
-      description: Name and exact path of the affected component (e.g., `[ComponentName.tsx]` in `[path/to/component]`).
+      label: Affected Package or Area
+      description: Name the package(s) and area(s), and include paths when possible (for example, packages/tui/src/components/...).
     validations:
       required: true
 
   - type: textarea
-    id: description
+    id: problem
     attributes:
-      label: Feature Description
-      description: Provide a detailed description including purpose, user impact, business or technical requirements, and deliverables.
+      label: Problem Statement
+      description: What is the current limitation or pain point?
+      placeholder: |
+        Describe who is affected, what fails today, and why this matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the desired behavior and expected user impact.
+      placeholder: |
+        Include the intended workflow, architecture or API shape, and any constraints.
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables Checklist
+      description: Provide concrete implementation outcomes as checklist items.
+      placeholder: |
+        - [ ] Add or update UI/CLI/API behavior
+        - [ ] Handle loading, error, and empty states
+        - [ ] Add/adjust tests
+        - [ ] Update docs if behavior changes
+    validations:
+      required: true
+
+  - type: textarea
+    id: edge-cases
+    attributes:
+      label: Edge Cases and Failure Modes
+      description: List expected edge-case handling.
+      placeholder: |
+        Cover empty/missing data, invalid inputs, large datasets, and failure conditions.
     validations:
       required: true
 
@@ -48,28 +93,61 @@ body:
     id: additional-requirements
     attributes:
       label: Additional Requirements
-      description: Any extra specifics for internationalization, browser support, responsive design, and compliance.
+      description: Add specifics for compatibility, internationalization, migration, performance, or security.
 
-  - type: markdown
+  - type: checkboxes
+    id: quality-expectations
     attributes:
-      value: |
-        ## Instructions for Copilot
+      label: Quality Expectations
+      description: Select all that apply for this feature.
+      options:
+        - label: Accessibility considerations are required (keyboard navigation, semantics, contrast).
+        - label: Responsive behavior is required across mobile, tablet, and desktop.
+        - label: Performance impact should be measured or justified.
+        - label: Security implications should be reviewed.
 
-        - Branch off the relevant base branch (e.g., `main` or `Sprint1`) as `feature/[short-feature-name]`
-        - Use React, TypeScript, and project style guides (see `../copilot-instructions.md`)
-        - Separate UI, logic, hooks; follow code style and conventions
-        - Mock APIs and dependencies for testing (`vi.mock`, `vi.spyOn`)
-        - Integrate with state management/context as needed
-        - Write/update unit tests achieving ≥80% coverage; all tests must pass
-        - Commit in conventional style: `feat(admin): add bedrock agent admin tab UI`
-        - Reference this issue in your PR with UI screenshots/video and test coverage summary
-        - Update relevant docs; capture implementation details in `doco/` folder
-        - Cognitive Complexity <15 for all code
+  - type: textarea
+    id: testing-plan
+    attributes:
+      label: Testing Plan
+      description: Describe how this should be validated.
+      placeholder: |
+        Include package-level commands and scenarios to verify.
+        Example commands (adjust per package):
+        - npm run lint
+        - npm run build
+        - npm run test
+        - bun typecheck (from the relevant package directory)
+    validations:
+      required: true
 
+  - type: textarea
+    id: links
+    attributes:
+      label: Supporting Links or Evidence
+      description: Add related issues/PRs, docs, mockups, screenshots, logs, or benchmark notes.
 
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope Boundaries
+      description: Clarify what is in scope and out of scope.
+      placeholder: |
+        In scope:
+        - ...
+
+        Out of scope:
+        - ...
 
   - type: textarea
     id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
-      description: List all requirements for implementation, testing, accessibility, code style, coverage, security, docs, and clean integration with existing codebase.
+      description: Provide a checklist of objective conditions that define done.
+      placeholder: |
+        - [ ] Required behavior is implemented and verified
+        - [ ] Relevant tests are added/updated and pass
+        - [ ] Documentation is updated for user-visible or API changes
+        - [ ] No regressions in adjacent functionality
+    validations:
+      required: true
