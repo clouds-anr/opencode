@@ -99,7 +99,11 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       if (method === "unknown") {
         return {
           status: 400,
-          body: { success: false as const, error: "Unknown installation method" },
+          body: {
+            success: false as const,
+            error:
+              "Unknown installation method: the binary is not user-writable and was not installed by a recognised package manager. Download an approved release from https://github.com/clouds-anr/opencode/releases and replace the binary manually.",
+          },
         }
       }
       const target = ctx.payload.target || (yield* installation.latest(method))
