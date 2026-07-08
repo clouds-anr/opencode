@@ -2,13 +2,13 @@ export * as PermissionLegacy from "./legacy"
 
 import { Schema } from "effect"
 import { ProjectV2 } from "../project"
-import { withStatics } from "../schema"
+import { statics } from "../schema"
 import { SessionSchema } from "../session/schema"
 import { Identifier } from "../util/identifier"
 
 export const ID = Schema.String.check(Schema.isStartsWith("per")).pipe(
   Schema.brand("PermissionID"),
-  withStatics((schema) => ({ ascending: (id?: string) => schema.make(id ?? "per_" + Identifier.ascending()) })),
+  statics((schema) => ({ ascending: (id?: string) => schema.make(id ?? "per_" + Identifier.ascending()) })),
 )
 export type ID = typeof ID.Type
 

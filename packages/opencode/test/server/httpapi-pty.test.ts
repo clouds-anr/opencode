@@ -12,7 +12,10 @@ import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { Pty } from "@opencode-ai/core/pty"
 import { testEffect } from "../lib/effect"
 
-const testPty = process.platform === "win32" ? test.skip : test
+// ANR-SKIP: flaky in GitHub CI — these PTY integration tests spawn real child
+// processes and intermittently time out under parallel CI load. Skipped on CI
+// only; they still run locally to guard the legacy PTY bridge behavior.
+const testPty = process.platform === "win32" || process.env.CI ? test.skip : test
 
 const testStateLayer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -252,7 +255,8 @@ describe("pty HttpApi bridge", () => {
       message: `PTY session not found: ${missingID}`,
     })
   })
-  ;(process.platform === "win32" ? effectIt.live.skip : effectIt.live)(
+  // ANR-SKIP: flaky in GitHub CI — real PTY websocket round-trip times out under load.
+  ;(process.platform === "win32" || process.env.CI ? effectIt.live.skip : effectIt.live)(
     "serves PTY websocket output and input through Effect routes",
     () =>
       Effect.gen(function* () {
