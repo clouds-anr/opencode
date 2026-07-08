@@ -1,0 +1,19 @@
+{
+  "startedAt": "2026-07-08T18:14:53.341Z",
+  "pid": 36032,
+  "mode": "non-interactive",
+  "cwd": "C:\\Development\\Repos\\opencode",
+  "argv": [
+    "--diagnostic",
+    "--help"
+  ],
+  "paths": {
+    "diagnostics": "C:\\Development\\Repos\\opencode\\opencode-diagnostics-20260708-181453-36032",
+    "appLog": "C:\\Users\\DontaDalpoas\\.local\\share\\opencode\\log\\opencode.log",
+    "diagnosticLog": "C:\\Development\\Repos\\opencode\\opencode-diagnostics-20260708-181453-36032\\opencode.log",
+    "data": "C:\\Users\\DontaDalpoas\\.local\\share\\opencode",
+    "config": "C:\\Users\\DontaDalpoas\\.config\\opencode",
+    "cache": "C:\\Users\\DontaDalpoas\\.cache\\opencode",
+    "state": "C:\\Users\\DontaDalpoas\\.local\\state\\opencode"
+  }
+}

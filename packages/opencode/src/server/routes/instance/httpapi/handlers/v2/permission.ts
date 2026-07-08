@@ -1,6 +1,6 @@
 // @ts-nocheck — v2 API groups not yet registered in InstanceHttpApi (upstream WIP)
 import { Database } from "@opencode-ai/core/database/database"
-import { LocationServiceMap } from "@opencode-ai/core/location-layer"
+import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { AbsolutePath } from "@opencode-ai/core/schema"

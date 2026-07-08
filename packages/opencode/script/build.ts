@@ -135,7 +135,12 @@ const targets = singleFlag
     })
   : allTargets
 
-await $`rm -rf dist`
+await fs.promises.rm("dist", {
+  recursive: true,
+  force: true,
+  maxRetries: 20,
+  retryDelay: 200,
+})
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
