@@ -120,6 +120,50 @@ For more info on how to configure OpenCode, [**head over to our docs**](https://
 
 If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
+### Windows Crash Diagnostics
+
+If users report intermittent crashes on Windows, first use the built-in diagnostic mode:
+
+```powershell
+opencode --diagnostic
+```
+
+At startup, OpenCode prints a banner with the diagnostics directory and application log file path on the local workstation.
+
+If OpenCode crashes too early to use built-in diagnostics reliably, run the one-click collector from the repo root in PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1
+```
+
+The script creates an `opencode-diagnostics-<timestamp>` folder in the current directory with captured stderr output, resolved OpenCode paths, key environment values (with sensitive fields redacted), and recent log file discovery.
+
+If crashes happen after several minutes of normal interactive use, run in interactive mode so terminal behavior is preserved:
+
+```powershell
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -InteractiveSession
+```
+
+Optional flags:
+
+```powershell
+# More retries
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -Attempts 5
+
+# Pass args to OpenCode after global flags
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -RunArgs run,hello
+
+# Interactive delayed-crash capture
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -InteractiveSession
+
+# Skip clean-environment probe
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -SkipCleanEnvProbe
+
+# Use explicit binary path
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -OpencodePath C:\path\to\opencode.exe
+```
+
 ### Building on OpenCode
 
 If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.

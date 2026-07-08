@@ -47,8 +47,9 @@ function format(input: unknown) {
 }
 
 export function fileLogger(file = path.join(Global.Path.log, "opencode.log"), id: string = runID) {
+  const resolved = process.env.OPENCODE_LOG_FILE?.trim() || file
   // Do not set batchWindow to 0; it causes high idle CPU usage.
-  return Logger.toFile(formatter(id), file, { flag: "a" })
+  return Logger.toFile(formatter(id), resolved, { flag: "a" })
 }
 
 const stderrLogger = Logger.make((options) => process.stderr.write(formatter().log(options) + "\n"))
