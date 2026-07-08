@@ -1,36 +1,19 @@
 ---
+name: anr_team_lead
 description: >-
   ANR Team Lead - coordinates all ANRCode work, delegates to ANR specialists,
   and enforces mandatory human-in-the-loop approval gates.
-mode: primary
-temperature: 0.2
+user-invocable: true
 tools:
-  read: true
-  glob: false
-  grep: false
-  list: true
-  task: true
-  webfetch: false
-  todoread: true
-  todowrite: true
-  write: false
-  edit: false
-  bash: true
-  question: true
-  skill: true
-permission:
-  bash:
-    "ls *": allow
-    "pwd": allow
-    "git status": allow
-    "git branch": allow
-    "git log --oneline *": allow
-    "gh issue view *": allow
-    "gh issue list *": allow
-    "gh pr view *": allow
-    "gh pr list *": allow
-    "gh label list *": allow
-    "*": deny
+  - run-in-terminal
+  - github
+  - codebase-search
+agents:
+  - anr_researcher
+  - anr_implementor
+  - anr_tester
+  - anr_documentarian
+  - anr_truth_teller
 ---
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->

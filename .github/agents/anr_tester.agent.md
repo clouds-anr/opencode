@@ -1,58 +1,17 @@
 ---
+name: anr_tester
 description: >-
   ANR Tester - validates ANRCode changes against upstream opencode test
   conventions and reports regressions, coverage, and residual risks.
-mode: subagent
-temperature: 0.2
+user-invocable: false
 tools:
-  read: true
-  glob: true
-  grep: true
-  list: true
-  task: false
-  webfetch: true
-  todoread: true
-  todowrite: true
-  write: true
-  edit: true
-  bash: true
-  skill: true
-permission:
-  bash:
-    "ls *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "find *": allow
-    "tree *": allow
-    "rg *": allow
-    "grep *": allow
-    "npm *": allow
-    "bun *": allow
-    "npx *": allow
-    "python *": allow
-    "pytest *": allow
-    "go test *": allow
-    "go vet *": allow
-    "cargo test *": allow
-    "jest *": allow
-    "vitest *": allow
-    "cmake *": allow
-    "ctest *": allow
-    "ninja *": allow
-    "make *": allow
-    "terraform fmt *": allow
-    "terraform validate *": allow
-    "terraform plan *": allow
-    "tfsec *": allow
-    "checkov *": allow
-    "sqlfluff *": allow
-    "yamllint *": allow
-    "git status": allow
-    "git log *": allow
-    "git diff *": allow
-    "git show *": allow
-    "*": deny
+  - read-file
+  - create-file
+  - replace-string-in-file
+  - codebase-search
+  - file-search
+  - run-in-terminal
+  - github
 ---
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->

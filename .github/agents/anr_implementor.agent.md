@@ -1,55 +1,19 @@
 ---
+name: anr_implementor
 description: >-
   ANR Implementor - executes approved plans, manages anr/ branches, applies ANR
   change markers, updates issues, and opens PRs for human review.
-mode: subagent
-temperature: 0.2
+user-invocable: false
 tools:
-  read: true
-  glob: true
-  grep: true
-  list: true
-  task: false
-  webfetch: true
-  todoread: true
-  todowrite: true
-  write: true
-  edit: true
-  bash: true
-  question: true
-  skill: true
-permission:
-  bash:
-    "ls *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "find *": allow
-    "tree *": allow
-    "rg *": allow
-    "grep *": allow
-    "git status": allow
-    "git log *": allow
-    "git diff *": allow
-    "git show *": allow
-    "git branch *": allow
-    "git checkout -b anr/*": allow
-    "git checkout anr/*": allow
-    "git add *": allow
-    "git commit *": allow
-    "git push origin anr/*": allow
-    "gh issue view *": allow
-    "gh issue list *": allow
-    "gh issue comment *": allow
-    "gh pr view *": allow
-    "gh pr list *": allow
-    "gh pr create *": allow
-    "gh pr edit *": allow
-    "gh pr merge *": deny
-    "gh pr close *": deny
-    "gh issue close *": deny
-    "gh project *": allow
-    "*": deny
+  - read-file
+  - create-file
+  - replace-string-in-file
+  - insert-edit-into-file
+  - codebase-search
+  - file-search
+  - fetch
+  - run-in-terminal
+  - github
 ---
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->
