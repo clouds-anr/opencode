@@ -3,7 +3,8 @@ import { AgentV2 } from "@opencode-ai/core/agent"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
-import { LocationServiceMap } from "@opencode-ai/core/location-layer"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 
 export const AgentsCommand = Command.make("agents", {}, () =>
@@ -25,9 +26,12 @@ export const AgentsCommand = Command.make("agents", {}, () =>
     )
   }).pipe(
     Effect.provide(
-      LocationServiceMap.get({
-        directory: AbsolutePath.make(process.cwd()),
-      }),
+      LocationServiceMap.Service.get(
+        Location.Ref.make({
+          directory: AbsolutePath.make(process.cwd()),
+        }),
+      ),
     ),
+    Effect.provide(locationServiceMapLayer),
   ),
 ).pipe(Command.withDescription("List all agents"))
