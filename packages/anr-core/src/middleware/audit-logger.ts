@@ -7,6 +7,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb"
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb"
 import type { ANRConfig } from "../config/types"
 import type { TelemetryContext } from "../integrations/otel"
+import { anrClientConfig } from "../util/aws-client-config"
 import { randomUUID } from "crypto"
 
 export interface AuditEvent {
@@ -56,20 +57,8 @@ export interface AuditLoggerCredentials {
  */
 export function initializeAuditLogger(config: ANRConfig, credentials?: AuditLoggerCredentials): void {
   try {
-    // Bun resolves some AWS SDK CJS modules differently across platforms, causing
-    // loadConfig() to appear as a Symbol instead of a function for options like
-    // accountIdEndpointMode and authSchemePreference. Supplying these explicitly
-    // prevents the SDK from calling loadConfig() for those paths at all.
-    const clientConfig: any = {
-      region: config.awsRegion,
-      accountIdEndpointMode: "disabled",
-      authSchemePreference: [],
-      maxAttempts: 3,
-      retryMode: "standard",
-      defaultsMode: "standard",
-      useDualstackEndpoint: false,
-      requestChecksumCalculation: "WHEN_REQUIRED",
-      responseChecksumValidation: "WHEN_REQUIRED",
+    const client = new DynamoDBClient({
+      ...anrClientConfig({ region: config.awsRegion }),
       ...(credentials && {
         credentials: {
           accessKeyId: credentials.accessKeyId,
@@ -77,8 +66,7 @@ export function initializeAuditLogger(config: ANRConfig, credentials?: AuditLogg
           sessionToken: credentials.sessionToken,
         },
       }),
-    }
-    const client = new DynamoDBClient(clientConfig)
+    })
 
     dynamoClient = DynamoDBDocumentClient.from(client)
     // Audit logger initialized (silent to avoid TUI pollution)

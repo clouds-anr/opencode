@@ -23,6 +23,64 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  anr-aws-sdk-drift:
+    name: anr-aws-sdk-drift
+    runs-on: ubuntu-latest
+    outputs:
+      run_smoke: ${{ steps.drift.outputs.run_smoke }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Detect Cognito SDK major/minor drift
+        id: drift
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run_smoke=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          head_version="$(node -p 'require("./packages/anr-core/package.json").dependencies["@aws-sdk/client-cognito-identity"]')"
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          base_json="$(git show "$base_sha:packages/anr-core/package.json" 2>/dev/null || true)"
+
+          if [ -z "$base_json" ]; then
+            echo "run_smoke=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_version="$(printf '%s' "$base_json" | node -e 'const fs=require("node:fs"); const pkg=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(pkg.dependencies?.["@aws-sdk/client-cognito-identity"] ?? "")')"
+          changed="$(node -e 'const [base, head] = process.argv.slice(1); const minorMajor = (value) => value.replace(/^[^0-9]*/, "").split(".").slice(0, 2).join("."); process.stdout.write(String(minorMajor(base) !== minorMajor(head)))' "$base_version" "$head_version")"
+          echo "run_smoke=$changed" >> "$GITHUB_OUTPUT"
+
+  anr-aws-smoke:
+    name: anr-aws-smoke
+    needs: anr-aws-sdk-drift
+    if: needs.anr-aws-sdk-drift.outputs.run_smoke == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run ANR AWS smoke test
+        run: bun --cwd packages/anr-core test test/aws-client-config-smoke.test.ts
+
   unit:
     name: unit (${{ matrix.settings.name }})
     strategy:

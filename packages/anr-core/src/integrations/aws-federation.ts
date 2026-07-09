@@ -5,6 +5,7 @@
 
 import { CognitoIdentityClient, GetIdCommand, GetCredentialsForIdentityCommand } from "@aws-sdk/client-cognito-identity"
 import type { ANRConfig } from "../config/types"
+import { anrClientConfig } from "../util/aws-client-config"
 
 export interface AWSCredentials {
   accessKeyId: string
@@ -20,27 +21,7 @@ export async function exchangeTokenForAWSCredentials(idToken: string, config: AN
 
   const region = config.awsRegion || "us-east-2"
   const govcloud = region.startsWith("us-gov-")
-  // Bun resolves some AWS SDK CJS modules differently across platforms, causing
-  // loadConfig() to appear as a Symbol instead of a function for options like
-  // accountIdEndpointMode and authSchemePreference. Supplying these explicitly
-  // prevents the SDK from calling loadConfig() for those paths at all.
-  // Bun resolves some AWS SDK packages to their CJS build on certain platforms,
-  // where lazily-loaded config options (loadConfig calls) fail because the
-  // node-config-provider re-export lands as a Symbol. Supplying all known lazy
-  // options explicitly prevents every loadConfig call path from being hit.
-  const clientConfig: any = {
-    region,
-    accountIdEndpointMode: "disabled",
-    authSchemePreference: [],
-    maxAttempts: 3,
-    retryMode: "standard",
-    defaultsMode: "standard",
-    useDualstackEndpoint: false,
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-    ...(govcloud && { useFipsEndpoint: true }),
-  }
-  const client = new CognitoIdentityClient(clientConfig)
+  const client = new CognitoIdentityClient(anrClientConfig({ region, govcloud }))
 
   try {
     // Step 1: Get identity ID using the ID token
