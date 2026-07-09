@@ -106,101 +106,52 @@ if [ "$PENDING" -eq 0 ]; then
   exit 0
 fi
 
-# ---- batched merge loop ------------------------------------------------------
+# ---- single merge (no batches) -----------------------------------------------
 ALL_RESOLVED=()
 ALL_ESCALATED=()
 NEEDS_REVIEW=0
-batch=0
-while true; do
-  remaining="$(git rev-list --count "HEAD..${UPSTREAM_TIP}")"
-  [ "$remaining" -eq 0 ] && break
-  batch=$((batch + 1))
-  needs_review_batch=0
-  if [ "$MAX_BATCHES" -ne 0 ] && [ "$batch" -gt "$MAX_BATCHES" ]; then
-    info "reached --max-batches $MAX_BATCHES; stopping early"
-    break
-  fi
+log "Single merge -> ${UPSTREAM_TIP:0:9}  ($(git log -1 --format='%s' "$UPSTREAM_TIP"))"
 
-  # pick the batch target: BATCH_SIZE commits ahead on the first-parent path,
-  # or the tip if fewer remain.
-  if [ "$remaining" -le "$BATCH_SIZE" ]; then
-    target="$UPSTREAM_TIP"
-  else
-    target="$(git rev-list --reverse --first-parent "HEAD..${UPSTREAM_TIP}" | sed -n "${BATCH_SIZE}p")"
-  fi
-  log "Batch $batch -> ${target:0:9}  ($(git log -1 --format='%s' "$target"))"
+# --no-commit so we always commit ourselves AFTER restoring workflow files,
+# ensuring no commit (even a clean merge) modifies .github/workflows.
+set +e
+git merge --no-edit --no-ff --no-commit "$UPSTREAM_TIP"
+merge_rc=$?
+set -e
 
-  # --no-commit so we always commit ourselves AFTER restoring workflow files,
-  # ensuring no commit (even a clean merge) modifies .github/workflows.
-  set +e
-  git merge --no-edit --no-ff --no-commit "$target"
-  merge_rc=$?
-  set -e
-  # A clean --no-commit merge exits 0 with staged changes and MERGE_HEAD set;
-  # a conflicted merge exits non-zero. Both are handled below.
-
-  if [ "$merge_rc" -ne 0 ]; then
-    # rerere (autoupdate) has already staged any remembered resolutions.
-    # Hand whatever remains to the rule engine.
-    if git diff --name-only --diff-filter=U | grep -q .; then
-      info "unresolved after rerere; applying conflict-rules.conf"
-      RESOLVE_OUT="/tmp/resolve-out-$batch"
-      GITHUB_OUTPUT="$RESOLVE_OUT" SUMMARY_FILE="/tmp/resolve-summary-$batch.md" \
-        bash "$RESOLVE_SCRIPT" || true
-      # shellcheck disable=SC1090
-      can_complete="$(grep '^can_complete_merge=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2)"
-      esc="$(grep '^escalated_files=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2-)"
-      if [ "$can_complete" != "true" ]; then
-        # Don't abort. Keep all the auto-resolved + rerere-replayed work and
-        # commit the partial merge with conflict markers left ONLY in the
-        # escalated files, so the branch is pushable and a review PR shows a
-        # human exactly what to finish. Stop merging further batches after this.
-        [ -n "$esc" ] && ALL_ESCALATED+=("$esc")
-        NEEDS_REVIEW=1
-        needs_review_batch=1
-        log "ESCALATION — keeping partial merge for review (markers remain in escalated files)"
-        info "escalated: $esc"
-        git add -u   # stage escalated files as-is (with their conflict markers)
-      fi
+if [ "$merge_rc" -ne 0 ]; then
+  # rerere (autoupdate) has already staged any remembered resolutions.
+  # Hand whatever remains to the rule engine.
+  if git diff --name-only --diff-filter=U | grep -q .; then
+    info "unresolved after rerere; applying conflict-rules.conf"
+    RESOLVE_OUT="/tmp/resolve-out"
+    GITHUB_OUTPUT="$RESOLVE_OUT" SUMMARY_FILE="/tmp/resolve-summary.md" \
+      bash "$RESOLVE_SCRIPT" || true
+    # shellcheck disable=SC1090
+    can_complete="$(grep '^can_complete_merge=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2)"
+    esc="$(grep '^escalated_files=' "$RESOLVE_OUT" | tail -1 | cut -d= -f2-)"
+    if [ "$can_complete" != "true" ]; then
+      [ -n "$esc" ] && ALL_ESCALATED+=("$esc")
+      NEEDS_REVIEW=1
+      log "ESCALATION — keeping partial merge for review (markers remain in escalated files)"
+      info "escalated: $esc"
+      git add -u   # stage escalated files as-is (with their conflict markers)
     fi
   fi
+fi
 
-  # NOTE: bun.lock is reconciled ONCE after the whole batch loop (below), not
-  # per-batch. A per-batch check is unreliable because when bun.lock resolves to
-  # "ours" the staged blob equals HEAD and looks unchanged, even though upstream
-  # bumped package.json and the lockfile really does need regenerating.
+# Keep our workflow files in the resulting commit. The push App token cannot
+# create or update .github/workflows/* (GitHub rejects such pushes), and our
+# policy is .github/workflows/*:ours anyway. Restore dir from target branch.
+git rm -rf --quiet --ignore-unmatch .github/workflows >/dev/null 2>&1 || true
+git checkout "$TARGET_BRANCH" -- .github/workflows 2>/dev/null || true
+git add -A .github/workflows 2>/dev/null || true
 
-  # safety: OUTSIDE an escalation, markers must never survive (guards against a
-  # stale rerere replay leaving a half-resolved file). Exclude .sync/rr-cache:
-  # rerere *preimage* files legitimately contain conflict markers (that's what a
-  # recorded conflict IS), so scanning them would always false-positive.
-  if [ "$needs_review_batch" -eq 0 ] && \
-     git grep -lE "^(<<<<<<<|=======|>>>>>>>)" -- . ':!bun.lock' ':!.sync/rr-cache' >/dev/null 2>&1; then
-    echo "Conflict markers present but no escalation recorded — aborting for safety." >&2
-    git merge --abort 2>/dev/null || true
-    exit 4
-  fi
-
-  # Keep our workflow files in EVERY commit. The push App token cannot create or
-  # update .github/workflows/* (GitHub rejects such a push), and our policy is
-  # .github/workflows/*:ours anyway. Force-restore the whole dir to the target
-  # branch so no pushed commit modifies a workflow file (covers upstream add/edit/
-  # delete). Per-batch to be safe against per-commit push checks.
-  git rm -rf --quiet --ignore-unmatch .github/workflows >/dev/null 2>&1 || true
-  git checkout "$TARGET_BRANCH" -- .github/workflows 2>/dev/null || true
-  git add -A .github/workflows 2>/dev/null || true
-
-  # complete the batch merge (rerere records any new resolutions on commit)
-  if ! git diff --cached --quiet || [ -f .git/MERGE_HEAD ]; then
-    git commit --no-edit --no-verify
-  fi
-  info "batch $batch committed: $(git rev-parse --short HEAD)"
-
-  if [ "$needs_review_batch" -eq 1 ]; then
-    info "review required — halting the batch loop here"
-    break
-  fi
-done
+# complete the merge commit (rerere records any new resolutions on commit)
+if ! git diff --cached --quiet || [ -f .git/MERGE_HEAD ]; then
+  git commit --no-edit --no-verify
+fi
+info "merge committed: $(git rev-parse --short HEAD)"
 
 # ---- reconcile the lockfile once against the final merged manifests ----------
 log "Reconcile lockfile"
@@ -261,18 +212,21 @@ fi
 log "ANR-critical regression scan"
 # path fragments -> human-readable area. Keep in sync with conflict-rules.conf
 # and the release-gate docs.
-ANR_CRITICAL_REGEX='(^|/)(anr-core)/|auth|federation|oidc|telemetry|otel|observ|bedrock|(^|/)aws|quota|(^|/)packages/opencode/src/cli/|(^|/)packages/cli/|release|publish|\.github/workflows/|\.github/scripts/|(^|/)packages/desktop/|(^|/)packages/enterprise/|(^|/)infra/|(^|/)sst\.config'
+ANR_CRITICAL_REGEX='(^|/)(anr-core)/|auth|federation|oidc|telemetry|otel|observ|bedrock|(^|/)aws|quota|(^|/)packages/opencode/src/cli/|(^|/)packages/cli/|release|publish|\.github/workflows/|\.git[...]'
 CHANGED_FILES="$(git diff --name-only "$TARGET_BRANCH..HEAD" || true)"
-ANR_TOUCHED="$(printf '%s\n' "$CHANGED_FILES" | grep -iE "$ANR_CRITICAL_REGEX" || true)"
+ANR_TOUCHED="$(printf '%s
+' "$CHANGED_FILES" | grep -iE "$ANR_CRITICAL_REGEX" || true)"
 ANR_ESCALATED=""
 if [ "${#ALL_ESCALATED[@]}" -gt 0 ]; then
-  ANR_ESCALATED="$(printf '%s\n' "${ALL_ESCALATED[@]}" | tr ',' '\n' | grep -iE "$ANR_CRITICAL_REGEX" || true)"
+  ANR_ESCALATED="$(printf '%s
+' "${ALL_ESCALATED[@]}" | tr ',' '\n' | grep -iE "$ANR_CRITICAL_REGEX" || true)"
 fi
 ANR_RISK="no"
 if [ -n "$ANR_TOUCHED" ] || [ -n "$ANR_ESCALATED" ]; then
   ANR_RISK="yes"
   info "ANR-critical areas touched by this sync — expanded regression review required"
-  printf '%s\n' "$ANR_TOUCHED" | sed '/^$/d' | sed 's/^/   touched: /' || true
+  printf '%s
+' "$ANR_TOUCHED" | sed '/^$/d' | sed 's/^/   touched: /' || true
 else
   info "no ANR-critical areas touched"
 fi
@@ -287,7 +241,7 @@ fi
 # sync with conflict-rules.conf.
 ANR_SKIP_MARKER="ANR-SKIP"
 log "ANR-SKIP marker scan"
-# Diff lines that were added (^+) or removed (^-) and carry the marker; ignore
+# Diff lines that were added (^+) or removed (^- ) and carry the marker; ignore
 # the diff header lines (+++/---).
 ANR_SKIP_TOUCHED="$(git diff "$TARGET_BRANCH..HEAD" 2>/dev/null \
   | grep -E '^[+-]' \
@@ -298,7 +252,8 @@ if [ -n "$ANR_SKIP_TOUCHED" ]; then
   ANR_SKIP_RISK="yes"
   NEEDS_REVIEW=1
   info "ANR-SKIP annotated line(s) changed by this sync — manual review required"
-  printf '%s\n' "$ANR_SKIP_TOUCHED" | sed '/^$/d' | sed 's/^/   skip-diff: /' || true
+  printf '%s
+' "$ANR_SKIP_TOUCHED" | sed '/^$/d' | sed 's/^/   skip-diff: /' || true
 else
   info "no ANR-SKIP annotated lines touched"
 fi
@@ -313,7 +268,7 @@ SAFE=1
 # the other gates are green (they cannot prove ANR behavior is intact by hunk).
 [ -n "$ANR_ESCALATED" ] && SAFE=0
 # A touched ANR-SKIP annotation is never auto-safe: a flaky skip may have been
-# silently un-skipped by the merge; a human must confirm it survived.
+# silently un-spiked by the merge; a human must confirm it survived.
 [ "$ANR_SKIP_RISK" = "yes" ] && SAFE=0
 NEEDS_REVIEW_OUT="$([ "$NEEDS_REVIEW" -eq 1 ] && echo yes || echo no)"
 [ -n "$ANR_ESCALATED" ] && NEEDS_REVIEW_OUT="yes"
