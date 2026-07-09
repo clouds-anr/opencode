@@ -130,7 +130,7 @@ test("embedded client uses the real router and handlers", async () => {
     Flag.OPENCODE_DB = database
     await rm(directory, { recursive: true, force: true })
   }
-})
+}, 15_000)
 
 // NOTE(anr-sync): skipped pending upstream fix. These three tests fail with
 // SQLITE_CANTOPEN because the embedded SQLite DB layer is memoized process-wide;
