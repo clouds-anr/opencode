@@ -45,15 +45,34 @@
 
 ### Installation
 
+GitHub Releases are the source of truth for all CLI distribution artifacts.
+See the **[platform install runbook](https://opencode.ai/docs/cli/install)** for
+full install, upgrade, and uninstall instructions per platform.
+
+**Primary paths by platform:**
+
+| Platform | Primary | Supported alternatives |
+|----------|---------|------------------------|
+| macOS | `brew install anomalyco/tap/opencode` | npm global, direct script |
+| Linux | `brew install anomalyco/tap/opencode` | AUR, npm global, direct script |
+| Windows | `winget install anomalyco.opencode` | Chocolatey, npm global |
+
 ```bash
-# YOLO
+# macOS / Linux — Homebrew (primary, always up to date)
+brew install anomalyco/tap/opencode
+
+# Windows — Winget (primary)
+winget install anomalyco.opencode
+
+# Any platform — npm global
+npm i -g opencode-ai@latest        # or bun/pnpm/yarn
+
+# Any platform — direct script
 curl -fsSL https://opencode.ai/install | bash
 
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
+# Additional channels
+choco install opencode             # Windows (Chocolatey)
+scoop install opencode             # Windows (community-maintained)
 brew install opencode              # macOS and Linux (official brew formula, updated less)
 sudo pacman -S opencode            # Arch Linux (Stable)
 paru -S opencode-bin               # Arch Linux (Latest from AUR)
@@ -63,6 +82,9 @@ nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.
+
+For downgrade instructions and platform-specific cleanup paths, see the
+**[downgrade and cleanup runbook](https://opencode.ai/docs/cli/downgrade)**.
 
 ### Desktop App (BETA)
 

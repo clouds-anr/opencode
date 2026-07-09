@@ -1,0 +1,215 @@
+---
+title: "Downgrade and Cleanup"
+description: "Rollback tiers, per-platform cleanup paths, and data-loss expectations for the OpenCode CLI"
+---
+
+## Overview
+
+This runbook describes how to safely downgrade the OpenCode CLI to an older version.
+Choose the correct rollback tier based on the release notes for the version you are leaving.
+
+---
+
+## Rollback tiers
+
+| Tier | When to use | Binary | Config | State / Cache | DB / Data |
+|------|-------------|--------|--------|---------------|-----------|
+| **Tier 1 — Binary rollback** | No compatibility risk declared in release notes | Reinstall older | Keep | Keep | Keep |
+| **Tier 2 — Runtime reset** | Runtime or daemon behavior changed | Reinstall older | Keep | **Clear** | Keep |
+| **Tier 3 — Clean rollback** | Release notes indicate storage or schema incompatibility | Reinstall older | Keep (optional) | **Clear** | **Clear** |
+
+<Warning>
+  Tier 3 rollback deletes local session data and cannot be undone.
+  Export or back up anything you need before proceeding.
+</Warning>
+
+---
+
+## Platform file locations
+
+Use these paths when clearing state, cache, or data directories.
+
+<Tabs>
+  <Tab title="macOS">
+    | Location | Path |
+    |----------|------|
+    | Config | `~/.config/opencode/` |
+    | Cache | `~/.cache/opencode/` |
+    | State | `~/.local/state/opencode/` |
+    | DB / Data | `~/.local/share/opencode/` |
+    | Daemon / service | No daemon — CLI is user-level only |
+
+    If `$XDG_CONFIG_HOME`, `$XDG_CACHE_HOME`, `$XDG_STATE_HOME`, or `$XDG_DATA_HOME`
+    are set in your environment, those values override the defaults above.
+  </Tab>
+  <Tab title="Linux">
+    | Location | Path |
+    |----------|------|
+    | Config | `~/.config/opencode/` |
+    | Cache | `~/.cache/opencode/` |
+    | State | `~/.local/state/opencode/` |
+    | DB / Data | `~/.local/share/opencode/` |
+    | Daemon / service | No daemon — CLI is user-level only |
+  </Tab>
+  <Tab title="Windows">
+    | Location | Path |
+    |----------|------|
+    | Config | `%APPDATA%\opencode\` |
+    | Cache | `%LOCALAPPDATA%\opencode\cache\` |
+    | State | `%LOCALAPPDATA%\opencode\state\` |
+    | DB / Data | `%LOCALAPPDATA%\opencode\data\` |
+    | Daemon / service | No daemon — CLI is user-level only |
+  </Tab>
+</Tabs>
+
+---
+
+## Tier 1 — Binary rollback only
+
+Reinstall the older binary through any supported channel.
+No data is removed.
+
+<Tabs>
+  <Tab title="macOS — Homebrew">
+    ```bash
+    brew uninstall opencode
+    brew install anomalyco/tap/opencode@<old-version>
+    # verify
+    opencode --version
+    ```
+  </Tab>
+  <Tab title="macOS / Linux — npm">
+    ```bash
+    npm install -g opencode-ai@<old-version>
+    opencode --version
+    ```
+  </Tab>
+  <Tab title="macOS / Linux — direct">
+    ```bash
+    curl -fsSL https://opencode.ai/install | bash -s -- --version <old-version>
+    opencode --version
+    ```
+  </Tab>
+  <Tab title="Windows — Winget">
+    ```powershell
+    winget install anomalyco.opencode --version <old-version>
+    opencode --version
+    ```
+  </Tab>
+  <Tab title="Windows — Chocolatey">
+    ```powershell
+    choco install opencode --version <old-version> --allow-downgrade
+    opencode --version
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Tier 2 — Runtime reset rollback
+
+Reinstall the older binary **then** clear state and cache.
+Config and database are preserved.
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state and cache
+    rm -rf ~/.local/state/opencode
+    rm -rf ~/.cache/opencode
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state and cache
+    rm -rf ~/.local/state/opencode
+    rm -rf ~/.cache/opencode
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state and cache
+    Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\state"
+    Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\cache"
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Tier 3 — Clean rollback
+
+Reinstall the older binary then clear state, cache, **and** the local database.
+Config may optionally be retained.
+
+<Warning>
+  This permanently removes local session data. Back up `~/.local/share/opencode/` (macOS/Linux)
+  or `%LOCALAPPDATA%\opencode\data\` (Windows) before running these commands.
+</Warning>
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state, cache, and data
+    rm -rf ~/.local/state/opencode
+    rm -rf ~/.cache/opencode
+    rm -rf ~/.local/share/opencode
+
+    # 3. optionally reset config too
+    # rm -rf ~/.config/opencode
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```bash
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state, cache, and data
+    rm -rf ~/.local/state/opencode
+    rm -rf ~/.cache/opencode
+    rm -rf ~/.local/share/opencode
+
+    # 3. optionally reset config too
+    # rm -rf ~/.config/opencode
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    # 1. reinstall older version (see Tier 1 above)
+
+    # 2. clear state, cache, and data
+    Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\state"
+    Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\cache"
+    Remove-Item -Recurse -Force "$env:LOCALAPPDATA\opencode\data"
+
+    # 3. optionally reset config too
+    # Remove-Item -Recurse -Force "$env:APPDATA\opencode"
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Release policy
+
+| Release type | Rollback section required | Default tier |
+|-------------|--------------------------|--------------|
+| **Patch** | Only when a risk is noted in the release notes | Tier 1 |
+| **Minor** | Always — includes cleanup-required status | Tier 1 or Tier 2 |
+| **Major** | Mandatory — includes required tier and impact summary | Tier 2 or Tier 3 |
+
+The rollback tier for a specific release is declared in the GitHub Release notes
+under the **Rollback** heading.
+
+---
+
+## Related guides
+
+- [CLI Installation](/cli/install) — install, upgrade, and uninstall per platform
