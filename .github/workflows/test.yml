@@ -321,6 +321,65 @@ jobs:
           bin="$(find packages/opencode/dist -type f -name 'opencode' | head -1)"
           OPENCODE_BIN="$bin" bun run .github/scripts/validate-opencode-config.ts
 
+  # ANR token-auth smoke: verifies non-interactive token mode can initialize
+  # and reach ANR backend services without opening a browser.
+  # Requires GitHub Actions secrets: ANR_ID_TOKEN (and optionally ANR_REFRESH_TOKEN).
+  # Skips cleanly when secrets are absent so the job never blocks merges on
+  # unprovisioned repos. Promote to required gate once secrets are stable.
+  anr-token-auth-smoke:
+    name: anr-token-auth-smoke
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Build single-platform CLI
+        run: bun run ./packages/opencode/script/build.ts --single --skip-embed-web-ui
+        env:
+          OPENCODE_VERSION: "0.0.0-smoke"
+
+      - name: Check for required secrets
+        id: secrets-check
+        run: |
+          if [ -z "${{ secrets.ANR_ID_TOKEN }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::ANR_ID_TOKEN secret is not set — skipping token-auth smoke."
+            echo "To enable: add ANR_ID_TOKEN (Cognito ID token) as a repo/org secret."
+            echo "Optional: ANR_REFRESH_TOKEN, ANR_AWS_ACCESS_KEY_ID, ANR_AWS_SECRET_ACCESS_KEY, ANR_AWS_SESSION_TOKEN"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run ANR token-auth smoke (agent list)
+        if: steps.secrets-check.outputs.skip == 'false'
+        run: |
+          bin="$(find packages/opencode/dist -type f -name 'opencode' | head -1)"
+          echo "Binary: $bin"
+          "$bin" agent list
+        env:
+          OPENCODE_FLAVOR: anr
+          OPENCODE_ANR_AUTH_MODE: token
+          OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}
+          OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}
+          # Optional: provide static AWS creds to bypass federation exchange
+          AWS_ACCESS_KEY_ID: ${{ secrets.ANR_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ANR_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.ANR_AWS_SESSION_TOKEN }}
+
   # Upgrade/migration smoke: install the previous released version, create state,
   # then run the build-under-test against that same state to catch migration
   # regressions (session/config on-disk format changes).

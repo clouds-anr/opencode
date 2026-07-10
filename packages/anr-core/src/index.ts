@@ -18,7 +18,16 @@ export {
 
 // Authentication
 export { authenticateWithOIDC, refreshOIDCTokens, type OIDCTokens } from "./integrations/oidc-auth"
-export { exchangeTokenForAWSCredentials } from "./integrations/aws-federation"
+export { exchangeTokenForAWSCredentials, type AWSCredentials } from "./integrations/aws-federation"
+export {
+  parseANRAuthMode,
+  validateTokenModeEnv,
+  resolveTokenModeCredentials,
+  type ANRAuthMode,
+  type TokenAuthResult,
+  type TokenModeValidationOk,
+  type TokenModeValidationError,
+} from "./integrations/token-auth"
 
 // Telemetry & Observability
 export {

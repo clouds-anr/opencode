@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { getCACertificates, setDefaultCACertificates } from "node:tls"
 import type { Event } from "electron"
-import { app } from "electron"
+import { app, shell } from "electron"
 
 import { Deferred, Effect, Fiber } from "effect"
 import contextMenu from "electron-context-menu"
@@ -339,7 +339,14 @@ const main = Effect.gen(function* () {
       spawnLocalServer(hostname, port, password, {
         userDataPath: app.getPath("userData"),
         onStdout: (message) => writeLog("server", "stdout", { message }),
-        onStderr: (message) => writeLog("server", "stderr", { message }, "warn"),
+        onStderr: (message) => {
+          const authUrl = message.startsWith("auth-url:") ? message.slice("auth-url:".length).trim() : null
+          if (authUrl) {
+            void shell.openExternal(authUrl)
+            return
+          }
+          writeLog("server", "stderr", { message }, "warn")
+        },
         onExit: (code) => writeLog("utility", "sidecar exited", { code }, "warn"),
       }),
     )

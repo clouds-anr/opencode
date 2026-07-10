@@ -407,3 +407,103 @@ describe("ANR Init Pipeline: complete flow simulation", () => {
     expect(config.cognitoUserPoolId).toBe("us-gov-west-1_FlowTest")
   })
 })
+
+// ---------------------------------------------------------------------------
+// Token auth mode — integration cases
+// ---------------------------------------------------------------------------
+
+describe("ANR Init Pipeline: token auth mode selection", () => {
+  const savedEnv: Record<string, string | undefined> = {}
+  const WATCHED = [
+    "OPENCODE_ANR_AUTH_MODE",
+    "OPENCODE_ANR_ID_TOKEN",
+    "OPENCODE_ANR_REFRESH_TOKEN",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_REGION",
+  ]
+
+  beforeEach(() => {
+    for (const k of WATCHED) savedEnv[k] = process.env[k]
+    for (const k of WATCHED) delete process.env[k]
+  })
+
+  afterEach(() => {
+    for (const k of WATCHED) {
+      if (savedEnv[k] === undefined) delete process.env[k]
+      else process.env[k] = savedEnv[k]
+    }
+  })
+
+  test("OPENCODE_ANR_AUTH_MODE unset → interactive mode", async () => {
+    const { parseANRAuthMode } = await import("../src/integrations/token-auth")
+    expect(parseANRAuthMode({})).toBe("interactive")
+  })
+
+  test("OPENCODE_ANR_AUTH_MODE=token → token mode selected", async () => {
+    const { parseANRAuthMode } = await import("../src/integrations/token-auth")
+    expect(parseANRAuthMode({ OPENCODE_ANR_AUTH_MODE: "token" })).toBe("token")
+  })
+
+  test("token mode with static AWS creds skips federation exchange", async () => {
+    const { resolveTokenModeCredentials } = await import("../src/integrations/token-auth")
+    const env = {
+      OPENCODE_ANR_ID_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2ln",
+      AWS_ACCESS_KEY_ID: "AKIASTATIC",
+      AWS_SECRET_ACCESS_KEY: "STATICSECRET",
+      AWS_SESSION_TOKEN: "STATICTOKEN",
+      AWS_REGION: "us-gov-west-1",
+    }
+    const result = await resolveTokenModeCredentials(fullTestConfig(), env)
+    expect(result.credentialSource).toBe("static")
+    expect(result.awsCredentials.accessKeyId).toBe("AKIASTATIC")
+  })
+
+  test("token mode without AWS creds attempts federation exchange (fails without real endpoint)", async () => {
+    const { resolveTokenModeCredentials } = await import("../src/integrations/token-auth")
+    const env = { OPENCODE_ANR_ID_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2ln" }
+    // Without static creds and with a fake token, exchange will fail.
+    // Verify the failure is wrapped in a CI-friendly message.
+    await expect(resolveTokenModeCredentials(fullTestConfig(), env)).rejects.toThrow(
+      /\[ANR\] Token auth: federation exchange failed/,
+    )
+  })
+
+  test("token mode with refresh token — validation passes", async () => {
+    const { validateTokenModeEnv } = await import("../src/integrations/token-auth")
+    const result = validateTokenModeEnv({
+      OPENCODE_ANR_ID_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2ln",
+      OPENCODE_ANR_REFRESH_TOKEN: "refresh-token-value",
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.refreshToken).toBe("refresh-token-value")
+  })
+
+  test("token mode without refresh token — validation still passes (refresh is optional)", async () => {
+    const { validateTokenModeEnv } = await import("../src/integrations/token-auth")
+    const result = validateTokenModeEnv({
+      OPENCODE_ANR_ID_TOKEN: "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2ln",
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.refreshToken).toBeUndefined()
+  })
+
+  test("missing required vars in token mode produces actionable error", async () => {
+    const { validateTokenModeEnv } = await import("../src/integrations/token-auth")
+    const result = validateTokenModeEnv({})
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain("OPENCODE_ANR_ID_TOKEN")
+      // Must be CI-friendly: no raw secret values in message
+      expect(result.message.length).toBeGreaterThan(20)
+    }
+  })
+
+  test("invalid OPENCODE_ANR_AUTH_MODE throws with helpful message", async () => {
+    const { parseANRAuthMode } = await import("../src/integrations/token-auth")
+    expect(() => parseANRAuthMode({ OPENCODE_ANR_AUTH_MODE: "headless" })).toThrow(
+      /Unknown OPENCODE_ANR_AUTH_MODE/,
+    )
+  })
+})
