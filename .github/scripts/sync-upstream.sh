@@ -4,8 +4,8 @@
 #
 # Pipeline per run:
 #   1. Restore the persisted rerere cache (remembered hunk resolutions).
-#   2. Fetch upstream and merge it into a sync branch in bounded batches.
-#   3. For each batch's conflicts:
+#   2. Fetch upstream and merge it into the sync branch (single merge to UPSTREAM_TIP).
+#   3. For any conflicts:
 #        a. rerere auto-replays any resolution we've recorded before (zero touch).
 #        b. resolve-conflicts.sh applies conflict-rules.conf (ours/theirs/escalate).
 #        c. bun.lock is reconciled with `bun install` if it was touched.
@@ -25,8 +25,6 @@
 # Usage:
 #   .github/scripts/sync-upstream.sh [options]
 #     --push                 push the sync branch when everything is clean+green
-#     --batch-size N         commits per merge batch (default: 70)
-#     --max-batches N        stop after N batches (default: unlimited)
 #     --upstream-ref REF     upstream ref to sync from (default: dev)
 #     --target-commit SHA    merge only up to this upstream commit (testing)
 #     --no-typecheck         skip the full-workspace typecheck AND tests (faster local loops)
@@ -39,8 +37,6 @@ UPSTREAM_REPO="${UPSTREAM_REPO:-https://github.com/sst/opencode.git}"
 UPSTREAM_REF="dev"
 TARGET_BRANCH="${TARGET_BRANCH:-dev}"
 SYNC_BRANCH="${SYNC_BRANCH:-sync/upstream}"
-BATCH_SIZE=70
-MAX_BATCHES=0            # 0 = unlimited
 TARGET_COMMIT=""
 DO_PUSH=0
 DO_TYPECHECK=1
@@ -51,8 +47,6 @@ SUMMARY_FILE="${SUMMARY_FILE:-/tmp/sync-upstream-summary.md}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --push) DO_PUSH=1 ;;
-    --batch-size) BATCH_SIZE="$2"; shift ;;
-    --max-batches) MAX_BATCHES="$2"; shift ;;
     --upstream-ref) UPSTREAM_REF="$2"; shift ;;
     --target-commit) TARGET_COMMIT="$2"; shift ;;
     --no-typecheck) DO_TYPECHECK=0 ;;
@@ -99,7 +93,7 @@ info "syncing toward ${UPSTREAM_TIP:0:9}"
 log "Prepare sync branch"
 git checkout -B "$SYNC_BRANCH" "$TARGET_BRANCH" --quiet
 PENDING="$(git rev-list --count "${SYNC_BRANCH}..${UPSTREAM_TIP}")"
-info "$PENDING upstream commit(s) to merge (batch size $BATCH_SIZE)"
+info "$PENDING upstream commit(s) to merge"
 if [ "$PENDING" -eq 0 ]; then
   echo "Already up to date."
   [ -n "${SYNC_GITHUB_OUTPUT:-}" ] && printf 'result=uptodate\nsafe_to_push=no\nneeds_review=no\ntests=skipped\ntypecheck=skipped\nanr_risk=no\nanr_skip_risk=no\n' >> "$SYNC_GITHUB_OUTPUT"
@@ -276,7 +270,6 @@ SAFE_OUT="$([ "$SAFE" -eq 1 ] && echo yes || echo no)"
 # newline -> comma for a single-line, workflow-friendly value
 ANR_TOUCHED_CSV="$(printf '%s' "$ANR_TOUCHED" | sed '/^$/d' | paste -sd ',' - 2>/dev/null || true)"
 {
-  echo "batches=$batch"
   echo "head=$(git rev-parse --short HEAD)"
   echo "typecheck=$TYPECHECK_OK"
   echo "tests=$TESTS_OK"

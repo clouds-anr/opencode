@@ -3,8 +3,8 @@
 # This replaces the old threshold-based sync. It runs nightly and can also be
 # triggered manually. All real logic lives in .github/scripts/sync-upstream.sh,
 # so it runs and is tested locally exactly as it runs here:
-#   bash .github/scripts/sync-upstream.sh --batch-size 70            # dry run
-#   bash .github/scripts/sync-upstream.sh --batch-size 70 --push     # push
+#   bash .github/scripts/sync-upstream.sh            # dry run
+#   bash .github/scripts/sync-upstream.sh --push     # push
 #
 # Safety model:
 #   * Only ever opens/updates ONE PR from sync/upstream -> dev. NEVER pushes dev,
@@ -27,10 +27,6 @@ on:
         description: "Resolve & validate only; do not push or open a PR"
         type: boolean
         default: false
-      batch_size:
-        description: "Commits per merge batch"
-        type: string
-        default: "70"
   schedule:
     # GitHub cron is UTC. 04:00 UTC ≈ 11 PM US Central (CDT; 10 PM during CST).
     - cron: "0 4 * * *"
@@ -112,9 +108,9 @@ jobs:
           # tracked tree. Discard that so the script's preflight sees a clean tree;
           # the script reconciles and commits bun.lock itself during the run.
           git checkout -- .
-          args="--batch-size ${{ inputs.batch_size || '70' }}"
+          args=""
           if [ "$DRY_RUN" != "true" ]; then
-            args="$args --push"
+            args="--push"
           fi
           # The script appends machine-readable results (safe_to_push, needs_review,
           # escalated, typecheck, head) to $SYNC_GITHUB_OUTPUT.
