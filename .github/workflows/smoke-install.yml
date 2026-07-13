@@ -1,0 +1,163 @@
+name: smoke-install
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  linux-curl:
+    name: Linux — curl installer
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - name: Fresh install
+        run: curl -fsSL https://opencode.ai/install | bash
+
+      - name: Verify install
+        run: |
+          opencode --version 2>&1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Capture current version
+        id: current
+        run: echo "version=$(opencode --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> "$GITHUB_OUTPUT"
+
+      - name: Downgrade to prior version
+        env:
+          CURRENT: ${{ steps.current.outputs.version }}
+        run: |
+          PRIOR=$(curl -fsSL https://api.github.com/repos/clouds-anr/opencode/releases | \
+            python3 -c "import sys,json; releases=[r['tag_name'].lstrip('v') for r in json.load(sys.stdin) if not r['prerelease']]; idx=releases.index('$CURRENT') if '$CURRENT' in releases else 0; print(releases[idx+1] if idx+1 < len(releases) else releases[0])")
+          curl -fsSL https://opencode.ai/install | bash -s -- --version "$PRIOR"
+
+      - name: Verify downgraded version
+        run: |
+          opencode --version 2>&1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Upgrade back to latest
+        run: curl -fsSL https://opencode.ai/install | bash
+
+      - name: Verify upgraded version
+        run: |
+          opencode --version 2>&1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Uninstall
+        run: rm -f "$(which opencode)"
+
+      - name: Verify uninstall
+        run: |
+          if command -v opencode &>/dev/null; then
+            echo "opencode still found after uninstall" >&2
+            exit 1
+          fi
+          echo "opencode successfully uninstalled"
+
+  macos-homebrew:
+    name: macOS — Homebrew
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - name: Fresh install
+        run: brew install anomalyco/tap/opencode
+
+      - name: Verify install
+        run: |
+          opencode --version 2>&1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Upgrade
+        run: brew upgrade opencode
+
+      - name: Verify upgraded version
+        run: |
+          opencode --version 2>&1 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Uninstall
+        run: |
+          brew uninstall opencode
+          brew untap anomalyco/tap || true
+
+      - name: Verify uninstall
+        run: |
+          if command -v opencode &>/dev/null; then
+            echo "opencode still found after uninstall" >&2
+            exit 1
+          fi
+          echo "opencode successfully uninstalled"
+
+  windows-chocolatey:
+    name: Windows — Chocolatey
+    runs-on: blacksmith-4vcpu-windows-2025
+    timeout-minutes: 15
+    steps:
+      - name: Fresh install
+        shell: pwsh
+        run: choco install opencode -y
+
+      - name: Verify install
+        shell: pwsh
+        run: |
+          $v = (opencode --version 2>&1) -join ""
+          if ($v -notmatch '^[0-9]+\.[0-9]+\.[0-9]+') {
+            Write-Error "Unexpected version output: $v"
+            exit 1
+          }
+          Write-Output $v
+
+      - name: Capture current version
+        id: current
+        shell: pwsh
+        run: |
+          $v = (opencode --version 2>&1) -join "" | Select-String -Pattern '[0-9]+\.[0-9]+\.[0-9]+' | ForEach-Object { $_.Matches[0].Value }
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Downgrade to prior version
+        shell: pwsh
+        env:
+          CURRENT: ${{ steps.current.outputs.version }}
+        run: |
+          $releases = (Invoke-RestMethod "https://api.github.com/repos/clouds-anr/opencode/releases") |
+            Where-Object { -not $_.prerelease } |
+            ForEach-Object { $_.tag_name -replace '^v', '' }
+          $idx = [Array]::IndexOf($releases, $env:CURRENT)
+          $prior = if ($idx -ge 0 -and ($idx + 1) -lt $releases.Count) { $releases[$idx + 1] } else { $releases[0] }
+          choco install opencode --version $prior --allow-downgrade -y
+
+      - name: Verify downgraded version
+        shell: pwsh
+        run: |
+          $v = (opencode --version 2>&1) -join ""
+          if ($v -notmatch '^[0-9]+\.[0-9]+\.[0-9]+') {
+            Write-Error "Unexpected version output: $v"
+            exit 1
+          }
+          Write-Output $v
+
+      - name: Upgrade back to latest
+        shell: pwsh
+        run: choco upgrade opencode -y
+
+      - name: Verify upgraded version
+        shell: pwsh
+        run: |
+          $v = (opencode --version 2>&1) -join ""
+          if ($v -notmatch '^[0-9]+\.[0-9]+\.[0-9]+') {
+            Write-Error "Unexpected version output: $v"
+            exit 1
+          }
+          Write-Output $v
+
+      - name: Uninstall
+        shell: pwsh
+        run: choco uninstall opencode -y
+
+      - name: Verify uninstall
+        shell: pwsh
+        run: |
+          if (Get-Command opencode -ErrorAction SilentlyContinue) {
+            Write-Error "opencode still found after uninstall"
+            exit 1
+          }
+          Write-Output "opencode successfully uninstalled"

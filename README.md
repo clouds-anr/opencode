@@ -55,13 +55,16 @@ full install, upgrade, and uninstall instructions per platform.
 |----------|---------|------------------------|
 | macOS | `brew install anomalyco/tap/opencode` | npm global, direct script |
 | Linux | `brew install anomalyco/tap/opencode` | AUR, npm global, direct script |
-| Windows | `winget install anomalyco.opencode` | Chocolatey, npm global |
+| Windows | `choco install opencode` | Winget, npm global |
 
 ```bash
 # macOS / Linux — Homebrew (primary, always up to date)
 brew install anomalyco/tap/opencode
 
-# Windows — Winget (primary)
+# Windows — Chocolatey (primary)
+choco install opencode
+
+# Windows — Winget (supported)
 winget install anomalyco.opencode
 
 # Any platform — npm global
