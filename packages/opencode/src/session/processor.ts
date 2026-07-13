@@ -446,6 +446,7 @@ const layer = Layer.effect(
                   json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
                   html: "html", css: "css", scss: "scss", sql: "sql",
                 }
+                // ANRCODE_CHANGE {"issue":100,"branch":"copilot/fixedit-tool-otel-tracking","date":"2026-07-13"}
                 const inp = toolCall.part.state.input
                 const tool = toolCall.part.tool
                 const ext = ((inp.filePath || "") as string).split(".").pop()?.toLowerCase() || ""
