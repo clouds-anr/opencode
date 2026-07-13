@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // Prompt composer and its state machine for direct interactive mode.
 //
 // createPromptState() wires keymap command layers, history navigation, and
@@ -234,7 +235,7 @@ export function RunPromptBody(props: {
 
           props.onContentChange()
         })
-        .catch(() => {})
+        .catch((err) => { console.debug("ignored", err) })
     }, 0)
   }
 

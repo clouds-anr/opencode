@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import { Server } from "@/server/server"
 import { InstanceRuntime } from "@/project/instance-runtime"
 import { Rpc } from "@/util/rpc"
@@ -106,7 +107,7 @@ export const rpc = {
   },
   async checkUpgrade(input: { directory: string }) {
     await InstanceRuntime.load({ directory: input.directory })
-    await upgrade().catch(() => {})
+    await upgrade().catch((err) => { console.debug("ignored", err) })
   },
   async reload() {
     await AppRuntime.runPromise(
@@ -132,7 +133,7 @@ export const rpc = {
   async shutdown() {
     console.log("worker shutting down")
     // Flush any pending OTEL metrics before shutting down
-    await shutdownOTEL().catch(() => {})
+    await shutdownOTEL().catch((err) => { console.debug("ignored", err) })
     await InstanceRuntime.disposeAllInstances()
     if (server) await server.stop(true)
     process.off("unhandledRejection", onUnhandledRejection)

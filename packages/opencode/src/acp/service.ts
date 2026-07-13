@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import {
   type AgentSideConnection,
   type AuthenticateRequest,
@@ -653,7 +654,7 @@ function makeUsageService(sdk: OpencodeClient) {
             cost: { amount: UsageService.totalSessionCost(messages), currency: "USD" },
           },
         })
-        .catch(() => {}),
+        .catch((err) => { console.debug("ignored", err) }),
     )
   })
 
@@ -670,7 +671,7 @@ function replayMessages(subscription: ACPEvent.Subscription | undefined, message
   if (!subscription) return Effect.void
   return Effect.promise(async () => {
     for (const message of messages) {
-      await subscription.replayMessage(message).catch(() => {})
+      await subscription.replayMessage(message).catch((err) => { console.debug("ignored", err) })
     }
   })
 }

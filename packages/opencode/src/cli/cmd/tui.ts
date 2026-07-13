@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import { cmd } from "@/cli/cmd/cmd"
 import { quotaInfo } from "@/index"
 import { onRefresh as onANRCredentialRefresh } from "@/auth/anr-refresh"
@@ -212,14 +213,14 @@ export const TuiThreadCommand = cmd({
       const worker = new Worker(file, { env: process.env as Record<string, string> })
       const client = Rpc.client<typeof rpc>(worker)
       const reload = () => {
-        client.call("reload", undefined).catch(() => {})
+        client.call("reload", undefined).catch((err) => { console.debug("ignored", err) })
       }
       process.on("SIGUSR2", reload)
 
       // Propagate credential refreshes to the worker in ANR mode
       if (process.env.OPENCODE_FLAVOR === "anr") {
         onANRCredentialRefresh((creds) => {
-          client.call("updateCredentials", creds).catch(() => {})
+          client.call("updateCredentials", creds).catch((err) => { console.debug("ignored", err) })
         })
       }
 
@@ -228,7 +229,7 @@ export const TuiThreadCommand = cmd({
         if (stopped) return
         stopped = true
         process.off("SIGUSR2", reload)
-        await withTimeout(client.call("shutdown", undefined), 5000).catch(() => {})
+        await withTimeout(client.call("shutdown", undefined), 5000).catch((err) => { console.debug("ignored", err) })
         worker.terminate()
       }
 
@@ -268,7 +269,7 @@ export const TuiThreadCommand = cmd({
       }
 
       setTimeout(() => {
-        client.call("checkUpgrade", { directory: cwd }).catch(() => {})
+        client.call("checkUpgrade", { directory: cwd }).catch((err) => { console.debug("ignored", err) })
       }, 1000).unref?.()
 
       try {
