@@ -5,6 +5,7 @@
 
 import { CognitoIdentityClient, GetIdCommand, GetCredentialsForIdentityCommand } from "@aws-sdk/client-cognito-identity"
 import type { ANRConfig } from "../config/types"
+// ANRCODE_CHANGE {"issue":351,"branch":"copilot/consolidate-bun-aws-sdk-workaround","date":"2026-07-13"}
 import { anrClientConfig } from "../util/aws-client-config"
 
 export interface AWSCredentials {

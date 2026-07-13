@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":351,"branch":"copilot/consolidate-bun-aws-sdk-workaround","date":"2026-07-13"}
 /**
  * Bun resolves some AWS SDK CJS modules differently across platforms, causing
  * loadConfig() to appear as a Symbol instead of a function for options like

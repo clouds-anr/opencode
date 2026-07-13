@@ -7,6 +7,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb"
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb"
 import type { ANRConfig } from "../config/types"
 import type { TelemetryContext } from "../integrations/otel"
+// ANRCODE_CHANGE {"issue":351,"branch":"copilot/consolidate-bun-aws-sdk-workaround","date":"2026-07-13"}
 import { anrClientConfig } from "../util/aws-client-config"
 import { randomUUID } from "crypto"
 
