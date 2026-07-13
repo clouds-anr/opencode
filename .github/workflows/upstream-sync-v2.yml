@@ -13,10 +13,9 @@
 #     pass: full-workspace typecheck AND full-workspace tests. Any failure, any
 #     leftover conflict marker, or any ANR-critical escalation labels it
 #     `needs-manual-review` instead.
-#   * Manual and nightly runs cannot clobber each other:
-#       - `concurrency` serializes runs (no two at once).
-#       - a pre-flight guard SKIPS the run if an open sync PR is already in flight,
-#         so an in-review PR (manual or nightly) is never force-pushed over.
+#   * `concurrency` serializes runs (no two at once). Every run refreshes the
+#     sync branch and updates the existing PR in place (idempotent gh pr edit),
+#     so an in-flight PR is kept current with the latest upstream state.
 #   * `dry_run` (manual only) resolves+validates+reports without pushing.
 name: upstream-sync-v2
 
@@ -37,7 +36,7 @@ permissions:
 
 # Shared group across manual + scheduled runs so they never execute together.
 # cancel-in-progress:false => a second run queues behind the first instead of
-# cancelling it, and the in-flight-PR guard below stops it from overwriting.
+# cancelling it, so runs never execute together.
 concurrency:
   group: upstream-sync
   cancel-in-progress: false
@@ -66,23 +65,6 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      # Guard: if a sync PR is already open (a manual or earlier nightly run left
-      # one for review), skip entirely so we don't force-push over it. The branch
-      # frees up once that PR is merged or closed.
-      - name: Skip if a sync PR is already in flight
-        id: guard
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base "$TARGET_BRANCH" \
-            --state open --json number --jq '.[0].number' || true)"
-          if [ -n "$existing" ] && [ "$DRY_RUN" != "true" ]; then
-            echo "Open sync PR #$existing already in flight — skipping to avoid overwriting it."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -102,7 +84,6 @@ jobs:
 
       - name: Run incremental sync
         id: sync
-        if: steps.guard.outputs.skip != 'true'
         run: |
           # setup-bun runs `bun install`, which regenerates bun.lock and dirties the
           # tracked tree. Discard that so the script's preflight sees a clean tree;
@@ -117,7 +98,7 @@ jobs:
           SYNC_GITHUB_OUTPUT="$GITHUB_OUTPUT" bash .github/scripts/sync-upstream.sh $args
 
       - name: Open / update the sync PR
-        if: ${{ steps.guard.outputs.skip != 'true' && env.DRY_RUN != 'true' && steps.sync.outputs.result == 'ok' }}
+        if: ${{ env.DRY_RUN != 'true' && steps.sync.outputs.result == 'ok' }}
         env:
           # Use the committer's App token (can create PRs); the default GITHUB_TOKEN
           # may be blocked from creating PRs by org policy. Falls back to GITHUB_TOKEN.
