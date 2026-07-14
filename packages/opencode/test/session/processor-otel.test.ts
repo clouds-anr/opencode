@@ -70,7 +70,7 @@ const EXT_MAP: Record<string, string> = {
  * Extracted here so we can test it against real OTEL functions and verify it fires correctly.
  */
 function executeTrackingBlock(toolPart: { tool: string; state: { status: string; input: Record<string, any> } }) {
-  const inp = toolPart.state.status === "running" ? toolPart.state.input : {} as Record<string, any>
+  const inp = toolPart.state.input
   const tool = toolPart.tool
   const ext = ((inp.filePath || "") as string).split(".").pop()?.toLowerCase() || ""
   const lang = EXT_MAP[ext] || ext || "unknown"
@@ -138,7 +138,7 @@ describe("processor OTEL tracking: edit tool", () => {
     expect(result.added).toBe(2)
   })
 
-  test("does NOT fire tracking for edit tool with status=pending (the bug)", () => {
+  test("fires tracking for edit tool with status=pending when input is present", () => {
     const result = executeTrackingBlock({
       tool: "edit",
       state: {
@@ -150,11 +150,11 @@ describe("processor OTEL tracking: edit tool", () => {
         },
       },
     })
-    // With status=pending, inp becomes {} so conditions fail
-    expect(result.tracked).toBe(false)
+    // Input is always read regardless of status — pending state with populated input does track
+    expect(result.tracked).toBe(true)
   })
 
-  test("does NOT fire tracking for edit tool with status=completed (post-completeToolCall read)", () => {
+  test("fires tracking for edit tool with status=completed (fix: input read regardless of status)", () => {
     const result = executeTrackingBlock({
       tool: "edit",
       state: {
@@ -166,8 +166,9 @@ describe("processor OTEL tracking: edit tool", () => {
         },
       },
     })
-    // With status=completed, inp becomes {} so conditions fail — THIS IS THE BUG
-    expect(result.tracked).toBe(false)
+    // Input is always read regardless of status — completed state now correctly tracks
+    expect(result.tracked).toBe(true)
+    expect(result.tool).toBe("edit")
   })
 
   test("correctly detects language from file extension", () => {
@@ -243,10 +244,8 @@ describe("processor OTEL tracking: write tool", () => {
     expect(result.lines).toBe(4)
   })
 
-  test("fires tracking for write tool with status=completed (write stores input in completed state)", () => {
-    // This test documents that write ALSO fails with status=completed
-    // Both edit and write have the same bug — but write may work in practice
-    // because its state is "running" at the time the tracking block executes
+  test("fires tracking for write tool with status=completed (fix: input read regardless of status)", () => {
+    // With the fix, write tool also correctly tracks when status=completed
     const result = executeTrackingBlock({
       tool: "write",
       state: {
@@ -257,7 +256,8 @@ describe("processor OTEL tracking: write tool", () => {
         },
       },
     })
-    expect(result.tracked).toBe(false)
+    expect(result.tracked).toBe(true)
+    expect(result.tool).toBe("write")
   })
 })
 
