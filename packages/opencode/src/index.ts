@@ -636,7 +636,10 @@ export async function main(argv?: string[]) {
       }
 
       // Clear stale env vars before loading new config
+      // Save externally-provided OPENCODE_ANR_ID_TOKEN so token auth mode works
+      const externalIdToken = process.env.OPENCODE_ANR_ID_TOKEN
       clearStaleEnv()
+      if (externalIdToken) process.env.OPENCODE_ANR_ID_TOKEN = externalIdToken
 
       await initializeANR(envFile)
     }
