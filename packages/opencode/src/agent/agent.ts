@@ -328,11 +328,14 @@ const layer = Layer.effect(
         const defaultInfo = Effect.fnUntraced(function* () {
           const c = yield* config.get()
           if (c.default_agent) {
-            const agent = agents[c.default_agent]
-            if (!agent) throw new Error(`default agent "${c.default_agent}" not found`)
-            if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
-            if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
-            return agent
+            const normalized = c.default_agent.toLowerCase()
+            const agent = agents[normalized] ?? agents[c.default_agent]
+            if (agent) {
+              if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
+              if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
+              return agent
+            }
+            // Agent not found or disabled - fall through to find any visible agent
           }
           const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
           if (!visible) throw new Error("no primary visible agent found")
