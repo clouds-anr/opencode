@@ -15,6 +15,7 @@ import { location } from "../fixture/location"
 import { tmpdir } from "../fixture/tmpdir"
 import { testEffect } from "../lib/effect"
 
+// ANR-SKIP: flaky in GitHub CI due to timeout/race condition
 const describeWatcher = Watcher.hasNativeBinding() && !process.env.CI ? describe : describe.skip
 
 type WatcherEvent = { file: string; event: "add" | "change" | "unlink" }
@@ -168,16 +169,12 @@ describeWatcher("Watcher", () => {
     ),
   )
 
-  it.live("watches non-git roots", () =>
+  it.live("skips non-git roots", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
         const fs = yield* FSUtil.Service
         const file = path.join(directory, "plain.txt")
-        yield* ready(directory)
-        expect(yield* nextUpdate((event) => event.file === file, fs.writeFileString(file, "plain"))).toEqual({
-          file,
-          event: "add",
-        })
+        yield* noUpdate((event) => event.file === file, fs.writeFileString(file, "plain"))
       }),
     ),
   )
@@ -190,7 +187,10 @@ describeWatcher("Watcher", () => {
         Effect.promise(() => tmpdir()),
         (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
       )
-      yield* ready(tmp.path).pipe(provide(tmp.path), Effect.scoped)
+      yield* ready(tmp.path).pipe(
+        provide(tmp.path, { type: "git", store: AbsolutePath.make(path.join(tmp.path, ".git")) }),
+        Effect.scoped,
+      )
       const file = path.join(tmp.path, "after-dispose.txt")
       yield* noUpdate((event) => event.file === file, fs.writeFileString(file, "gone")).pipe(
         Effect.provideService(EventV2.Service, events),

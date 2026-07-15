@@ -9,13 +9,17 @@ import { errorMessage } from "@/util/error"
 import { ChildProcess } from "effect/unstable/process"
 import { AppProcess } from "@opencode-ai/core/process"
 import path from "path"
+import fs from "fs"
 import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import semver from "semver"
 import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { NpmConfig } from "@opencode-ai/core/npm-config"
 import { InstallationEvent } from "@opencode-ai/schema/installation-event"
 
-export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
+// Repository used for release checks
+const RELEASE_REPO = "clouds-anr/opencode"
+
+export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "standalone" | "unknown"
 
 export type ReleaseType = "patch" | "minor" | "major"
 
@@ -203,6 +207,21 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           }
         }
 
+        // If no package manager claims this binary, check whether the current user
+        // can write to the executable.  A writable binary is a standalone / manually
+        // downloaded release that can be upgraded in-place via GitHub releases.
+        // A non-writable binary is likely managed by a system-level package manager
+        // we don't recognise, so leave it untouched.
+        const canWrite = yield* Effect.sync(() => {
+          try {
+            fs.accessSync(process.execPath, fs.constants.W_OK)
+            return true
+          } catch {
+            return false
+          }
+        })
+        if (canWrite) return "standalone" as Method
+
         return "unknown" as Method
       }),
       latest: Effect.fn("Installation.latest")(function* (installMethod?: Method) {
@@ -255,7 +274,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         }
 
         const response = yield* httpOk.execute(
-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+          HttpClientRequest.get(`https://api.github.com/repos/${RELEASE_REPO}/releases/latest`).pipe(
             HttpClientRequest.acceptJson,
           ),
         )
@@ -305,6 +324,14 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           case "scoop":
             upgradeResult = yield* run(["scoop", "install", `opencode@${target}`])
             break
+          case "standalone":
+            return yield* new UpgradeFailedError({
+              stderr: [
+                "Automatic upgrade is not supported for standalone binaries.",
+                `Please download the latest release manually from:`,
+                `  https://github.com/${RELEASE_REPO}/releases`,
+              ].join("\n"),
+            })
           default:
             return yield* new UpgradeFailedError({ stderr: `Unknown installation method: ${m}` })
         }

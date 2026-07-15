@@ -446,7 +446,8 @@ const layer = Layer.effect(
                   json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
                   html: "html", css: "css", scss: "scss", sql: "sql",
                 }
-                const inp = toolCall.part.state.status === "running" ? toolCall.part.state.input : {} as Record<string, any>
+                // ANRCODE_CHANGE {"issue":100,"branch":"copilot/fixedit-tool-otel-tracking","date":"2026-07-13"}
+                const inp = toolCall.part.state.input
                 const tool = toolCall.part.tool
                 const ext = ((inp.filePath || "") as string).split(".").pop()?.toLowerCase() || ""
                 const lang = EXT_MAP[ext] || ext || "unknown"
