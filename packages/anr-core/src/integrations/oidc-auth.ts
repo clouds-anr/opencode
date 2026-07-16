@@ -3,6 +3,9 @@
  * Follows the Go app's OIDC flow with PKCE for Cognito authentication
  */
 
+// ANRCODE_CHANGE {"issue":363,"branch":"anr/363/port-retry-logic","date":"2026-07-16"}
+// Added automatic port retry logic (8400-8404) to handle concurrent opencode instances
+
 import { createServer, IncomingMessage, ServerResponse } from "http"
 import { randomBytes } from "crypto"
 import { createHash } from "crypto"
@@ -66,8 +69,50 @@ async function openBrowser(url: string): Promise<void> {
   console.log(`\nPlease open this URL manually:\n${url}`)
 }
 
+/**
+ * Find an available port for the OAuth callback server.
+ * Tries ports in sequence starting from startPort.
+ * 
+ * @param startPort - The first port to try (default: 8400)
+ * @param maxAttempts - Maximum number of ports to try (default: 5)
+ * @returns The first available port
+ * @throws Error if no port is available after maxAttempts
+ */
+async function findAvailablePort(startPort: number, maxAttempts: number): Promise<number> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const port = startPort + attempt
+    try {
+      // Test if port is available by attempting to bind to it
+      const testServer = createServer()
+      await new Promise<void>((resolve, reject) => {
+        testServer.once('error', reject)
+        testServer.listen(port, '127.0.0.1', () => {
+          testServer.close(() => resolve())
+        })
+      })
+      console.error(`[anr-auth] OAuth callback server will use port ${port}`)
+      return port
+    } catch (error: any) {
+      if (error.code === 'EADDRINUSE' && attempt < maxAttempts - 1) {
+        console.error(`[anr-auth] Port ${port} in use, trying port ${port + 1}...`)
+        continue
+      }
+      if (attempt === maxAttempts - 1) {
+        throw new Error(
+          `Failed to start OAuth callback server after ${maxAttempts} attempts.\n` +
+          `Ports tried: ${startPort}-${startPort + maxAttempts - 1}\n` +
+          `Please close other opencode instances or set OPENCODE_ANR_REDIRECT_PORT environment variable.`
+        )
+      }
+      // Re-throw non-EADDRINUSE errors immediately
+      throw error
+    }
+  }
+  throw new Error('Unexpected error in findAvailablePort')
+}
+
 export async function authenticateWithOIDC(config: ANRConfig): Promise<OIDCTokens> {
-  const redirectPort = 8400
+  const redirectPort = await findAvailablePort(8400, 5)
   const redirectURI = `http://localhost:${redirectPort}/callback`
 
   // Generate PKCE parameters
