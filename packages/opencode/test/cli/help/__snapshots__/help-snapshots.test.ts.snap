@@ -202,7 +202,7 @@ Options:
       --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
   -m, --method      installation method to use
-                          [string] [choices: "curl", "npm", "pnpm", "bun", "brew", "choco", "scoop"]"
+            [string] [choices: "curl", "npm", "pnpm", "bun", "brew", "choco", "scoop", "standalone"]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode uninstall --help 1`] = `
