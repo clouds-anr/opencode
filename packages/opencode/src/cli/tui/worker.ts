@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":354,"branch":"anr/354/fix-worker-log-spam","date":"2026-07-15"}
 import { Server } from "@/server/server"
 import { InstanceRuntime } from "@/project/instance-runtime"
 import { Rpc } from "@/util/rpc"
@@ -127,10 +128,8 @@ export const rpc = {
     process.env.AWS_SECRET_ACCESS_KEY = input.secretAccessKey
     process.env.AWS_SESSION_TOKEN = input.sessionToken
     if (input.idToken) process.env.OPENCODE_ANR_ID_TOKEN = input.idToken
-    console.log("worker credentials updated")
   },
   async shutdown() {
-    console.log("worker shutting down")
     // Flush any pending OTEL metrics before shutting down
     await shutdownOTEL().catch(() => {})
     await InstanceRuntime.disposeAllInstances()
