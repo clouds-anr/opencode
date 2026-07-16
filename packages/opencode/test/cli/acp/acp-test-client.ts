@@ -44,7 +44,9 @@ export function createAcpClient(acp: AcpHandle): AcpClient {
       yield* acp.send(message)
 
       while (true) {
-        const received = yield* acp.receive.pipe(Effect.timeout(Duration.seconds(15)))
+        // Windows CI startup (bun transpile + server init) can exceed 15s under load.
+        const timeoutSecs = process.env.GITHUB_ACTIONS === "true" || process.env.CI === "true" ? 45 : 15
+        const received = yield* acp.receive.pipe(Effect.timeout(Duration.seconds(timeoutSecs)))
         if (isJsonRpcResponse<T>(received) && received.id === id) return received
       }
     })
