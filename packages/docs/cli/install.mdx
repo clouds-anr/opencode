@@ -1,0 +1,244 @@
+---
+title: "CLI Installation"
+description: "Install, upgrade, and uninstall the OpenCode CLI on macOS, Linux, and Windows"
+---
+
+## Primary install paths
+
+GitHub Releases are the source of truth for all OpenCode CLI distribution artifacts.
+Every supported install channel is updated automatically from the same release pipeline
+that produced the binaries for a given tag.
+
+### macOS
+
+<Tabs>
+  <Tab title="Homebrew (primary)">
+    ```bash
+    brew install anomalyco/tap/opencode
+    ```
+
+    Upgrade:
+    ```bash
+    brew upgrade opencode
+    ```
+
+    Uninstall:
+    ```bash
+    brew uninstall opencode
+    brew untap anomalyco/tap   # optional, removes the tap
+    ```
+  </Tab>
+  <Tab title="npm global">
+    ```bash
+    npm install -g opencode-ai@latest
+    ```
+
+    Upgrade:
+    ```bash
+    npm install -g opencode-ai@latest
+    ```
+
+    Uninstall:
+    ```bash
+    npm uninstall -g opencode-ai
+    ```
+  </Tab>
+  <Tab title="Direct installer">
+    ```bash
+    curl -fsSL https://opencode.ai/install | bash
+    ```
+
+    Upgrade: re-run the same command.
+
+    Uninstall:
+    ```bash
+    rm -f "$(which opencode)"
+    ```
+    Then remove the `PATH` entry the installer added to your shell profile.
+  </Tab>
+</Tabs>
+
+### Linux
+
+<Tabs>
+  <Tab title="Homebrew (primary)">
+    ```bash
+    brew install anomalyco/tap/opencode
+    ```
+
+    Upgrade:
+    ```bash
+    brew upgrade opencode
+    ```
+
+    Uninstall:
+    ```bash
+    brew uninstall opencode
+    ```
+  </Tab>
+  <Tab title="Arch Linux (AUR)">
+    ```bash
+    # Latest binary from GitHub Releases
+    paru -S opencode-bin
+
+    # Stable from official repo
+    sudo pacman -S opencode
+    ```
+
+    Upgrade:
+    ```bash
+    paru -Syu opencode-bin
+    ```
+
+    Uninstall:
+    ```bash
+    paru -R opencode-bin
+    ```
+  </Tab>
+  <Tab title="npm global">
+    ```bash
+    npm install -g opencode-ai@latest
+    ```
+
+    Upgrade:
+    ```bash
+    npm install -g opencode-ai@latest
+    ```
+
+    Uninstall:
+    ```bash
+    npm uninstall -g opencode-ai
+    ```
+  </Tab>
+  <Tab title="Direct installer">
+    ```bash
+    curl -fsSL https://opencode.ai/install | bash
+    ```
+
+    Upgrade: re-run the same command.
+
+    Uninstall:
+    ```bash
+    rm -f "$(which opencode)"
+    ```
+  </Tab>
+</Tabs>
+
+### Windows
+
+<Tabs>
+  <Tab title="Chocolatey (primary)">
+    ```powershell
+    choco install opencode
+    ```
+
+    Upgrade:
+    ```powershell
+    choco upgrade opencode
+    ```
+
+    Uninstall:
+    ```powershell
+    choco uninstall opencode
+    ```
+  </Tab>
+  <Tab title="Winget (supported)">
+    ```powershell
+    winget install anomalyco.opencode
+    ```
+
+    Upgrade:
+    ```powershell
+    winget upgrade anomalyco.opencode
+    ```
+
+    Uninstall:
+    ```powershell
+    winget uninstall anomalyco.opencode
+    ```
+  </Tab>
+  <Tab title="Scoop (community)">
+    <Warning>
+      Scoop support is community-maintained and not release-gated by the OpenCode team.
+      It may lag behind official releases.
+    </Warning>
+
+    ```powershell
+    scoop install opencode
+    ```
+
+    Upgrade:
+    ```powershell
+    scoop update opencode
+    ```
+
+    Uninstall:
+    ```powershell
+    scoop uninstall opencode
+    ```
+  </Tab>
+  <Tab title="npm global">
+    ```powershell
+    npm install -g opencode-ai@latest
+    ```
+
+    Upgrade:
+    ```powershell
+    npm install -g opencode-ai@latest
+    ```
+
+    Uninstall:
+    ```powershell
+    npm uninstall -g opencode-ai
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Installation directory (script installer)
+
+When using the direct installer script, the binary is placed in the first writable
+location from this priority list:
+
+| Priority | Path |
+|----------|------|
+| 1 | `$OPENCODE_INSTALL_DIR` — explicit override |
+| 2 | `$XDG_BIN_DIR` — XDG Base Directory |
+| 3 | `$HOME/bin` — if it already exists |
+| 4 | `$HOME/.opencode/bin` — fallback |
+
+```bash
+# examples
+OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
+XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+```
+
+---
+
+## Install a specific version
+
+```bash
+# direct installer
+curl -fsSL https://opencode.ai/install | bash -s -- --version 0.3.14
+
+# npm
+npm install -g opencode-ai@0.3.14
+
+# Homebrew (pin)
+brew install anomalyco/tap/opencode@0.3.14
+```
+
+---
+
+## Verifying the installation
+
+```bash
+opencode --version
+```
+
+---
+
+## Related guides
+
+- [Downgrade and cleanup runbook](/cli/downgrade) — step-by-step rollback instructions for all platforms
