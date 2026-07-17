@@ -26,6 +26,12 @@ export default defineConfig({
     allowedHosts: true,
     port: 3000,
   },
+  // ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"}
+  preview: {
+    host: "0.0.0.0",
+    allowedHosts: true,
+    port: 3000,
+  },
   build: {
     target: "esnext",
     sourcemap: true,

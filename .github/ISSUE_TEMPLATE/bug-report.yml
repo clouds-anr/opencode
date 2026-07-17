@@ -77,9 +77,9 @@ body:
       label: Regression?
       description: Did this work in a previous version?
       options:
-        - Yes
-        - No
-        - Not sure
+        - 'Yes'
+        - 'No'
+        - 'Not sure'
     validations:
       required: true
 

@@ -7,26 +7,34 @@
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
 
+<!-- ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"} -->
 ## ANR Change Markers
 
-Any file modified or created outside of `packages/anr-core/` **must** have an `ANRCODE_CHANGE` marker near the top of the file (after any license header or frontmatter). Use a `//` comment for TypeScript/JavaScript files and an HTML comment for Markdown files.
+Any file modified or created outside of `packages/anr-core/` **must** carry an `ANRCODE_CHANGE` marker. Use a `//` comment for TypeScript/JavaScript files and an HTML comment for Markdown files.
+
+Markers exist to help resolve merge conflicts during upstream syncs: they flag which hunks are ANR-owned so a conflicting change can be identified at a glance. **Placement follows from that purpose.**
+
+Placement:
+- For a **newly created** file, put a single marker near the top (after any license header or frontmatter).
+- For a **modified** file, put the marker **immediately adjacent to the changed region(s)** — directly above the edited block, not at the top of the file. This keeps the marker inside or beside the hunk a merge would conflict on.
+- A file with several unrelated edits may carry several markers, one per changed region.
 
 Format:
 ```
 // ANRCODE_CHANGE {"issue":<pr-or-issue-number>,"branch":"<current-branch>","date":"YYYY-MM-DD"}
 ```
 
-Example:
+Example (marker beside a modified block):
 ```ts
 // ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
-import { Effect } from "effect"
+const command = process.env.CI ? previewCommand : devCommand
 ```
 
 Rules:
 - Apply to every **modified** or **created** source file in the commit, without exception.
 - Use the originating PR or issue number as `issue`.
 - Use today's date in `YYYY-MM-DD` format.
-- A file may carry multiple markers if touched across multiple issues; append rather than replace.
+- A file may carry multiple markers if touched across multiple issues or in multiple regions; append rather than replace.
 - `packages/anr-core/` is ANR-owned source; changes there do not require the marker.
 
 ## Branch Names
