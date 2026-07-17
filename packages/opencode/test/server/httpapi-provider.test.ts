@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
 import { describe, expect } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -313,7 +314,7 @@ describe("provider HttpApi", () => {
     30000,
   )
 
-  it.instance(
+  itPlugin.instance(
     "returns declared provider auth validation errors",
     Effect.gen(function* () {
       const directory = (yield* TestInstance).directory
