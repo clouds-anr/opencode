@@ -43,6 +43,27 @@ jobs:
     uses: ./.github/workflows/test.yml
     secrets: inherit
 
+  # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+  # secrets context is not available in job-level `if` conditions, so surface
+  # secret presence as boolean outputs here and gate downstream jobs on them.
+  secrets-check:
+    if: github.repository == 'clouds-anr/opencode'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      has_azure: ${{ steps.check.outputs.has_azure }}
+      has_winget: ${{ steps.check.outputs.has_winget }}
+      has_chocolatey: ${{ steps.check.outputs.has_chocolatey }}
+    steps:
+      - id: check
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          echo "has_azure=$([ -n \"$AZURE_CLIENT_ID\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_winget=$([ -n \"$WINGET_TOKEN\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_chocolatey=$([ -n \"$CHOCOLATEY_API_KEY\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   version:
     needs: gate
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -133,8 +154,10 @@ jobs:
     needs:
       - build-cli
       - version
+      - secrets-check
     runs-on: blacksmith-4vcpu-windows-2025
-    if: github.repository == 'clouds-anr/opencode' && env.AZURE_CLIENT_ID != ''
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.secrets-check.outputs.has_azure == 'true'
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -491,7 +514,9 @@ jobs:
       - sign-cli-windows
       - version
       - artifact-scan
-    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && env.WINGET_TOKEN != ''
+      - secrets-check
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && needs.secrets-check.outputs.has_winget == 'true'
     runs-on: blacksmith-4vcpu-windows-2025
     env:
       VERSION: ${{ needs.version.outputs.version }}
@@ -539,7 +564,9 @@ jobs:
       - sign-cli-windows
       - version
       - artifact-scan
-    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && env.CHOCOLATEY_API_KEY != ''
+      - secrets-check
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && needs.secrets-check.outputs.has_chocolatey == 'true'
     runs-on: blacksmith-4vcpu-windows-2025
     env:
       VERSION: ${{ needs.version.outputs.version }}

@@ -9,9 +9,7 @@ const serverPort = process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"
 // and fast. The dev server compiles modules on demand, and that latency is unbounded
 // under host contention (e.g. release jobs running alongside builds), which surfaces as
 // teardown timeouts. Locally, keep the dev server for fast iteration.
-const command = process.env.CI
-  ? `bun run build && bun run serve -- --host 0.0.0.0 --port ${port}`
-  : `bun run dev -- --host 0.0.0.0 --port ${port}`
+const command = `bun run dev -- --host 0.0.0.0 --port ${port}`
 const reuse = !process.env.CI
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? 5 : 0)) || undefined
 export default defineConfig({
@@ -19,6 +17,11 @@ export default defineConfig({
   testIgnore: process.env.OPENCODE_PERFORMANCE === "1" ? "performance/**/*.test.ts" : "performance/**",
   outputDir: "./e2e/test-results",
   // ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"}
+  // Warm the dev server's module graph once before the suite so per-navigation, on-demand
+  // Vite compilation is not paid inside any individual test's timeout budget. This is the
+  // main source of teardown timeouts under host contention (identical code passes on an
+  // idle PR runner but times out on a busy release runner).
+  globalSetup: "./e2e/global-setup.ts",
   // Overall per-test budget with headroom so a slow-but-healthy load never starves
   // fixture teardown (Playwright bills context teardown against this timeout).
   timeout: 90_000,
@@ -34,9 +37,7 @@ export default defineConfig({
     command,
     url: baseURL,
     reuseExistingServer: reuse,
-    // ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"}
-    // A cold CI build (build + preview startup) can take a while; give it room.
-    timeout: process.env.CI ? 240_000 : 120_000,
+    timeout: 120_000,
     env: {
       VITE_OPENCODE_SERVER_HOST: serverHost,
       VITE_OPENCODE_SERVER_PORT: serverPort,
