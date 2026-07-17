@@ -7,6 +7,12 @@ import { readJson, writeJsonAtomic } from "../util/persistence"
 import { useTuiPaths } from "./runtime"
 import path from "path"
 
+function isNoEntryError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  if (!("code" in error)) return false
+  return error.code === "ENOENT"
+}
+
 export const { use: useKV, provider: KVProvider } = createSimpleContext({
   name: "KV",
   init: () => {
@@ -24,6 +30,7 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
         setStore(x)
       })
       .catch((error) => {
+        if (isNoEntryError(error)) return
         console.error("Failed to read KV state", { error })
       })
       .finally(() => {

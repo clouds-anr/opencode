@@ -320,7 +320,7 @@ const layer = Layer.effect(
             values(),
             sortBy(
               [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"],
-              [(x) => x.name, "asc"],
+              [(x) => x.name.toLowerCase(), "asc"],
             ),
           )
         })

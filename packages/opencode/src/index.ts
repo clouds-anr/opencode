@@ -58,8 +58,9 @@ import {
 } from "@opencode-ai/anr-core"
 import { randomUUID } from "crypto"
 import { platform, arch, release } from "os"
-import { existsSync, readdirSync, readFileSync } from "fs"
+import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "fs"
 import path from "path"
+import { Global } from "@opencode-ai/core/global"
 
 // ANR mode state (when running with OPENCODE_FLAVOR=anr)
 let anrContext: {
@@ -68,6 +69,14 @@ let anrContext: {
   sessionStartTime: number
   commandName: string
 } | null = null
+
+let diagnosticSession:
+  | {
+      directory: string
+      mode: "interactive" | "non-interactive"
+      startedAt: string
+    }
+  | undefined
 
 // Export quota info for TUI access
 export let quotaInfo: {
@@ -100,6 +109,77 @@ function detectTerminalType(): string {
   if (process.env.WSL_DISTRO_NAME) return `wsl-${process.env.WSL_DISTRO_NAME}`
   if (process.env.WSL_INTEROP) return "wsl"
   return process.env.TERM || "unknown"
+}
+
+function startDiagnosticSession(args: string[]) {
+  const startedAt = new Date().toISOString()
+  const stamp = startedAt.replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-")
+  const mode = process.stdin.isTTY && process.stdout.isTTY ? "interactive" : "non-interactive"
+  const root = process.env.OPENCODE_DIAGNOSTIC_ROOT?.trim()
+  const directory = root
+    ? path.join(root, `${stamp}-${process.pid}`)
+    : path.join(process.cwd(), `opencode-diagnostics-${stamp}-${process.pid}`)
+  const opencodeLog = path.join(Global.Path.log, "opencode.log")
+  const diagnosticLog = path.join(directory, "opencode.log")
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(diagnosticLog, "", { flag: "a" })
+
+  writeFileSync(
+    path.join(directory, "session.json"),
+    JSON.stringify(
+      {
+        startedAt,
+        pid: process.pid,
+        mode,
+        cwd: process.cwd(),
+        argv: args,
+        paths: {
+          diagnostics: directory,
+          appLog: opencodeLog,
+          diagnosticLog,
+          data: Global.Path.data,
+          config: Global.Path.config,
+          cache: Global.Path.cache,
+          state: Global.Path.state,
+        },
+      },
+      null,
+      2,
+    ),
+  )
+
+  process.env.OPENCODE_DIAGNOSTIC_DIR = directory
+  process.env.OPENCODE_LOG_FILE = diagnosticLog
+
+  process.stderr.write("\n")
+  process.stderr.write("OpenCode diagnostic mode enabled\n")
+  process.stderr.write(`mode: ${mode}\n`)
+  process.stderr.write(`diagnostics directory: ${directory}\n`)
+  process.stderr.write(`diagnostic log file: ${diagnosticLog}\n`)
+  process.stderr.write(`application log file: ${opencodeLog}\n\n`)
+
+  return {
+    directory,
+    mode,
+    startedAt,
+  } as const
+}
+
+function finishDiagnosticSession(session: NonNullable<typeof diagnosticSession>, exitCode: number) {
+  writeFileSync(
+    path.join(session.directory, "exit.json"),
+    JSON.stringify(
+      {
+        startedAt: session.startedAt,
+        endedAt: new Date().toISOString(),
+        pid: process.pid,
+        mode: session.mode,
+        exitCode,
+      },
+      null,
+      2,
+    ),
+  )
 }
 
 /**
@@ -626,6 +706,10 @@ export async function main(argv?: string[]) {
       describe: "run without external plugins",
       type: "boolean",
     })
+    .option("diagnostic", {
+      describe: "enable diagnostic capture and print local diagnostics paths",
+      type: "boolean",
+    })
     .option("env-file", {
       describe: "path to ANR .env config file",
       type: "string",
@@ -635,6 +719,11 @@ export async function main(argv?: string[]) {
       if (opts.logLevel) process.env.OPENCODE_LOG_LEVEL = opts.logLevel
       if (opts.pure) {
         process.env.OPENCODE_PURE = "1"
+      }
+      if (opts.diagnostic) {
+        process.env.OPENCODE_DIAGNOSTIC = "1"
+        if (!process.env.OPENCODE_LOG_LEVEL) process.env.OPENCODE_LOG_LEVEL = "DEBUG"
+        if (!diagnosticSession) diagnosticSession = startDiagnosticSession(args)
       }
 
       Heap.start()
@@ -733,6 +822,11 @@ export async function main(argv?: string[]) {
     }
     process.exitCode = 1
   } finally {
+    if (diagnosticSession) {
+      const exitCode = typeof process.exitCode === "number" ? process.exitCode : 0
+      finishDiagnosticSession(diagnosticSession, exitCode)
+    }
+
     // Flush telemetry metrics with a timeout to prevent hanging
     try {
       const shutdownPromise = shutdownOTEL()

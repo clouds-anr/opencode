@@ -5,6 +5,12 @@ declare const OPENCODE_CLI_NAME: string | undefined
 
 export const Commands = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME : "opencode", {
   description: "OpenCode 2.0 preview command line interface",
+  params: {
+    diagnostic: Flag.boolean("diagnostic").pipe(
+      Flag.withDescription("enable diagnostic capture and print local diagnostics paths"),
+      Flag.withDefault(false),
+    ),
+  },
   commands: [
     Spec.make("api", {
       description: "Make a request to the running server",

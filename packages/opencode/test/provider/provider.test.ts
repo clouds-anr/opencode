@@ -1530,7 +1530,7 @@ test("models.dev reasoning options replace generated variants and unsupported op
   expect(models.override.variants).toEqual({
     high: { thinkingConfig: { includeThoughts: true, thinkingLevel: "high" } },
   })
-  expect(models["gemini-3-pro-fast"].variants).toEqual(models.override.variants)
+  expect(models["override-fast"].variants).toEqual(models.override.variants)
 })
 
 test("public provider info omits invalid models", () => {

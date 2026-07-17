@@ -1,22 +1,50 @@
 import { expect, test } from "bun:test"
+import { LayerNodePlatform } from "@opencode-ai/core/effect/app-node-platform"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { Deferred, Effect, Latch, Option, Schema, Stream } from "effect"
+import { SessionRunnerModel } from "@opencode-ai/core/session/runner/model"
+import { LLMClient, LLMEvent, Model } from "@opencode-ai/llm"
+import * as OpenAIChat from "@opencode-ai/llm/protocols/openai-chat"
+import { Deferred, Effect, Latch, Layer, Option, Schema, Stream } from "effect"
 import type { OpenCodeEvent } from "../src"
 
 test("embedded client uses the real router and handlers", async () => {
   const directory = await mkdtemp(join(tmpdir(), "opencode-embedded-"))
   const database = Flag.OPENCODE_DB
   Flag.OPENCODE_DB = join(directory, "opencode.sqlite")
-  const { AbsolutePath, Agent, Location, Model, OpenCode, Prompt, Provider, Session, Tool } = await import("../src")
+  const { AbsolutePath, Agent, Location, Model: SessionModel, OpenCode, Prompt, Provider, Session, Tool } =
+    await import("../src")
   const sessionID = Session.ID.make(`ses_embedded_${crypto.randomUUID()}`)
-  const model = Model.Ref.make({ id: Model.ID.make("embedded"), providerID: Provider.ID.make("test") })
+  const model = SessionModel.Ref.make({ id: SessionModel.ID.make("embedded"), providerID: Provider.ID.make("test") })
+  const runnerModel = Model.make({ id: "embedded", provider: "test", route: OpenAIChat.route })
+  const models = SessionRunnerModel.layerWith(() => Effect.succeed(runnerModel))
+  const llm = Layer.succeed(
+    LLMClient.Service,
+    LLMClient.Service.of({
+      prepare: () => Effect.die("unused"),
+      stream: () =>
+        Stream.fromIterable([
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.textStart({ id: "embedded-response" }),
+          LLMEvent.textDelta({ id: "embedded-response", text: "ok" }),
+          LLMEvent.textEnd({ id: "embedded-response" }),
+          LLMEvent.stepFinish({ index: 0, reason: "stop" }),
+          LLMEvent.finish({ reason: "stop" }),
+        ]),
+      generate: () => Effect.die("unused"),
+    }),
+  )
 
   try {
     const program = Effect.gen(function* () {
-      const opencode = yield* OpenCode.create()
+      const opencode = yield* OpenCode.create({
+        replacements: [
+          [SessionRunnerModel.node, models],
+          [LayerNodePlatform.llmClient, llm],
+        ],
+      })
       yield* opencode.tools.register({
         embedded_tool: Tool.make({
           description: "Embedded test tool",
@@ -102,7 +130,7 @@ test("embedded client uses the real router and handlers", async () => {
     Flag.OPENCODE_DB = database
     await rm(directory, { recursive: true, force: true })
   }
-})
+}, 15_000)
 
 // NOTE(anr-sync): skipped pending upstream fix. These three tests fail with
 // SQLITE_CANTOPEN because the embedded SQLite DB layer is memoized process-wide;

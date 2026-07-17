@@ -1,10 +1,33 @@
 # AGENTS.md
+<!-- ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"} -->
 
 - To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+
+## ANR Change Markers
+
+Any file modified or created outside of `packages/anr-core/` **must** have an `ANRCODE_CHANGE` marker near the top of the file (after any license header or frontmatter). Use a `//` comment for TypeScript/JavaScript files and an HTML comment for Markdown files.
+
+Format:
+```
+// ANRCODE_CHANGE {"issue":<pr-or-issue-number>,"branch":"<current-branch>","date":"YYYY-MM-DD"}
+```
+
+Example:
+```ts
+// ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
+import { Effect } from "effect"
+```
+
+Rules:
+- Apply to every **modified** or **created** source file in the commit, without exception.
+- Use the originating PR or issue number as `issue`.
+- Use today's date in `YYYY-MM-DD` format.
+- A file may carry multiple markers if touched across multiple issues; append rather than replace.
+- `packages/anr-core/` is ANR-owned source; changes there do not require the marker.
 
 ## Branch Names
 

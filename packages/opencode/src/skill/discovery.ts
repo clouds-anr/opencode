@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient, path } from "@opencode-ai/core/effect/app-node-platform"
 import { NodePath } from "@effect/platform-node"
@@ -107,12 +108,21 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
                   Effect.gen(function* () {
                     const cached = yield* fs.exists(root).pipe(Effect.orDie)
                     if (cached) yield* fs.rename(root, backup)
+                    // fs.rename for non-empty directories fails on Windows with EPERM;
+                    // fall back to a recursive copy-then-delete so the swap still lands.
                     yield* fs.rename(staging, root).pipe(
-                      Effect.catch((error) =>
-                        Effect.gen(function* () {
-                          if (cached) yield* fs.rename(backup, root).pipe(Effect.ignore)
-                          return yield* Effect.fail(error)
-                        }),
+                      Effect.catch(() =>
+                        fs.copy(staging, root, { overwrite: true }).pipe(
+                          Effect.flatMap(() =>
+                            fs.remove(staging, { recursive: true, force: true }).pipe(Effect.ignore),
+                          ),
+                          Effect.catch((error) =>
+                            Effect.gen(function* () {
+                              if (cached) yield* fs.rename(backup, root).pipe(Effect.ignore)
+                              return yield* Effect.fail(error)
+                            }),
+                          ),
+                        ),
                       ),
                     )
                     if (cached) yield* fs.remove(backup, { recursive: true, force: true }).pipe(Effect.ignore)

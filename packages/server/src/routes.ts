@@ -36,6 +36,10 @@ const applicationServices = LayerNode.group([
   LocationServiceMap.node,
 ])
 
+type RouteOptions = {
+  replacements?: LayerNode.Replacements
+}
+
 export function createRoutes(password?: string) {
   return makeRoutes(
     password
@@ -44,12 +48,19 @@ export function createRoutes(password?: string) {
   )
 }
 
-export function createEmbeddedRoutes() {
-  return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }))
+export function createEmbeddedRoutes(options?: RouteOptions) {
+  return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }), options)
 }
 
-function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>) {
-  const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
+function makeRoutes<AuthError, AuthServices>(
+  auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>,
+  options?: RouteOptions,
+) {
+  const replacements: LayerNode.Replacements = [
+    [SessionExecution.node, SessionExecutionLocal.node],
+    ...(options?.replacements ?? []),
+  ]
+  const serviceLayer = AppNodeBuilder.build(applicationServices, replacements)
 
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
     Layer.provide(handlers),

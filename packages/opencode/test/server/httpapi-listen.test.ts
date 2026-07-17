@@ -16,9 +16,9 @@ const original = {
   envUsername: process.env.OPENCODE_SERVER_USERNAME,
 }
 const auth = { username: "opencode", password: "listen-secret" }
-// ANR-SKIP: flaky in GitHub CI — these PTY websocket integration tests spawn real
-// child processes and intermittently time out under parallel CI load. Skipped on
-// CI only; they still run locally to guard Server.listen PTY upgrade behavior.
+// ANR-SKIP: flaky in GitHub CI — these integration tests spawn real child processes
+// and intermittently time out under parallel CI load on Windows. Skipped on CI and
+// Windows only; they still run locally to guard Server.listen behavior.
 const testPty = process.platform === "win32" || process.env.CI ? test.skip : test
 
 afterEach(async () => {
@@ -305,7 +305,7 @@ describe("HttpApi Server.listen", () => {
     expect(output).not.toContain("Sent HTTP response")
   })
 
-  test("plugin client requests reuse the listening server instance", async () => {
+  testPty("plugin client requests reuse the listening server instance", async () => {
     await using tmp = await tmpdir({
       init: async (directory) => {
         const plugin = path.join(directory, "plugin.ts")

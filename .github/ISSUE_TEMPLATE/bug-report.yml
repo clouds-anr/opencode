@@ -1,12 +1,56 @@
 name: Bug report
 description: Report an issue that should be fixed (avoid pasting giant AI generated summaries or your issue may be closed/ignored)
 body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before You Submit
+
+        Share concrete repro details so maintainers can route and debug quickly.
+
+  - type: input
+    id: package-area
+    attributes:
+      label: Affected Package or Area
+      description: Name the package(s) and area(s), and include paths when possible (for example, packages/tui/src/...).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the user impact of this bug?
+      options:
+        - Critical (blocking, data loss, or crash)
+        - High (major workflow broken)
+        - Medium (workaround exists)
+        - Low (minor issue)
+    validations:
+      required: true
+
   - type: textarea
     id: description
     attributes:
       label: Description
       description: Describe the bug you encountered
       placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Expected Result
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-result
+    attributes:
+      label: Actual Result
+      description: What happened instead?
     validations:
       required: true
 
@@ -23,8 +67,35 @@ body:
     attributes:
       label: OpenCode version
       description: What version of OpenCode are you using?
+      placeholder: e.g., 0.9.0
     validations:
-      required: false
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Regression?
+      description: Did this work in a previous version?
+      options:
+        - Yes
+        - No
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      description: How often does this occur?
+      options:
+        - Always
+        - Often
+        - Sometimes
+        - Rarely
+        - Once
+    validations:
+      required: true
 
   - type: textarea
     id: reproduce
@@ -35,6 +106,24 @@ body:
         1.
         2.
         3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, Errors, or Traceback
+      description: Paste relevant logs, stack traces, or error output (remove secrets).
+      placeholder: Paste relevant terminal/app logs or error messages here.
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Known Workaround
+      description: Is there any temporary workaround?
+      placeholder: Describe any workaround you found, or write "None".
     validations:
       required: false
 
@@ -54,7 +143,7 @@ body:
       description: what OS are you using?
       placeholder: e.g., macOS 26.0.1, Ubuntu 22.04, Windows 11
     validations:
-      required: false
+      required: true
 
   - type: input
     id: terminal
@@ -63,4 +152,4 @@ body:
       description: what terminal are you using?
       placeholder: e.g., iTerm2, Ghostty, Alacritty, Windows Terminal
     validations:
-      required: false
+      required: true
