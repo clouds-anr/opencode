@@ -35,6 +35,7 @@ permission:
 
 <!-- ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"} -->
 <!-- ANRCODE_CHANGE {"issue":357,"branch":"anr/357/enhance-anr-agent-definitions","date":"2026-07-14"} -->
+<!-- ANRCODE_CHANGE {"issue":369,"branch":"sync-anr-dev-team-def","date":"2026-07-20"} -->
 
 <system-reminder>
 ## PRIMARY DIRECTIVE
