@@ -29,14 +29,55 @@ permissions:
   packages: write
 
 jobs:
+  # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
   # ---------------------------------------------------------------------------
-  # 0. Gate: the full test suite must pass for THIS SHA before we version/build.
-  #    Reuses test.yml so a release exercises the same suite PRs do. A red gate
-  #    blocks the draft release + CLI build.
+  # 0. Gate: wait for the test workflow that was triggered by the same push on
+  #    this SHA to complete rather than spawning a duplicate run. Both release
+  #    and test fire on every dev push at the same instant; re-running the full
+  #    suite doubles Windows runner demand and causes timing-sensitive tests to
+  #    flake under contention. Polling the existing run is cheaper and correct.
   # ---------------------------------------------------------------------------
   gate:
-    uses: ./.github/workflows/test.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Wait for test workflow on this SHA
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "Waiting for 'test' workflow run on SHA $SHA"
+          # Give the push-triggered test run a moment to be registered before polling.
+          # On workflow_dispatch there may be no concurrent run; the loop will still
+          # find any completed run on this SHA (e.g. a prior push run or manual run).
+          sleep 15
+          for i in $(seq 1 90); do
+            RUN=$(gh run list \
+              --repo "$REPO" \
+              --commit "$SHA" \
+              --workflow test.yml \
+              --limit 1 \
+              --json databaseId,status,conclusion \
+              --jq 'map(select(.status == "completed")) | .[0] // empty')
+            if [ -z "$RUN" ]; then
+              echo "Attempt $i: no completed test run found yet, retrying in 20s..."
+              sleep 20
+              continue
+            fi
+            CONCLUSION=$(echo "$RUN" | jq -r '.conclusion')
+            echo "Test workflow completed with: $CONCLUSION"
+            if [ "$CONCLUSION" = "success" ]; then
+              echo "Test suite passed — proceeding with release."
+              exit 0
+            else
+              echo "Test suite did not pass — blocking release."
+              exit 1
+            fi
+          done
+          echo "Timed out after 30 minutes waiting for test workflow."
+          exit 1
 
   # ---------------------------------------------------------------------------
   # 1. Version: derive from git tags, create a draft GitHub release
