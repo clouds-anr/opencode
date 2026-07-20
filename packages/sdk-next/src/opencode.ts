@@ -7,7 +7,11 @@ import { createEmbeddedRoutes } from "@opencode-ai/server/routes"
 import { Context, Effect, Layer, Scope } from "effect"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 
-export const create = Effect.fn("OpenCode.create")(function* () {
+type CreateOptions = {
+  replacements?: LayerNode.Replacements
+}
+
+export const create = Effect.fn("OpenCode.create")(function* (options: CreateOptions = {}) {
   const scope = yield* Scope.Scope
   const memoMap = yield* Layer.makeMemoMap
   const context = yield* Layer.buildWithMemoMap(
@@ -20,7 +24,7 @@ export const create = Effect.fn("OpenCode.create")(function* () {
   const web = yield* Effect.acquireRelease(
     Effect.sync(() =>
       HttpRouter.toWebHandler(
-        createEmbeddedRoutes().pipe(
+        createEmbeddedRoutes({ replacements: options.replacements }).pipe(
           HttpRouter.provideRequest(Layer.succeed(PermissionSaved.Service, permissions)),
           Layer.provide(HttpServer.layerServices),
         ),

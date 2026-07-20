@@ -5,7 +5,9 @@ on:
   push:
     branches:
       - ci
-      - dev
+      # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+      # dev removed: release.yml owns the dev push pipeline for this fork.
+      # publish fires on workflow_dispatch only for manual upstream-style releases.
       - beta
       - fix/npm-native-binary-install
       - snapshot-*
@@ -42,6 +44,27 @@ jobs:
     if: github.repository == 'clouds-anr/opencode'
     uses: ./.github/workflows/test.yml
     secrets: inherit
+
+  # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+  # secrets context is not available in job-level `if` conditions, so surface
+  # secret presence as boolean outputs here and gate downstream jobs on them.
+  secrets-check:
+    if: github.repository == 'clouds-anr/opencode'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      has_azure: ${{ steps.check.outputs.has_azure }}
+      has_winget: ${{ steps.check.outputs.has_winget }}
+      has_chocolatey: ${{ steps.check.outputs.has_chocolatey }}
+    steps:
+      - id: check
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          echo "has_azure=$([ -n \"$AZURE_CLIENT_ID\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_winget=$([ -n \"$WINGET_TOKEN\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_chocolatey=$([ -n \"$CHOCOLATEY_API_KEY\" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   version:
     needs: gate
@@ -133,8 +156,10 @@ jobs:
     needs:
       - build-cli
       - version
+      - secrets-check
     runs-on: blacksmith-4vcpu-windows-2025
-    if: github.repository == 'clouds-anr/opencode' && env.AZURE_CLIENT_ID != ''
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.secrets-check.outputs.has_azure == 'true'
     env:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -416,12 +441,179 @@ jobs:
           name: latest-yml-${{ matrix.settings.target }}
           path: packages/desktop/dist/latest*.yml
 
+  # ---------------------------------------------------------------------------
+  # artifact-scan: scan all CLI artifacts for .env files, .aws credential files,
+  # and known AWS key/token patterns before any artifact is published.
+  # A match fails the release immediately.
+  # ---------------------------------------------------------------------------
+  artifact-scan:
+    needs:
+      - build-cli
+      - sign-cli-windows
+      - version
+    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: opencode-cli
+          path: /tmp/scan/cli
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: opencode-cli-windows
+          path: /tmp/scan/cli-windows
+
+      - name: Scan artifacts for secrets and credential files
+        run: |
+          set -euo pipefail
+          SCAN_ROOT=/tmp/scan
+          FAIL=0
+
+          echo "=== Checking for .env files ==="
+          if find "$SCAN_ROOT" -name ".env" -o -name ".env.*" | grep -q .; then
+            echo "ERROR: .env file(s) found in release artifacts"
+            find "$SCAN_ROOT" -name ".env" -o -name ".env.*"
+            FAIL=1
+          fi
+
+          echo "=== Checking for .aws credential/config files ==="
+          if find "$SCAN_ROOT" -name "credentials" -path "*/.aws/*" \
+               -o -name "config" -path "*/.aws/*" | grep -q .; then
+            echo "ERROR: .aws credential/config file(s) found in release artifacts"
+            find "$SCAN_ROOT" \( -name "credentials" -path "*/.aws/*" \
+                                 -o -name "config" -path "*/.aws/*" \)
+            FAIL=1
+          fi
+
+          echo "=== Scanning for AWS key/token patterns in text files ==="
+          # AWS access key IDs start with AKIA, ABIA, ACCA, ASIA, or AROA
+          if grep -rE --include="*.json" --include="*.yaml" --include="*.yml" \
+               --include="*.toml" --include="*.env" --include="*.sh" \
+               --include="*.ts" --include="*.js" \
+               '(AKIA|ABIA|ACCA|ASIA|AROA)[A-Z0-9]{16}|aws_secret_access_key\s*=\s*\S+' \
+               "$SCAN_ROOT" 2>/dev/null; then
+            echo "ERROR: Potential AWS credential pattern detected in release artifacts"
+            FAIL=1
+          fi
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo ""
+            echo "Release blocked: credential or secret files detected in build artifacts."
+            echo "Remove all .env files, .aws configs, and hardcoded credentials before re-running."
+            exit 1
+          fi
+
+          echo "Artifact scan passed — no secrets or credential files detected."
+
+  # ---------------------------------------------------------------------------
+  # publish-winget: submit an updated manifest PR to microsoft/winget-pkgs
+  # after the Windows CLI binary is available as a release asset.
+  # Requires: WINGET_TOKEN secret (PAT with PR rights on microsoft/winget-pkgs)
+  # ---------------------------------------------------------------------------
+  publish-winget:
+    needs:
+      - sign-cli-windows
+      - version
+      - artifact-scan
+      - secrets-check
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && needs.secrets-check.outputs.has_winget == 'true'
+    runs-on: blacksmith-4vcpu-windows-2025
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: opencode-cli-signed-windows
+          path: dist
+
+      - name: Compute SHA256 checksums
+        shell: pwsh
+        run: |
+          $x64Hash   = (Get-FileHash "dist\opencode-windows-x64\bin\opencode.exe"   -Algorithm SHA256).Hash.ToLower()
+          $arm64Hash = (Get-FileHash "dist\opencode-windows-arm64\bin\opencode.exe" -Algorithm SHA256).Hash.ToLower()
+          echo "X64_SHA=$x64Hash"    >> $env:GITHUB_OUTPUT
+          echo "ARM64_SHA=$arm64Hash" >> $env:GITHUB_OUTPUT
+        id: checksums
+
+      - name: Install wingetcreate
+        shell: pwsh
+        run: |
+          $url = "https://aka.ms/wingetcreate/latest"
+          Invoke-WebRequest -Uri $url -OutFile wingetcreate.exe
+
+      - name: Submit Winget manifest
+        shell: pwsh
+        run: |
+          $ver     = "${{ env.VERSION }}"
+          $x64Url  = "https://github.com/${{ github.repository }}/releases/download/v${ver}/opencode-windows-x64.zip"
+          $arm64Url= "https://github.com/${{ github.repository }}/releases/download/v${ver}/opencode-windows-arm64.zip"
+          # wingetcreate update submits a PR to microsoft/winget-pkgs
+          .\wingetcreate.exe update anomalyco.opencode `
+            --version "$ver" `
+            --urls "$x64Url|x64" "$arm64Url|arm64" `
+            --token "$env:WINGET_TOKEN" `
+            --submit
+
+  # ---------------------------------------------------------------------------
+  # publish-chocolatey: build and push the Chocolatey package for Windows.
+  # Requires: CHOCOLATEY_API_KEY secret
+  # ---------------------------------------------------------------------------
+  publish-chocolatey:
+    needs:
+      - sign-cli-windows
+      - version
+      - artifact-scan
+      - secrets-check
+    # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+    if: github.repository == 'clouds-anr/opencode' && needs.version.outputs.release && needs.secrets-check.outputs.has_chocolatey == 'true'
+    runs-on: blacksmith-4vcpu-windows-2025
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: opencode-cli-signed-windows
+          path: dist
+
+      - name: Compute SHA256 checksum (x64)
+        id: checksums
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash "dist\opencode-windows-x64\bin\opencode.exe" -Algorithm SHA256).Hash.ToLower()
+          echo "X64_SHA=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Create Chocolatey package
+        shell: pwsh
+        run: |
+          $ver    = "${{ env.VERSION }}"
+          $x64Url = "https://github.com/${{ github.repository }}/releases/download/v${ver}/opencode-windows-x64.zip"
+          .\script\chocolatey\build.ps1 `
+            -Version $ver `
+            -X64Url  $x64Url `
+            -X64Sha256 "${{ steps.checksums.outputs.X64_SHA }}"
+
+      - name: Push to Chocolatey
+        shell: pwsh
+        run: |
+          choco push dist\chocolatey\opencode.${{ env.VERSION }}.nupkg `
+            --source https://push.chocolatey.org `
+            --api-key "$env:CHOCOLATEY_API_KEY"
+
   publish:
     needs:
       - version
       - build-cli
       - sign-cli-windows
       - build-electron
+      - artifact-scan
+      - publish-winget
+      - publish-chocolatey
     if: always() && !failure() && !cancelled() && needs.version.outputs.release
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:

@@ -388,6 +388,12 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
   const promptRef = usePromptRef()
   const quota = useQuota()
   const pluginRuntime = usePluginRuntime()
+
+  // ANR: Configure audio device preference for attention notifications
+  if (tuiConfig.attention.audio_device) {
+    TuiAudio.setAudioDevice(tuiConfig.attention.audio_device)
+  }
+
   const attention = createTuiAttention({ renderer, config: tuiConfig, kv })
   const clipboard = useClipboard()
 

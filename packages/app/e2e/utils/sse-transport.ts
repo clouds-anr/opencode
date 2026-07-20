@@ -158,6 +158,21 @@ export async function installSseTransport<T>(
       }
 
       ;(window as BrowserTransport).__testSseTransport = { command }
+      // ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"}
+      // Close any still-open streams when the page goes away so a lingering
+      // event-stream response never keeps browserContext.close() hanging during teardown.
+      window.addEventListener("pagehide", () => {
+        for (const connection of connections) {
+          if (connection.endedAt !== undefined) continue
+          connection.endedAt = performance.now()
+          connection.endedBy = "close"
+          try {
+            connection.controller.close()
+          } catch {
+            // controller may already be closed/errored; ignore during teardown
+          }
+        }
+      })
       const fetch = (input: RequestInfo | URL, init?: RequestInit) => {
         const request = new Request(input, init)
         const url = new URL(request.url)

@@ -23,9 +23,16 @@ const cli = yargs(hideBin(process.argv))
     describe: "run without external plugins",
     type: "boolean",
   })
+  .option("diagnostic", {
+    describe: "enable diagnostic capture",
+    type: "boolean",
+  })
   .middleware((opts) => {
     if (opts.printLogs) process.env.OPENCODE_PRINT_LOGS = "1"
     if (opts.logLevel) process.env.OPENCODE_LOG_LEVEL = opts.logLevel
+    if (opts.diagnostic) {
+      process.env.OPENCODE_DIAGNOSTIC = "1"
+    }
   })
   .command(TuiThreadCommand)
   .parse()

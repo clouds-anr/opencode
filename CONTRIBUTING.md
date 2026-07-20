@@ -327,3 +327,27 @@ Issues may be flagged for:
 - Missing meaningful content
 
 If you believe your issue was incorrectly flagged, let a maintainer know.
+
+## Release Gate
+
+All CLI releases are gated on:
+
+1. **Full test suite** — `test.yml` must be green for the target SHA before any artifact is produced.
+2. **Artifact security scan** — the release pipeline scans every packaged CLI binary for `.env` files,
+   `.aws` credential/config files, and known AWS key/token patterns. Publication is blocked if anything
+   is found. Add allowlist exceptions only after a security review.
+3. **Channel update success** — Homebrew, Winget, Chocolatey, AUR, and npm must all update
+   successfully from the release artifacts. A channel update failure blocks the final publish step.
+
+## AWS Credential Policy
+
+- **No `.env` distribution.** Do not include `.env` files or any credential-bearing env files in
+  release assets, installers, package manifests, or binaries.
+- **No bundled secrets.** AWS keys, tokens, or role ARNs must never be embedded in build artifacts.
+- **CI authentication.** GitHub Actions workflows use OIDC role assumption (`id-token: write`) where
+  possible. When OIDC is not feasible, use encrypted repository or organization secrets only.
+  Never commit plaintext credentials.
+- **Local developer guidance.** Optional AWS-related environment variables can be set in your shell
+  profile (`~/.zshrc`, `~/.bashrc`, etc.) on a per-user basis. Never copy or share a shared `.env`
+  file to configure AWS access.
+

@@ -51,6 +51,7 @@ test("resolves host-neutral defaults", () => {
     volume: 0.4,
     sound_pack: "opencode.default",
     sounds: {},
+    audio_device: "default",
   })
   expect(config.leader_timeout).toBe(LeaderTimeoutDefault)
   expect(config.mouse).toBe(true)
