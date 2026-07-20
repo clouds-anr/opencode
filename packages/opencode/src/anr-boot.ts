@@ -165,7 +165,7 @@ export async function initializeANR(envFile?: string): Promise<void> {
 
   let tokens: { idToken: string; accessToken: string; refreshToken?: string; expiresIn?: number }
   let awsCredentials: Awaited<ReturnType<typeof exchangeTokenForAWSCredentials>>
-  let credentialSource: "interactive" | "static" | "exchange" = "interactive"
+  let credentialSource: "interactive" | "static" | "exchange" | "refresh-exchange" = "interactive"
 
   if (authMode === "token") {
     let result
@@ -230,7 +230,9 @@ export async function initializeANR(envFile?: string): Promise<void> {
             console.error("🔄 [token mode] Silently refreshed OIDC tokens")
           } catch {
             console.error("❌ [token mode] Refresh token exchange failed. No interactive fallback in CI.")
-            console.error("   Credentials will remain in use until STS expiry. Re-run with a fresh OPENCODE_ANR_ID_TOKEN.")
+            console.error(
+              "   Credentials will remain in use until STS expiry. Check that OPENCODE_ANR_REFRESH_TOKEN is still valid.",
+            )
             return {
               accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
               secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",

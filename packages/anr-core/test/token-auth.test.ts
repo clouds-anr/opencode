@@ -103,6 +103,25 @@ describe("validateTokenModeEnv", () => {
     }
   })
 
+  test("succeeds with only a refresh token (refresh-first bootstrap)", () => {
+    const result = validateTokenModeEnv({ OPENCODE_ANR_REFRESH_TOKEN: "refresh-only" })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.idToken).toBe("")
+      expect(result.refreshToken).toBe("refresh-only")
+      expect(result.staticAWSCreds).toBeUndefined()
+    }
+  })
+
+  test("failure message mentions the refresh token option", () => {
+    const result = validateTokenModeEnv({})
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain("OPENCODE_ANR_REFRESH_TOKEN")
+      expect(result.message).toContain("recommended for CI")
+    }
+  })
+
   test("succeeds when ID token is provided", () => {
     const result = validateTokenModeEnv({ OPENCODE_ANR_ID_TOKEN: FAKE_JWT })
     expect(result.ok).toBe(true)
@@ -251,5 +270,73 @@ describe("resolveTokenModeCredentials — exchange path", () => {
     }
     expect(msg).not.toContain(badToken)
     expect(msg).toContain("Token length:")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// resolveTokenModeCredentials — refresh-first bootstrap (fetch stubbed)
+// ---------------------------------------------------------------------------
+
+describe("resolveTokenModeCredentials — refresh-first bootstrap", () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  test("exchanges the refresh token for a fresh ID token before federation", async () => {
+    const calls: { url: string; body: string }[] = []
+    globalThis.fetch = (async (url: URL | RequestInfo, init?: RequestInit) => {
+      calls.push({ url: String(url), body: String(init?.body ?? "") })
+      return new Response(
+        JSON.stringify({ id_token: FAKE_JWT, access_token: "access", refresh_token: "rotated", expires_in: 3600 }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )
+    }) as unknown as typeof fetch
+
+    // The refresh call succeeds (stubbed); the subsequent federation exchange
+    // hits a fake identity pool and fails — proving refresh-first ordering.
+    let msg = ""
+    try {
+      await resolveTokenModeCredentials(minimalConfig(), { OPENCODE_ANR_REFRESH_TOKEN: "long-lived-refresh" })
+    } catch (e) {
+      msg = (e as Error).message
+    }
+    expect(msg).toContain("federation exchange failed")
+    expect(calls[0].url).toBe("https://auth.govcloud.example.com/oauth2/token")
+    expect(calls[0].body).toContain("grant_type=refresh_token")
+    expect(calls[0].body).toContain("long-lived-refresh")
+  })
+
+  test("fails with actionable error when refresh fails and no ID token fallback exists", async () => {
+    globalThis.fetch = (async () => new Response("invalid_grant", { status: 400 })) as unknown as typeof fetch
+
+    let msg = ""
+    try {
+      await resolveTokenModeCredentials(minimalConfig(), { OPENCODE_ANR_REFRESH_TOKEN: "expired-refresh" })
+    } catch (e) {
+      msg = (e as Error).message
+    }
+    expect(msg).toContain("refresh token exchange failed")
+    expect(msg).toContain("OPENCODE_ANR_REFRESH_TOKEN")
+    expect(msg).not.toContain("expired-refresh")
+  })
+
+  test("falls back to the provided ID token when refresh fails", async () => {
+    globalThis.fetch = (async () => new Response("invalid_grant", { status: 400 })) as unknown as typeof fetch
+
+    // Refresh fails, so resolution falls back to exchanging FAKE_JWT directly —
+    // which then fails at the (fake) identity pool with the federation error.
+    let msg = ""
+    try {
+      await resolveTokenModeCredentials(minimalConfig(), {
+        OPENCODE_ANR_ID_TOKEN: FAKE_JWT,
+        OPENCODE_ANR_REFRESH_TOKEN: "expired-refresh",
+      })
+    } catch (e) {
+      msg = (e as Error).message
+    }
+    expect(msg).toContain("federation exchange failed")
+    expect(msg).not.toContain("refresh token exchange failed")
   })
 })

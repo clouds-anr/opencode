@@ -323,7 +323,8 @@ jobs:
 
   # ANR token-auth smoke: verifies non-interactive token mode can initialize
   # and reach ANR backend services without opening a browser.
-  # Requires GitHub Actions secrets: ANR_ID_TOKEN (and optionally ANR_REFRESH_TOKEN).
+  # Requires a GitHub Actions secret: ANR_REFRESH_TOKEN (long-lived, recommended)
+  # or ANR_ID_TOKEN (short-lived, needs manual rotation).
   # Skips cleanly when secrets are absent so the job never blocks merges on
   # unprovisioned repos. Promote to required gate once secrets are stable.
   anr-token-auth-smoke:
@@ -355,11 +356,12 @@ jobs:
       - name: Check for required secrets
         id: secrets-check
         run: |
-          if [ -z "${{ secrets.ANR_ID_TOKEN }}" ]; then
+          if [ -z "${{ secrets.ANR_REFRESH_TOKEN }}" ] && [ -z "${{ secrets.ANR_ID_TOKEN }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::ANR_ID_TOKEN secret is not set — skipping token-auth smoke."
-            echo "To enable: add ANR_ID_TOKEN (Cognito ID token) as a repo/org secret."
-            echo "Optional: ANR_REFRESH_TOKEN, ANR_AWS_ACCESS_KEY_ID, ANR_AWS_SECRET_ACCESS_KEY, ANR_AWS_SESSION_TOKEN"
+            echo "::notice::Neither ANR_REFRESH_TOKEN nor ANR_ID_TOKEN secret is set — skipping token-auth smoke."
+            echo "To enable: add ANR_REFRESH_TOKEN (long-lived Cognito refresh token, recommended)"
+            echo "or ANR_ID_TOKEN (short-lived Cognito ID token) as a repo/org secret."
+            echo "Optional: ANR_AWS_ACCESS_KEY_ID, ANR_AWS_SECRET_ACCESS_KEY, ANR_AWS_SESSION_TOKEN"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -373,8 +375,10 @@ jobs:
         env:
           OPENCODE_FLAVOR: anr
           OPENCODE_ANR_AUTH_MODE: token
-          OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}
+          # Refresh token is preferred: it is long-lived and a fresh ID token is
+          # minted at startup (refresh-first bootstrap). ID token is a fallback.
           OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}
+          OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}
           # Optional: provide static AWS creds to bypass federation exchange
           AWS_ACCESS_KEY_ID: ${{ secrets.ANR_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.ANR_AWS_SECRET_ACCESS_KEY }}

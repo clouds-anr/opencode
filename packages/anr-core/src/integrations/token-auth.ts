@@ -8,8 +8,11 @@
  *
  * Environment contract:
  *   OPENCODE_ANR_AUTH_MODE        "interactive" (default) | "token"
- *   OPENCODE_ANR_ID_TOKEN         Required in token mode (unless AWS creds given directly)
- *   OPENCODE_ANR_REFRESH_TOKEN    Optional — enables scheduled token refresh in token mode
+ *   OPENCODE_ANR_REFRESH_TOKEN    Recommended for CI — long-lived Cognito refresh token;
+ *                                 exchanged for a fresh ID token at startup (refresh-first
+ *                                 bootstrap) and used for scheduled refresh thereafter
+ *   OPENCODE_ANR_ID_TOKEN         Required in token mode when neither a refresh token nor
+ *                                 static AWS creds are provided
  *   AWS_ACCESS_KEY_ID             Optional — if present with SECRET+TOKEN, skips federation
  *   AWS_SECRET_ACCESS_KEY         Optional — see above
  *   AWS_SESSION_TOKEN             Optional — see above
@@ -18,6 +21,7 @@
 
 import type { ANRConfig } from "../config/types"
 import { exchangeTokenForAWSCredentials, type AWSCredentials } from "./aws-federation"
+import { refreshOIDCTokens } from "./oidc-auth"
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -30,7 +34,7 @@ export interface TokenAuthResult {
   refreshToken: string | undefined
   awsCredentials: AWSCredentials
   /** How credentials were obtained — useful for logging/diagnostics. */
-  credentialSource: "static" | "exchange"
+  credentialSource: "static" | "exchange" | "refresh-exchange"
 }
 
 // ---------------------------------------------------------------------------
@@ -97,27 +101,28 @@ export function validateTokenModeEnv(
     }
   }
 
-  // No static creds — require ID token for federation exchange.
-  const missing: string[] = []
-  if (!env.OPENCODE_ANR_ID_TOKEN) missing.push("OPENCODE_ANR_ID_TOKEN")
-
-  if (missing.length > 0) {
+  // No static creds — require an ID token or a refresh token for federation exchange.
+  // A refresh token alone is sufficient: it is exchanged for a fresh ID token at
+  // startup (refresh-first bootstrap), which is the recommended CI configuration.
+  if (!env.OPENCODE_ANR_ID_TOKEN && !env.OPENCODE_ANR_REFRESH_TOKEN) {
     return {
       ok: false,
       message:
         `[ANR] Token auth mode is missing required environment variable(s):\n` +
-        missing.map((v) => `  - ${v} is not set`).join("\n") +
-        `\n\nTo fix:\n` +
-        `  • Set OPENCODE_ANR_ID_TOKEN to a valid Cognito ID token.\n` +
-        `  • Or provide AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN\n` +
-        `    to bypass federation entirely.\n` +
-        `  • OPENCODE_ANR_REFRESH_TOKEN is optional but enables token refresh in CI.`,
+        `  - OPENCODE_ANR_ID_TOKEN is not set\n` +
+        `  - OPENCODE_ANR_REFRESH_TOKEN is not set\n` +
+        `\nTo fix (one of):\n` +
+        `  • Set OPENCODE_ANR_REFRESH_TOKEN to a long-lived Cognito refresh token\n` +
+        `    (recommended for CI — a fresh ID token is minted automatically).\n` +
+        `  • Set OPENCODE_ANR_ID_TOKEN to a valid, unexpired Cognito ID token.\n` +
+        `  • Provide AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN\n` +
+        `    to bypass federation entirely.`,
     }
   }
 
   return {
     ok: true,
-    idToken: env.OPENCODE_ANR_ID_TOKEN!,
+    idToken: env.OPENCODE_ANR_ID_TOKEN || "",
     refreshToken: env.OPENCODE_ANR_REFRESH_TOKEN,
     staticAWSCreds: undefined,
   }
@@ -131,7 +136,11 @@ export function validateTokenModeEnv(
  * Resolve AWS credentials for token mode:
  *   1. If AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN are all
  *      set, return them directly (source: "static") — no federation call.
- *   2. Otherwise exchange OPENCODE_ANR_ID_TOKEN via Cognito Identity Pool
+ *   2. Else if OPENCODE_ANR_REFRESH_TOKEN is set, exchange it for a fresh ID
+ *      token first (refresh-first bootstrap), then federate that ID token
+ *      (source: "refresh-exchange"). Falls back to step 3 if the refresh fails
+ *      and an ID token is also available.
+ *   3. Otherwise exchange OPENCODE_ANR_ID_TOKEN via Cognito Identity Pool
  *      (source: "exchange").
  *
  * Throws a CI-friendly error on failure. Redacts secret values from messages.
@@ -164,6 +173,39 @@ export async function resolveTokenModeCredentials(
     }
   }
 
+  // Refresh-first bootstrap — a refresh token mints a fresh ID token without a
+  // browser, so CI stores one long-lived secret instead of rotating ID tokens.
+  if (validation.refreshToken) {
+    let refreshed
+    try {
+      refreshed = await refreshOIDCTokens(config, validation.refreshToken)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!validation.idToken) {
+        throw new Error(
+          `[ANR] Token auth: refresh token exchange failed and no OPENCODE_ANR_ID_TOKEN fallback is set.\n` +
+            `  ${msg}\n\n` +
+            `  Check that:\n` +
+            `    • OPENCODE_ANR_REFRESH_TOKEN is a valid, unexpired Cognito refresh token\n` +
+            `    • The refresh token was issued to the app client in your config (CLIENT_ID)\n` +
+            `    • Refresh token rotation is disabled on the Cognito app client —\n` +
+            `      rotation invalidates a statically stored secret after first use`,
+        )
+      }
+      console.error("⚠️  [ANR] Refresh-first bootstrap failed — falling back to OPENCODE_ANR_ID_TOKEN.")
+      console.error(`   ${msg}`)
+    }
+
+    if (refreshed) {
+      return {
+        idToken: refreshed.idToken,
+        refreshToken: refreshed.refreshToken ?? validation.refreshToken,
+        credentialSource: "refresh-exchange",
+        awsCredentials: await federateIdToken(refreshed.idToken, config),
+      }
+    }
+  }
+
   // Exchange path — use ID token to get AWS creds via Cognito Identity Pool.
   const idToken = validation.idToken
   if (!idToken) {
@@ -181,9 +223,21 @@ export async function resolveTokenModeCredentials(
     )
   }
 
-  let awsCredentials: AWSCredentials
+  return {
+    idToken,
+    refreshToken: validation.refreshToken,
+    credentialSource: "exchange",
+    awsCredentials: await federateIdToken(idToken, config),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function federateIdToken(idToken: string, config: ANRConfig): Promise<AWSCredentials> {
   try {
-    awsCredentials = await exchangeTokenForAWSCredentials(idToken, config)
+    return await exchangeTokenForAWSCredentials(idToken, config)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     throw new Error(
@@ -195,18 +249,7 @@ export async function resolveTokenModeCredentials(
         `    • The token's issuer matches the configured Cognito User Pool`,
     )
   }
-
-  return {
-    idToken,
-    refreshToken: validation.refreshToken,
-    credentialSource: "exchange",
-    awsCredentials,
-  }
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function resolveStaticAWSCreds(env: NodeJS.ProcessEnv): StaticAWSCreds | undefined {
   const { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, AWS_REGION } = env

@@ -2,31 +2,45 @@
 
 Non-interactive, browserless auth for CI/CD pipelines. Set `OPENCODE_ANR_AUTH_MODE=token` to skip the OIDC browser flow.
 
+**Recommended CI setup:** store a single long-lived Cognito **refresh token** in GitHub Actions secrets. At startup opencode exchanges it for a fresh ID token (refresh-first bootstrap), then federates that into AWS credentials — no manual token rotation, no browser.
+
 ## Environment Variable Contract
 
 | Variable | Required | Description |
 |---|---|---|
 | `OPENCODE_ANR_AUTH_MODE` | No (default: `interactive`) | `interactive` or `token` |
-| `OPENCODE_ANR_ID_TOKEN` | Yes in token mode\* | Cognito OIDC ID token (JWT) |
-| `OPENCODE_ANR_REFRESH_TOKEN` | No | Enables scheduled token refresh without browser |
+| `OPENCODE_ANR_REFRESH_TOKEN` | Recommended for CI\* | Long-lived Cognito refresh token; a fresh ID token is minted at startup and on schedule |
+| `OPENCODE_ANR_ID_TOKEN` | Only if no refresh token\* | Cognito OIDC ID token (JWT), short-lived (~1 h) |
 | `AWS_ACCESS_KEY_ID` | No | If set with SECRET+TOKEN, skips federation exchange |
 | `AWS_SECRET_ACCESS_KEY` | No | See above |
 | `AWS_SESSION_TOKEN` | No | See above |
 | `AWS_REGION` | No | Overrides config region when using static creds |
 | `OPENCODE_ANR_SKIP_AUTH` | No | **Config-validation only** — not for real auth |
 
-\* Not required if `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_SESSION_TOKEN` are all set.
+\* Token mode needs at least one of: `OPENCODE_ANR_REFRESH_TOKEN`, `OPENCODE_ANR_ID_TOKEN`, or the full static AWS credential triple.
 
 ## Credential Resolution
 
 Token mode resolves credentials in this order:
 
-1. **Static AWS creds** — if `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` are all set, use them directly. No Cognito Identity Pool call is made.
-2. **Federation exchange** — otherwise, exchange `OPENCODE_ANR_ID_TOKEN` via the Cognito Identity Pool configured in your `.env` file.
+1. **Static AWS creds** — if `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` are all set, use them directly. No Cognito call is made.
+2. **Refresh-first bootstrap** — if `OPENCODE_ANR_REFRESH_TOKEN` is set, exchange it at Cognito's token endpoint for a fresh ID token, then federate that via the Cognito Identity Pool. If the refresh fails and `OPENCODE_ANR_ID_TOKEN` is also set, fall back to step 3; otherwise fail fast.
+3. **Federation exchange** — exchange `OPENCODE_ANR_ID_TOKEN` via the Cognito Identity Pool configured in your `.env` file.
 
 ## Typical CI Usage
 
-### With federation exchange (Cognito token → AWS creds)
+### Recommended: long-lived refresh token (autonomous)
+
+```yaml
+- name: Run opencode
+  env:
+    OPENCODE_FLAVOR: anr
+    OPENCODE_ANR_AUTH_MODE: token
+    OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}
+  run: opencode agent list
+```
+
+### With a short-lived ID token (manual rotation)
 
 ```yaml
 - name: Run opencode
@@ -34,7 +48,6 @@ Token mode resolves credentials in this order:
     OPENCODE_FLAVOR: anr
     OPENCODE_ANR_AUTH_MODE: token
     OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}
-    OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}  # optional
   run: opencode agent list
 ```
 
@@ -52,12 +65,23 @@ Token mode resolves credentials in this order:
   run: opencode agent list
 ```
 
+## Provisioning the Refresh Token (one-time bootstrap)
+
+1. Run opencode interactively once (`OPENCODE_ANR_AUTH_MODE` unset) and complete the browser OIDC login — ideally as a dedicated CI service account in the Cognito User Pool, not a personal account.
+2. Capture the refresh token issued by the login and store it as the `ANR_REFRESH_TOKEN` GitHub Actions secret.
+3. Confirm two settings on the Cognito **app client** with whoever administers the user pool:
+   - **Refresh token validity** covers your desired CI credential lifetime (Cognito default is 30 days; configurable up to 10 years).
+   - **Refresh token rotation is disabled.** If Cognito rotates the refresh token on each use, the statically stored secret is invalidated after the first CI run.
+
+After that, every CI run self-serves fresh credentials for the life of the refresh token. The refresh call is a plain POST to Cognito's `/oauth2/token` endpoint using the public app client — no client secret is involved.
+
 ## Token Refresh Behaviour in Token Mode
 
 | Scenario | Behaviour |
 |---|---|
-| `OPENCODE_ANR_REFRESH_TOKEN` set, refresh succeeds | Silent refresh — no browser |
-| `OPENCODE_ANR_REFRESH_TOKEN` set, refresh fails | Logs error, keeps existing creds until STS expiry. No browser fallback. Re-run with a fresh token. |
+| `OPENCODE_ANR_REFRESH_TOKEN` set | Fresh ID token minted at startup; silent refresh on schedule thereafter — no browser |
+| `OPENCODE_ANR_REFRESH_TOKEN` set, refresh fails at startup | Falls back to `OPENCODE_ANR_ID_TOKEN` if set; otherwise fails fast |
+| `OPENCODE_ANR_REFRESH_TOKEN` set, scheduled refresh fails mid-run | Logs error, keeps existing creds until STS expiry. No browser fallback. |
 | No `OPENCODE_ANR_REFRESH_TOKEN` | One-time warning logged. Creds remain valid until AWS STS expiry. No interactive fallback. |
 
 Interactive mode (default) is unchanged: silent refresh attempted first, browser opened on failure.
@@ -69,12 +93,14 @@ Missing or invalid configuration exits immediately with a clear, actionable mess
 ```
 [ANR] Token auth mode is missing required environment variable(s):
   - OPENCODE_ANR_ID_TOKEN is not set
+  - OPENCODE_ANR_REFRESH_TOKEN is not set
 
-To fix:
-  • Set OPENCODE_ANR_ID_TOKEN to a valid Cognito ID token.
-  • Or provide AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN
+To fix (one of):
+  • Set OPENCODE_ANR_REFRESH_TOKEN to a long-lived Cognito refresh token
+    (recommended for CI — a fresh ID token is minted automatically).
+  • Set OPENCODE_ANR_ID_TOKEN to a valid, unexpired Cognito ID token.
+  • Provide AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY + AWS_SESSION_TOKEN
     to bypass federation entirely.
-  • OPENCODE_ANR_REFRESH_TOKEN is optional but enables token refresh in CI.
 ```
 
 Error messages **never** include secret values.
@@ -94,17 +120,19 @@ Error messages **never** include secret values.
 
 ## Secret Rotation and Expiry
 
-- Cognito ID tokens are **short-lived** (typically 1 hour). Rotate `ANR_ID_TOKEN` before each CI run or use a workflow that generates a fresh token at job start.
-- If `OPENCODE_ANR_REFRESH_TOKEN` is provided, opencode will refresh automatically before STS expiry. Refresh tokens are longer-lived but should be rotated regularly per your org's policy.
-- AWS STS session tokens (`AWS_SESSION_TOKEN`) have their own expiry. If pre-issued, ensure they are valid for the duration of the job.
+- **Refresh tokens** are the recommended CI secret: long-lived (configurable on the Cognito app client, up to 10 years), revocable, and exchanged automatically for short-lived ID tokens. Rotate per your org's policy.
+- Cognito **ID tokens** are short-lived (typically 1 hour). Only use `ANR_ID_TOKEN` directly if you regenerate it before each CI run.
+- AWS **STS session tokens** (`AWS_SESSION_TOKEN`) have their own expiry. If pre-issued, ensure they are valid for the duration of the job.
 - Store all tokens exclusively in GitHub Actions secrets (or equivalent). Never commit them to `.env` files.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `OPENCODE_ANR_ID_TOKEN is not set` | Secret not wired in workflow | Add `OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}` to env |
+| `missing required environment variable(s)` | No secret wired in workflow | Add `OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}` to env |
+| `refresh token exchange failed` | Expired/revoked refresh token, wrong app client, or rotation enabled | Re-provision the refresh token; verify `CLIENT_ID` matches the issuing app client; disable rotation on the app client |
 | `federation exchange failed` | Expired or invalid ID token | Regenerate token; check identity pool ID and region in config |
 | `does not appear to be a valid JWT` | Wrong secret mapped | Verify `ANR_ID_TOKEN` secret contains a valid Cognito ID token (three-part JWT) |
 | `Unknown OPENCODE_ANR_AUTH_MODE value` | Typo in env var | Valid values: `interactive`, `token` |
 | Credentials expire mid-job | No refresh token + long job | Add `OPENCODE_ANR_REFRESH_TOKEN` secret or break job into shorter steps |
+| Second CI run fails after first succeeds | Refresh token rotation enabled on app client | Disable rotation, or update the stored secret with the rotated token |
