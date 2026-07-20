@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // Serial prompt queue for direct interactive mode.
 //
 // Prompts arrive from the footer (user types and hits enter) and queue up
@@ -344,6 +345,6 @@ export async function runPromptQueue(input: QueueInput): Promise<void> {
     offClose()
     offRemoveQueued()
     close()
-    await draining?.catch(() => {})
+    await draining?.catch((err) => { console.debug("ignored", err) })
   }
 }

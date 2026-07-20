@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { OAUTH_DUMMY_KEY } from "../auth"
 import { createServer } from "http"
@@ -513,7 +514,7 @@ export async function XaiAuthPlugin(input: PluginInput, options: XaiAuthPluginOp
                           expires: refreshedExpires,
                         },
                       })
-                      .catch(() => {})
+                      .catch((err) => { console.warn("xAI provider error", err) })
                     return { access: tokens.access_token, refresh: refreshedRefresh, expires: refreshedExpires }
                   })
                   .finally(() => {

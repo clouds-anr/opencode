@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import type { Model } from "@opencode-ai/sdk/v2"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -242,18 +243,18 @@ export async function DigitalOceanAuthPlugin(input: PluginInput): Promise<Hooks>
         if (bearerValid && stale) {
           const result = await listRouters(oauthAccess)
           if (result.ok) {
-            routers = result.routers
-            const updated: Record<string, string> = {
-              ...metadata,
-              routers: JSON.stringify(routers.map((r) => ({ name: r.name, uuid: r.uuid, description: r.description }))),
-              routers_fetched_at: String(Date.now()),
-            }
-            await input.client.auth
-              .set({
-                path: { id: "digitalocean" },
-                body: { type: "api", key: ctx.auth.key, metadata: updated },
-              })
-              .catch(() => {})
+             routers = result.routers
+             const updated: Record<string, string> = {
+               ...metadata,
+               routers: JSON.stringify(routers.map((r) => ({ name: r.name, uuid: r.uuid, description: r.description }))),
+               routers_fetched_at: String(Date.now()),
+             }
+             await input.client.auth
+               .set({
+                 path: { id: "digitalocean" },
+                 body: { type: "api", key: ctx.auth.key, metadata: updated },
+               })
+               .catch((err) => { console.warn("DigitalOcean provider error", err) })
           } else if (result.status === 401 || result.status === 403) {
           } else if (result.status !== 0) {
           }

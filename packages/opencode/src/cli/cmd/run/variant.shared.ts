@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // Model variant resolution and persistence.
 //
 // Variants are provider-specific reasoning effort levels (e.g., "high", "max").
@@ -201,7 +202,7 @@ export function createVariantRuntime(fs = AppNodeBuilder.build(FSUtil.node)): Va
   const runtime = makeRuntime(Service, createLayer(fs))
   return {
     resolveSavedVariant: (model) => runtime.runPromise((svc) => svc.resolveSavedVariant(model)).catch(() => undefined),
-    saveVariant: (model, variant) => runtime.runPromise((svc) => svc.saveVariant(model, variant)).catch(() => {}),
+    saveVariant: (model, variant) => runtime.runPromise((svc) => svc.saveVariant(model, variant)).catch((err) => { console.debug("ignored", err) }),
   }
 }
 

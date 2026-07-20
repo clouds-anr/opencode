@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 // CLI entry point for `opencode run` and `opencode --mini`.
@@ -568,7 +569,7 @@ export const RunCommand = effectCmd({
           throw new Error("Failed to create session")
         }
 
-        void share(sdk, id).catch(() => {})
+        void share(sdk, id).catch((err) => { console.debug("ignored", err) })
         return {
           id,
           title: result.data?.title,
@@ -844,7 +845,7 @@ export const RunCommand = effectCmd({
             return { error: String(e), emittedText: false }
           })
           const closeEvents = async () => {
-            await events.stream.return(undefined).catch(() => {})
+            await events.stream.return(undefined).catch((err) => { console.debug("ignored", err) })
           }
           async function finish() {
             if (args.attach) {

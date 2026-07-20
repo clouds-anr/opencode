@@ -107,7 +107,7 @@ export const rpc = {
   },
   async checkUpgrade(input: { directory: string }) {
     await InstanceRuntime.load({ directory: input.directory })
-    await upgrade().catch(() => {})
+    await upgrade().catch((err) => { console.debug("ignored", err) })
   },
   async reload() {
     await AppRuntime.runPromise(
@@ -131,7 +131,7 @@ export const rpc = {
   },
   async shutdown() {
     // Flush any pending OTEL metrics before shutting down
-    await shutdownOTEL().catch(() => {})
+    await shutdownOTEL().catch((err) => { console.debug("ignored", err) })
     await InstanceRuntime.disposeAllInstances()
     if (server) await server.stop(true)
     process.off("unhandledRejection", onUnhandledRejection)

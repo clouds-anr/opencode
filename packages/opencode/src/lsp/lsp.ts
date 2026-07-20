@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -357,7 +358,7 @@ const layer = Layer.effect(
               after,
             })
           }),
-        ).catch(() => {}),
+        ).catch((err) => { console.warn("LSP initialization failed", err) }),
       )
     })
 

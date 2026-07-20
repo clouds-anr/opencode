@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import path from "path"
 import { writeHeapSnapshot } from "node:v8"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -31,7 +32,7 @@ export function start() {
     )
     await Promise.resolve()
       .then(() => writeHeapSnapshot(file))
-      .catch(() => {})
+      .catch((err) => { console.debug("ignored", err) })
 
     lock = false
   }

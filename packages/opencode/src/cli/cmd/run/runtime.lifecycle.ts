@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // Lifecycle management for the split-footer renderer.
 //
 // Creates the OpenTUI CliRenderer in split-footer mode, resolves the theme
@@ -223,7 +224,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
         detail: directoryLabel(input.directory),
       }),
     )
-    await renderer.idle().catch(() => {})
+    await renderer.idle().catch((err) => { console.debug("ignored", err) })
 
     const { RunFooter } = await footerTask
     let closed = false
@@ -259,7 +260,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
           return
         }
 
-        await renderer.idle().catch(() => {})
+        await renderer.idle().catch((err) => { console.debug("ignored", err) })
         const ignore = () => {}
         detachSigint()
         process.on("SIGINT", ignore)
@@ -317,7 +318,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
       let wroteExit = false
 
       try {
-        await footer.idle().catch(() => {})
+        await footer.idle().catch((err) => { console.debug("ignored", err) })
 
         const show = renderer.isDestroyed ? false : next.showExit
         if (!renderer.isDestroyed && show) {
@@ -335,11 +336,11 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
               theme: footer.currentTheme().splash,
             }),
           )
-          await renderer.idle().catch(() => {})
+    await renderer.idle().catch((err) => { console.debug("ignored", err) })
         }
       } finally {
         footer.close()
-        await footer.idle().catch(() => {})
+        await footer.idle().catch((err) => { console.debug("ignored", err) })
         footer.destroy()
         unregisterKeymap?.()
         shutdown(renderer)
