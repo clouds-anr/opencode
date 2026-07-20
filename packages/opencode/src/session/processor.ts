@@ -22,7 +22,7 @@ import type { Provider } from "@/provider/provider"
 import { Question } from "@/question"
 import { errorMessage } from "@/util/error"
 import { trackModelCall, getTelemetryContext, logTokenUsage, flushOTEL, trackLinesOfCode, trackCodeEditTool, trackCodeEditDecision, trackCommit, trackActiveTime, checkQuota, QuotaExceededError } from "@opencode-ai/anr-core"
-import { refresh as refreshANRCredentials } from "@/auth/anr-refresh"
+import { refresh as refreshANRCredentials, expired as checkANRCredentialsExpired } from "@/auth/anr-refresh"
 import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
@@ -50,6 +50,11 @@ function isExpiredTokenError(e: unknown): boolean {
   if ((e as Record<string, unknown>)?.statusCode === 401 || (e as Record<string, unknown>)?.status === 401) return true
   return false
 }
+
+// ANRCODE_CHANGE {"issue":366,"branch":"anr/366/inactivity-credential-check","date":"2026-07-16"}
+// Track last activity time for inactivity-based credential checking
+let lastActivityTime = Date.now()
+const INACTIVITY_THRESHOLD_MS = 30 * 60 * 1000 // 30 minutes
 
 export type Result = "compact" | "stop" | "continue"
 
@@ -767,6 +772,36 @@ const layer = Layer.effect(
             ctx.currentText = undefined
             ctx.reasoningMap = {}
             yield* status.set(ctx.sessionID, { type: "busy" })
+
+            // ANRCODE_CHANGE {"issue":366,"branch":"anr/366/inactivity-credential-check","date":"2026-07-16"}
+            // Check credentials after periods of inactivity (30+ minutes)
+            if (globalThis.process.env.OPENCODE_FLAVOR === "anr") {
+              const inactivityDuration = Date.now() - lastActivityTime
+
+              if (inactivityDuration > INACTIVITY_THRESHOLD_MS) {
+                if (checkANRCredentialsExpired()) {
+                  console.error(
+                    `🔄 Credentials expired after ${Math.round(inactivityDuration / 60000)} minutes of inactivity, refreshing...`,
+                  )
+
+                  const success = yield* Effect.promise(() => refreshANRCredentials())
+
+                  if (!success) {
+                    yield* halt(
+                      new Error(
+                        "Credentials expired and refresh failed. A browser window should have opened for re-authentication. " +
+                          "Please complete the login and try again.",
+                      ),
+                    )
+                  }
+
+                  console.error("✅ Credentials refreshed successfully after inactivity")
+                }
+              }
+
+              lastActivityTime = Date.now()
+            }
+
             const stream = llm.stream(streamInput)
 
             yield* stream.pipe(
