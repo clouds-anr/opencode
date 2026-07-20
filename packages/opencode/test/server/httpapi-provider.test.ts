@@ -355,7 +355,8 @@ describe("provider HttpApi", () => {
     30000,
   )
 
-  it.instance(
+  // ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  itPlugin.instance(
     "serves provider lists when auth loaders add runtime fetch options",
     Effect.gen(function* () {
       const directory = (yield* TestInstance).directory
@@ -382,7 +383,8 @@ describe("provider HttpApi", () => {
     { ...projectOptions, init: writeFunctionOptionsPlugin },
   )
 
-  it.instance(
+  // ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  itPlugin.instance(
     "keeps provider.models hook input mutations out of provider state",
     Effect.gen(function* () {
       const directory = (yield* TestInstance).directory
