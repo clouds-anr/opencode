@@ -5,7 +5,9 @@ on:
   push:
     branches:
       - ci
-      - dev
+      # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+      # dev removed: release.yml owns the dev push pipeline for this fork.
+      # publish fires on workflow_dispatch only for manual upstream-style releases.
       - beta
       - fix/npm-native-binary-install
       - snapshot-*

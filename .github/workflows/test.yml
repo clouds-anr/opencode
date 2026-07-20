@@ -1,9 +1,9 @@
 name: test
 
 on:
-  push:
-    branches:
-      - dev
+  # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  # push: dev removed. Tests run on PRs; release.yml reuses the PR result via
+  # the parent-2 SHA lookup in its gate job. No duplicate run on merge.
   pull_request:
   workflow_dispatch:
   # Allow other workflows (release.yml, publish.yml) to require this suite as a
@@ -11,9 +11,8 @@ on:
   workflow_call:
 
 concurrency:
-  # Keep every run on dev so cancelled checks do not pollute the default branch
-  # commit history. PRs and other branches still share a group and cancel stale runs.
-  group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
+  # PRs and other branches share a group and cancel stale runs.
+  group: ${{ format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref) }}
   cancel-in-progress: true
 
 permissions:
