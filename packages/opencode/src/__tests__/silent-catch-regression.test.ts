@@ -1,13 +1,13 @@
 // ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 
 describe("Silent catch handler regression tests", () => {
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>
-  let consoleDebugSpy: ReturnType<typeof vi.spyOn>
+  let consoleWarnSpy: ReturnType<typeof spyOn>
+  let consoleDebugSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
-    consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-    consoleDebugSpy = vi.spyOn(console, "debug").mockImplementation(() => {})
+    consoleWarnSpy = spyOn(console, "warn").mockImplementation(() => {})
+    consoleDebugSpy = spyOn(console, "debug").mockImplementation(() => {})
   })
 
   afterEach(() => {
