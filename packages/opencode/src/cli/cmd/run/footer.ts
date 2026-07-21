@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // RunFooter -- the mutable control surface for direct interactive mode.
 //
 // In the split-footer architecture, scrollback is immutable (append-only)
@@ -226,7 +227,7 @@ export class RunFooter implements FooterApi {
       onThemeRelease: (theme) => {
         void this.renderer
           .idle()
-          .catch(() => {})
+          .catch((err) => { console.debug("ignored", err) })
           .finally(() => this.destroyTheme(theme))
       },
     })
@@ -588,7 +589,7 @@ export class RunFooter implements FooterApi {
         return this.idle()
       }
 
-      await this.renderer.idle().catch(() => {})
+      await this.renderer.idle().catch((err) => { console.debug("ignored", err) })
     })
   }
 
@@ -856,14 +857,14 @@ export class RunFooter implements FooterApi {
         if (patch.model) {
           this.patch(patch)
         }
-        if (result.status) {
-          this.setNotice(result.status)
-        }
-      })
-      .catch(() => {})
-  }
+         if (result.status) {
+           this.setNotice(result.status)
+         }
+       })
+       .catch((err) => { console.debug("ignored", err) })
+   }
 
-  private handleVariantSelect = (variant: string | undefined): void => {
+   private handleVariantSelect = (variant: string | undefined): void => {
     if (this.isClosed) {
       return
     }
@@ -897,14 +898,14 @@ export class RunFooter implements FooterApi {
         if (patch.model) {
           this.patch(patch)
         }
-        if (result.status) {
-          this.setNotice(result.status)
-        }
-      })
-      .catch(() => {})
-  }
+         if (result.status) {
+           this.setNotice(result.status)
+         }
+       })
+       .catch((err) => { console.debug("ignored", err) })
+   }
 
-  private clearInterruptTimer(): void {
+   private clearInterruptTimer(): void {
     if (!this.interruptTimeout) {
       return
     }
@@ -1055,7 +1056,7 @@ export class RunFooter implements FooterApi {
     this.renderer.clearPaletteCache()
     void this.renderer
       .getPalette({ size: 256 })
-      .catch(() => {})
+      .catch((err) => { console.debug("ignored", err) })
       .finally(() => {
         this.paletteRefreshRunning = false
         if (!retry && !this.paletteRefreshQueued) {

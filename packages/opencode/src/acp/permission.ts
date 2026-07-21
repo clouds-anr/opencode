@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type {
   AgentSideConnection,
   PermissionOption,
@@ -39,7 +40,7 @@ export class Handler {
     const previous = this.queues.get(permission.sessionID) ?? Promise.resolve()
     const next = previous
       .then(() => this.process(event))
-      .catch(() => {})
+      .catch((err) => { console.debug("ignored", err) })
       .finally(() => {
         if (this.queues.get(permission.sessionID) === next) {
           this.queues.delete(permission.sessionID)
@@ -82,7 +83,7 @@ export class Handler {
     }
 
     if (permission.permission === "edit") {
-      await this.writeProposedEdit(session.id, permission.metadata).catch(() => {})
+      await this.writeProposedEdit(session.id, permission.metadata).catch((err) => { console.debug("ignored", err) })
     }
 
     await this.reply(permission.id, reply, session.cwd)

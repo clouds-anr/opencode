@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import { Effect } from "effect"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
@@ -72,11 +73,11 @@ export const WebCommand = effectCmd({
       }
 
       // Open localhost in browser
-      open(localhostUrl).catch(() => {})
+      open(localhostUrl).catch((err) => { console.debug("ignored", err) })
     } else {
       const displayUrl = server.url.toString()
       UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, displayUrl)
-      open(displayUrl).catch(() => {})
+      open(displayUrl).catch((err) => { console.debug("ignored", err) })
     }
 
     yield* Effect.never
