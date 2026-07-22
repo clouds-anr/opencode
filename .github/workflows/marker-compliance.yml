@@ -1,0 +1,66 @@
+# ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
+name: ANRCode Marker Compliance
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  marker-compliance:
+    name: Check ANRCODE_CHANGE Markers
+    runs-on: ubuntu-latest
+    # Skip for upstream-sync PRs
+    if: "!contains(github.event.pull_request.title, '[skip-marker-check]')"
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin dev
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          git diff --name-only origin/dev...HEAD > changed-files.txt
+          echo "Changed files:"
+          cat changed-files.txt
+
+      - name: Run marker compliance check
+        id: compliance
+        run: |
+          if [ ! -s changed-files.txt ]; then
+            echo "No changed files detected."
+            exit 0
+          fi
+          # Run validator — exits 1 if any file is missing a marker
+          bun run packages/anr-core/script/validate-marker-compliance.ts $(cat changed-files.txt | tr '\n' ' ') 2>&1 | tee compliance-report.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Post compliance report as PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try {
+              report = fs.readFileSync('compliance-report.txt', 'utf8');
+            } catch (e) {
+              report = 'No compliance report generated.';
+            }
+            const exitCode = '${{ steps.compliance.outputs.exit_code }}';
+            const status = exitCode === '0' ? '✅ All changed files have ANRCODE_CHANGE markers.' : '⚠️ Some changed files are missing ANRCODE_CHANGE markers (warn-only — not blocking this PR).';
+            const body = `## ANRCode Marker Compliance\n\n${status}\n\n<details><summary>Full Report</summary>\n\n\`\`\`\n${report}\n\`\`\`\n\n</details>\n\n> To suppress this check, add \`[skip-marker-check]\` to your PR title (upstream-sync PRs only).`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });

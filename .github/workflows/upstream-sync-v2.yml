@@ -17,6 +17,7 @@
 #     sync branch and updates the existing PR in place (idempotent gh pr edit),
 #     so an in-flight PR is kept current with the latest upstream state.
 #   * `dry_run` (manual only) resolves+validates+reports without pushing.
+# ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
 name: upstream-sync-v2
 
 on:

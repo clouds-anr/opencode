@@ -2,6 +2,7 @@ name: test
 
 on:
   # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
   # push: dev removed. Tests run on PRs; release.yml reuses the PR result via
   # the parent-2 SHA lookup in its gate job. No duplicate run on merge.
   pull_request:
@@ -200,8 +201,9 @@ jobs:
               --filter=@opencode-ai/script
               --filter=@opencode-ai/slack
 
-          # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
-          # windows-opencode timeouts raised from 20 → 30 min: setup alone costs ~10 min
+            # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+            # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
+            # windows-opencode timeouts raised from 20 → 30 min: setup alone costs ~10 min
           # on Windows runners leaving <1 min headroom at 20. windows-opencode-2 split
           # into -2a (test/server, 49 files, ~3m40s) and -2b (session/tool/mcp/v2,
           # ~4m45s) so each shard has ~15 min headroom and a smaller failure blast radius.
@@ -393,10 +395,11 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - name: linux
-            host: ubuntu-latest
-          # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
-          # Windows e2e removed: 5 parallel Chromium workers on a single Windows runner
+           - name: linux
+             host: ubuntu-latest
+            # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+            # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
+            # Windows e2e removed: 5 parallel Chromium workers on a single Windows runner
           # causes fixture teardown races and timing flakes that rotate across specs on
           # every run. Linux already provides full functional coverage.
     runs-on: ${{ matrix.settings.host }}

@@ -8,6 +8,7 @@
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
 
 <!-- ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"} -->
+<!-- ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"} -->
 ## ANR Change Markers
 
 Any file modified or created outside of `packages/anr-core/` **must** carry an `ANRCODE_CHANGE` marker. Use a `//` comment for TypeScript/JavaScript files and an HTML comment for Markdown files.
@@ -24,6 +25,8 @@ Format:
 // ANRCODE_CHANGE {"issue":<pr-or-issue-number>,"branch":"<current-branch>","date":"YYYY-MM-DD"}
 ```
 
+> **Note:** The `issue` field must be a **numeric** GitHub issue number (e.g., `350`). String labels (e.g., `"windows-test-stability"`) are not valid and will be flagged by the compliance validator.
+
 Example (marker beside a modified block):
 ```ts
 // ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
@@ -36,6 +39,14 @@ Rules:
 - Use today's date in `YYYY-MM-DD` format.
 - A file may carry multiple markers if touched across multiple issues or in multiple regions; append rather than replace.
 - `packages/anr-core/` is ANR-owned source; changes there do not require the marker.
+
+<!-- ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"} -->
+See [`docs/anr-code-customizations.md`](docs/anr-code-customizations.md) for detailed examples, troubleshooting, and upstream sync guidance.
+
+To validate markers locally before pushing:
+```bash
+git diff --name-only origin/dev...HEAD | xargs bun run packages/anr-core/script/validate-marker-compliance.ts
+```
 
 ## Branch Names
 
