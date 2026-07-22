@@ -1,10 +1,11 @@
+// ANRCODE_CHANGE {"issue":310,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-22"}
 /**
  * Unit tests for token-auth.ts
  *
  * Tests mode selection, environment validation, and credential resolution
  * without making any real network calls.
  */
-import { describe, expect, test, mock, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import {
   parseANRAuthMode,
   validateTokenModeEnv,
@@ -279,6 +280,10 @@ describe("resolveTokenModeCredentials — exchange path", () => {
 
 describe("resolveTokenModeCredentials — refresh-first bootstrap", () => {
   const originalFetch = globalThis.fetch
+
+  beforeEach(() => {
+    globalThis.fetch = originalFetch
+  })
 
   afterEach(() => {
     globalThis.fetch = originalFetch

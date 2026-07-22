@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":310,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-22"}
 /**
  * Token-based (non-interactive) authentication for ANR CI mode.
  *
@@ -156,8 +157,7 @@ export async function resolveTokenModeCredentials(
 
   // Static path — caller provided full AWS creds.
   if (validation.staticAWSCreds) {
-    const { accessKeyId, secretAccessKey, sessionToken, region } = validation.staticAWSCreds
-    const effectiveRegion = region || config.awsRegion
+    const { accessKeyId, secretAccessKey, sessionToken } = validation.staticAWSCreds
     return {
       idToken: validation.idToken,
       refreshToken: validation.refreshToken,
@@ -167,8 +167,6 @@ export async function resolveTokenModeCredentials(
         secretAccessKey,
         sessionToken,
         expiration: undefined,
-        // Override config region with env region when static creds are provided
-        ...(effectiveRegion && { expiration: undefined }),
       },
     }
   }
