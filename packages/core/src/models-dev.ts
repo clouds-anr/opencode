@@ -212,6 +212,7 @@ const layer = Layer.effect(
       )
       if (!response) return undefined as Record<string, Provider> | undefined
       const policy = response as Record<string, unknown>
+      
       // Check if response has models in DynamoDB format (with .M) or direct format
       const modelsAttr = policy.models as { M?: Record<string, Record<string, unknown>> } | undefined
       if (modelsAttr?.M) {
@@ -225,6 +226,18 @@ const layer = Layer.effect(
       if (policy.models && typeof policy.models === "object") {
         return policy.models as Record<string, Provider>
       }
+      
+      // Handle "allowed_models" format - fetch full catalog from models.dev and filter
+      if (policy.allowed_models && Array.isArray(policy.allowed_models)) {
+        const fullCatalogText = yield* fetchApi().pipe(Effect.catch(() => Effect.succeed(undefined)))
+        if (!fullCatalogText) return undefined as Record<string, Provider> | undefined
+        const fullCatalog = JSON.parse(fullCatalogText) as Record<string, Provider>
+        const allowedSet = new Set(policy.allowed_models as string[])
+        return Object.fromEntries(
+          Object.entries(fullCatalog).filter(([providerID]) => allowedSet.has(providerID))
+        ) as Record<string, Provider>
+      }
+      
       return undefined as Record<string, Provider> | undefined
     })
 
