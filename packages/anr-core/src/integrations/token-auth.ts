@@ -90,14 +90,20 @@ export function validateTokenModeEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): TokenModeValidationOk | TokenModeValidationError {
   const staticAWSCreds = resolveStaticAWSCreds(env)
+  // Tokens are base64url/JWT and can never legitimately contain whitespace,
+  // but secrets pasted from a terminal often pick up newlines at visual wrap
+  // points (e.g. macOS Terminal copies soft-wrapped lines with hard breaks).
+  // Strip all whitespace so a mangled paste still authenticates.
+  const idToken = env.OPENCODE_ANR_ID_TOKEN?.replace(/\s+/g, "") || ""
+  const refreshToken = env.OPENCODE_ANR_REFRESH_TOKEN?.replace(/\s+/g, "") || undefined
 
   // If full static AWS creds are present, we don't need an ID token for exchange.
   // We still accept OPENCODE_ANR_ID_TOKEN for telemetry context building.
   if (staticAWSCreds) {
     return {
       ok: true,
-      idToken: env.OPENCODE_ANR_ID_TOKEN || "",
-      refreshToken: env.OPENCODE_ANR_REFRESH_TOKEN,
+      idToken,
+      refreshToken,
       staticAWSCreds,
     }
   }
@@ -105,7 +111,7 @@ export function validateTokenModeEnv(
   // No static creds — require an ID token or a refresh token for federation exchange.
   // A refresh token alone is sufficient: it is exchanged for a fresh ID token at
   // startup (refresh-first bootstrap), which is the recommended CI configuration.
-  if (!env.OPENCODE_ANR_ID_TOKEN && !env.OPENCODE_ANR_REFRESH_TOKEN) {
+  if (!idToken && !refreshToken) {
     return {
       ok: false,
       message:
@@ -123,8 +129,8 @@ export function validateTokenModeEnv(
 
   return {
     ok: true,
-    idToken: env.OPENCODE_ANR_ID_TOKEN || "",
-    refreshToken: env.OPENCODE_ANR_REFRESH_TOKEN,
+    idToken,
+    refreshToken,
     staticAWSCreds: undefined,
   }
 }

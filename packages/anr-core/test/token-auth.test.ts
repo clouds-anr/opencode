@@ -104,6 +104,24 @@ describe("validateTokenModeEnv", () => {
     }
   })
 
+  test("strips whitespace mangled into tokens by terminal copy/paste", () => {
+    const wrapped = FAKE_JWT.slice(0, 20) + "\n" + FAKE_JWT.slice(20, 45) + "\r\n  " + FAKE_JWT.slice(45)
+    const result = validateTokenModeEnv({
+      OPENCODE_ANR_ID_TOKEN: wrapped,
+      OPENCODE_ANR_REFRESH_TOKEN: "refresh-\npart\n",
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.idToken).toBe(FAKE_JWT)
+      expect(result.refreshToken).toBe("refresh-part")
+    }
+  })
+
+  test("whitespace-only tokens are treated as unset", () => {
+    const result = validateTokenModeEnv({ OPENCODE_ANR_REFRESH_TOKEN: "  \n " })
+    expect(result.ok).toBe(false)
+  })
+
   test("succeeds with only a refresh token (refresh-first bootstrap)", () => {
     const result = validateTokenModeEnv({ OPENCODE_ANR_REFRESH_TOKEN: "refresh-only" })
     expect(result.ok).toBe(true)

@@ -371,7 +371,10 @@ jobs:
         run: |
           bin="$(find packages/opencode/dist -type f -name 'opencode' | head -1)"
           echo "Binary: $bin"
-          "$bin" agent list
+          # Pin the env flavor: the repo ships multiple .opencode/.env.* files and
+          # auto-selection order is filesystem-dependent. The stored refresh token
+          # is issued by the commercial app client, so the config must match.
+          "$bin" agent list --env-file .opencode/.env.commercial
         env:
           OPENCODE_FLAVOR: anr
           OPENCODE_ANR_AUTH_MODE: token
