@@ -4,6 +4,9 @@ name: ANRCode Marker Compliance
 on:
   pull_request:
     branches: [dev]
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+  schedule:
+    - cron: '0 2 * * *'  # Nightly at 2 AM UTC
 
 jobs:
   marker-compliance:
@@ -31,36 +34,152 @@ jobs:
           echo "Changed files:"
           cat changed-files.txt
 
-      - name: Run marker compliance check
-        id: compliance
+       - name: Run marker compliance check
+         id: compliance
+         # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
+         run: |
+           if [ ! -s changed-files.txt ]; then
+             echo "No changed files detected."
+             exit 0
+           fi
+           # Run validator — exits 1 if any file is missing a marker
+           bun run packages/anr-core/script/validate-marker-compliance.ts $(cat changed-files.txt | tr '\n' ' ') 2>&1 | tee compliance-report.txt
+           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+      - name: Check fork divergence
+        id: divergence
         run: |
-          if [ ! -s changed-files.txt ]; then
-            echo "No changed files detected."
-            exit 0
-          fi
-          # Run validator — exits 1 if any file is missing a marker
-          bun run packages/anr-core/script/validate-marker-compliance.ts $(cat changed-files.txt | tr '\n' ' ') 2>&1 | tee compliance-report.txt
+          bun run packages/anr-core/script/detect-fork-divergence.ts 2>&1 | tee divergence-report.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
         continue-on-error: true
 
-      - name: Post compliance report as PR comment
-        if: always()
-        uses: actions/github-script@v7
+       - name: Post compliance report as PR comment
+         if: always()
+         uses: actions/github-script@v7
+         with:
+           script: |
+             const fs = require('fs');
+             let complianceReport = '';
+             let divergenceReport = '';
+             try {
+               complianceReport = fs.readFileSync('compliance-report.txt', 'utf8');
+             } catch (e) {
+               complianceReport = 'No compliance report generated.';
+             }
+             try {
+               divergenceReport = fs.readFileSync('divergence-report.txt', 'utf8');
+             } catch (e) {
+               divergenceReport = 'No divergence report generated.';
+             }
+             const checkAExitCode = '${{ steps.compliance.outputs.exit_code }}';
+             const checkAFailed = checkAExitCode !== '0';
+             const statusLine = checkAFailed
+               ? '❌ **Files in this PR are missing `ANRCODE_CHANGE` markers. This PR cannot be merged until all markers are added.**'
+               : '✅ All files changed in this PR have valid `ANRCODE_CHANGE` markers.';
+             const howToFix = checkAFailed ? `
+             ### How to Fix
+
+             1. Add a marker to each file listed above, immediately adjacent to the changed region:
+             \`\`\`
+             // ANRCODE_CHANGE {"issue":<number>,"branch":"<branch>","date":"YYYY-MM-DD"}
+             \`\`\`
+             For Markdown files use an HTML comment:
+             \`\`\`
+             <!-- ANRCODE_CHANGE {"issue":<number>,"branch":"<branch>","date":"YYYY-MM-DD"} -->
+             \`\`\`
+
+             2. Validate locally before pushing:
+             \`\`\`bash
+             git diff --name-only origin/dev...HEAD | xargs bun run packages/anr-core/script/validate-marker-compliance.ts
+             \`\`\`
+
+             3. See [ANRCode Customization Framework](docs/anr-code-customizations.md) for full guidance.
+             ` : '';
+             const body = `## ANRCode Marker Compliance
+
+             ${statusLine}
+             ${howToFix}
+             <details><summary>Check A — PR Files Compliance Report</summary>
+
+             \`\`\`
+             ${complianceReport}
+             \`\`\`
+
+             </details>
+
+             <details><summary>Check B — Fork Divergence Report (informational only, does not block merge)</summary>
+
+             > This report shows all files changed since the ANR fork that are missing markers. It is informational only and does not block this PR.
+
+             \`\`\`
+             ${divergenceReport}
+             \`\`\`
+
+             </details>
+
+             > To suppress both checks, add \`[skip-marker-check]\` to your PR title (upstream-sync PRs only).`;
+             github.rest.issues.createComment({
+               issue_number: context.issue.number,
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               body
+             });
+
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+  nightly-marker-baseline:
+    name: Nightly Marker Baseline Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v4
         with:
-          script: |
-            const fs = require('fs');
-            let report = '';
-            try {
-              report = fs.readFileSync('compliance-report.txt', 'utf8');
-            } catch (e) {
-              report = 'No compliance report generated.';
-            }
-            const exitCode = '${{ steps.compliance.outputs.exit_code }}';
-            const status = exitCode === '0' ? '✅ All changed files have ANRCODE_CHANGE markers.' : '⚠️ Some changed files are missing ANRCODE_CHANGE markers (warn-only — not blocking this PR).';
-            const body = `## ANRCode Marker Compliance\n\n${status}\n\n<details><summary>Full Report</summary>\n\n\`\`\`\n${report}\n\`\`\`\n\n</details>\n\n> To suppress this check, add \`[skip-marker-check]\` to your PR title (upstream-sync PRs only).`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body
-            });
+          ref: dev
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Scan all tracked files outside anr-core with markers
+        id: baseline-scan
+        run: |
+          git ls-files | grep -v '^packages/anr-core/' | xargs grep -l 'ANRCODE_CHANGE' > marked-files.txt || true
+          if [ -s marked-files.txt ]; then
+            echo "Validating $(wc -l < marked-files.txt) marked files outside anr-core..."
+            bun run packages/anr-core/script/validate-marker-compliance.ts $(cat marked-files.txt | tr '\n' ' ') 2>&1 | tee baseline-report.txt
+            echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          else
+            echo "No marked files found outside anr-core."
+            echo "exit_code=0" >> $GITHUB_OUTPUT
+          fi
+         continue-on-error: true
+
+       # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
+       - name: Check for unmarked files on dev branch
+         id: divergence-check
+         run: |
+           bun run packages/anr-core/script/detect-fork-divergence.ts 2>&1 | tee divergence-baseline.txt
+         continue-on-error: true
+
+       - name: Report baseline scan results
+         if: always()
+         run: |
+           echo "## Nightly Marker Baseline Scan" >> $GITHUB_STEP_SUMMARY
+           echo "" >> $GITHUB_STEP_SUMMARY
+           if [ -f baseline-report.txt ]; then
+             echo "### Scan Results" >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+             cat baseline-report.txt >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+           else
+             echo "No marked files found outside anr-core to validate." >> $GITHUB_STEP_SUMMARY
+           fi
+           if [ -f divergence-baseline.txt ]; then
+             echo "" >> $GITHUB_STEP_SUMMARY
+             echo "### Divergence Report (informational)" >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+             cat divergence-baseline.txt >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+           fi

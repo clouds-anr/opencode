@@ -22,15 +22,21 @@ interface DivergenceReport {
     markedFiles: number;
     unmarkedFiles: number;
     exemptFiles: number;
+    // ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+    anrOwnedFiles: number;
   };
   markedFiles: string[];
   unmarkedFiles: string[];
   exemptFiles: string[];
+  // ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+  anrOwnedFiles: string[];
 }
 
 const UPSTREAM_REMOTE = "upstream";
 const UPSTREAM_REPO = "https://github.com/sst/opencode.git";
 const UPSTREAM_BRANCH = "dev";
+
+
 
 const EXEMPT_PATTERNS = [
   /^packages\/anr-core\//,
@@ -44,6 +50,12 @@ const MARKER_REGEX = /ANRCODE_CHANGE\s*\{[^}]+\}/;
 
 function isExempt(filePath: string): boolean {
   return EXEMPT_PATTERNS.some((pattern) => pattern.test(filePath));
+}
+
+// ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
+function isANROwned(filePath: string): boolean {
+  // All files outside packages/anr-core/ (and not exempt) are ANR-owned and require markers
+  return !isExempt(filePath);
 }
 
 function hasMarker(filePath: string): boolean {
@@ -120,10 +132,19 @@ function main(): void {
   const markedFiles: string[] = [];
   const unmarkedFiles: string[] = [];
   const exemptFiles: string[] = [];
+  // ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+  const anrOwnedFiles: string[] = [];
 
   for (const file of divergedFiles) {
     if (isExempt(file)) {
       exemptFiles.push(file);
+    } else if (isANROwned(file)) {
+      anrOwnedFiles.push(file);
+      if (hasMarker(file)) {
+        markedFiles.push(file);
+      } else {
+        unmarkedFiles.push(file);
+      }
     } else if (hasMarker(file)) {
       markedFiles.push(file);
     } else {
@@ -141,10 +162,14 @@ function main(): void {
       markedFiles: markedFiles.length,
       unmarkedFiles: unmarkedFiles.length,
       exemptFiles: exemptFiles.length,
+      // ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+      anrOwnedFiles: anrOwnedFiles.length,
     },
     markedFiles,
     unmarkedFiles,
     exemptFiles,
+    // ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-23"}
+    anrOwnedFiles,
   };
 
   // Output JSON to stdout
@@ -160,9 +185,10 @@ function main(): void {
   console.error(`  With ANRCODE_CHANGE markers: ${markedFiles.length}`);
   console.error(`  Missing markers: ${unmarkedFiles.length}`);
   console.error(`  Exempt files: ${exemptFiles.length}`);
+  console.error(`  ANR-owned files (all non-exempt): ${anrOwnedFiles.length}`);
 
   if (unmarkedFiles.length > 0) {
-    console.error(`\nUnmarked files (missing ANRCODE_CHANGE):`);
+    console.error(`\nMissing markers (ANR-owned):`);
     unmarkedFiles.forEach((file) => console.error(`  - ${file}`));
   }
 

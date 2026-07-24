@@ -8,7 +8,7 @@
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
 
 <!-- ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"} -->
-<!-- ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"} -->
+<!-- ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"} -->
 ## ANR Change Markers
 
 Any file modified or created outside of `packages/anr-core/` **must** carry an `ANRCODE_CHANGE` marker. Use a `//` comment for TypeScript/JavaScript files and an HTML comment for Markdown files.

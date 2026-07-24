@@ -2,7 +2,7 @@ name: test
 
 on:
   # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
-  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
   # push: dev removed. Tests run on PRs; release.yml reuses the PR result via
   # the parent-2 SHA lookup in its gate job. No duplicate run on merge.
   pull_request:
