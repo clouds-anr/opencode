@@ -15,6 +15,8 @@ export const ID = Schema.String.pipe(
     googleVertex: schema.make("google-vertex"),
     githubCopilot: schema.make("github-copilot"),
     amazonBedrock: schema.make("amazon-bedrock"),
+    // ANRCODE_CHANGE {"issue":"audio-device-selection","branch":"audio-device-selection","date":"2026-07-27"}
+    amazonBedrockMantle: schema.make("amazon-bedrock-mantle"),
     azure: schema.make("azure"),
     openrouter: schema.make("openrouter"),
     mistral: schema.make("mistral"),
