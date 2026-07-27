@@ -494,6 +494,38 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         },
       }
     }),
+    // ANRCODE_CHANGE {"issue":"audio-device-selection","branch":"audio-device-selection","date":"2026-07-27"}
+    "amazon-bedrock-mantle": Effect.fnUntraced(function* () {
+      const providerConfig = (yield* dep.config()).provider?.["amazon-bedrock-mantle"]
+      const auth = yield* dep.auth("amazon-bedrock-mantle")
+
+      const awsBearerToken = iife(() => {
+        const envToken = process.env.AWS_BEARER_TOKEN_BEDROCK
+        if (envToken) return envToken
+        if (auth?.type === "api") {
+          process.env.AWS_BEARER_TOKEN_BEDROCK = auth.key
+          return auth.key
+        }
+        return undefined
+      })
+
+      const configApiKey = providerConfig?.options?.apiKey
+
+      if (!awsBearerToken && !configApiKey) return { autoload: false }
+
+      const defaultRegion = process.env.AWS_REGION ?? providerConfig?.options?.region ?? "us-east-1"
+
+      return {
+        autoload: true,
+        options: { region: defaultRegion },
+        vars(_options: Record<string, any>) {
+          return { AWS_REGION: _options.region ?? defaultRegion }
+        },
+        async getModel(sdk: any, modelID: string) {
+          return selectBedrockMantleLanguageModel(sdk, modelID)
+        },
+      }
+    }),
     llmgateway: () =>
       Effect.succeed({
         autoload: false,
