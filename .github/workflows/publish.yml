@@ -6,6 +6,7 @@ on:
     branches:
       - ci
       # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+      # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
       # dev removed: release.yml owns the dev push pipeline for this fork.
       # publish fires on workflow_dispatch only for manual upstream-style releases.
       - beta
@@ -46,6 +47,7 @@ jobs:
     secrets: inherit
 
   # ANRCODE_CHANGE {"issue":"publish-env-context","branch":"dev","date":"2026-07-17"}
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
   # secrets context is not available in job-level `if` conditions, so surface
   # secret presence as boolean outputs here and gate downstream jobs on them.
   secrets-check:

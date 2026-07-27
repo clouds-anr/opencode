@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
   # ---------------------------------------------------------------------------
   # 0. Gate: find a passing test.yml run for this commit without re-running the
   #    suite. Strategy:
