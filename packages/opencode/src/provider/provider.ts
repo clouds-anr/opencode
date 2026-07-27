@@ -499,6 +499,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const providerConfig = (yield* dep.config()).provider?.["amazon-bedrock-mantle"]
       const auth = yield* dep.auth("amazon-bedrock-mantle")
 
+      const isANR = process.env.OPENCODE_FLAVOR === "anr"
+
+      const awsAccessKeyId = isANR ? process.env.AWS_ACCESS_KEY_ID : undefined
+
       const awsBearerToken = iife(() => {
         const envToken = process.env.AWS_BEARER_TOKEN_BEDROCK
         if (envToken) return envToken
@@ -511,7 +515,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
 
       const configApiKey = providerConfig?.options?.apiKey
 
-      if (!awsBearerToken && !configApiKey) return { autoload: false }
+      if (!awsBearerToken && !configApiKey && !awsAccessKeyId) return { autoload: false }
 
       const defaultRegion = process.env.AWS_REGION ?? providerConfig?.options?.region ?? "us-east-1"
 
