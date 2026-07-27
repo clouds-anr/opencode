@@ -518,10 +518,10 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       return {
         autoload: true,
         options: { region: defaultRegion },
-        vars(_options: Record<string, any>) {
-          return { AWS_REGION: _options.region ?? defaultRegion }
+        vars(options: Record<string, any>) {
+          return { AWS_REGION: options.region ?? defaultRegion }
         },
-        async getModel(sdk: any, modelID: string) {
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, _model?: Model) {
           return selectBedrockMantleLanguageModel(sdk, modelID)
         },
       }
