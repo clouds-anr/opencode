@@ -222,8 +222,10 @@ const layer = Layer.effect(
           ]),
         ) as Record<string, Provider>
       }
-      if (policy.models && typeof policy.models === "object") {
-        return policy.models as Record<string, Provider>
+      // Check for both "models" and "providers" keys (API returns "providers")
+      const providersData = policy.providers || policy.models
+      if (providersData && typeof providersData === "object") {
+        return providersData as Record<string, Provider>
       }
       return undefined as Record<string, Provider> | undefined
     })
