@@ -1950,6 +1950,7 @@ export type ModelsListOutput = {
           readonly type: "aisdk"
           readonly package: string
           readonly url?: string
+          readonly shape?: string
           readonly settings?: { readonly [x: string]: JsonValue }
         }
       | {
@@ -2008,6 +2009,7 @@ export type ProvidersListOutput = {
           readonly type: "aisdk"
           readonly package: string
           readonly url?: string
+          readonly shape?: string
           readonly settings?: { readonly [x: string]: JsonValue }
         }
       | { readonly type: "native"; readonly url?: string; readonly settings: { readonly [x: string]: JsonValue } }
@@ -2041,6 +2043,7 @@ export type ProvidersGetOutput = {
           readonly type: "aisdk"
           readonly package: string
           readonly url?: string
+          readonly shape?: string
           readonly settings?: { readonly [x: string]: JsonValue }
         }
       | { readonly type: "native"; readonly url?: string; readonly settings: { readonly [x: string]: JsonValue } }

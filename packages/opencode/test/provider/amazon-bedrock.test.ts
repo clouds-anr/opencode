@@ -168,7 +168,14 @@ it.instance(
       provider: {
         "amazon-bedrock": {
           options: { region: "us-east-1" },
-          models: { "openai.gpt-oss-safeguard-120b": mantleModelConfig },
+          // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+          // shape "chat" is data-driven from the catalog; the selector no longer hardcodes model IDs.
+          models: {
+            "openai.gpt-oss-safeguard-120b": {
+              ...mantleModelConfig,
+              provider: { npm: "@ai-sdk/amazon-bedrock/mantle", shape: "chat" },
+            },
+          },
         },
       },
     },
@@ -464,10 +471,36 @@ it.instance(
       provider: {
         "amazon-bedrock-mantle": {
           models: {
+            // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
             "openai.gpt-oss-safeguard-20b": {
-              provider: { npm: "@ai-sdk/amazon-bedrock/mantle" },
+              provider: { npm: "@ai-sdk/amazon-bedrock/mantle", shape: "chat" },
             },
           },
+        },
+      },
+    },
+  },
+)
+
+// ANRCODE_CHANGE {"issue":"audio-device-selection","branch":"audio-device-selection","date":"2026-07-27"}
+it.instance(
+  "Bedrock Mantle: getModel routes to responses API with config apiKey credential",
+  () =>
+    Effect.gen(function* () {
+      yield* set("AWS_BEARER_TOKEN_BEDROCK", "")
+      const model = yield* Provider.use.getModel(
+        ProviderV2.ID.amazonBedrockMantle,
+        ModelV2.ID.make("anthropic.claude-sonnet-5"),
+      )
+      const language = yield* Provider.use.getLanguage(model)
+      expect((language as { provider: string }).provider).toBe("bedrock-mantle.responses")
+    }),
+  {
+    config: {
+      provider: {
+        "amazon-bedrock-mantle": {
+          options: { apiKey: "test-key" },
+          models: { "anthropic.claude-sonnet-5": { provider: { npm: "@ai-sdk/amazon-bedrock/mantle" } } },
         },
       },
     },

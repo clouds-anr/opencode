@@ -30,6 +30,10 @@ export const AISDK = Schema.Struct({
   type: Schema.Literal("aisdk"),
   package: Schema.String,
   url: Schema.String.pipe(optional),
+  // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+  // Data-driven wire endpoint selector (arbitrary string, e.g. "responses" | "chat").
+  // Keeps per-model endpoint routing in the catalog instead of provider code.
+  shape: Schema.String.pipe(optional),
   settings: Schema.Record(Schema.String, Schema.Unknown).pipe(optional),
 }).annotate({ identifier: "Provider.AISDK" })
 

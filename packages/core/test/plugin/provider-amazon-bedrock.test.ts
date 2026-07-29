@@ -342,6 +342,9 @@ describe("AmazonBedrockPlugin", () => {
       const aisdk = yield* AISDK.Service
       const calls: string[] = []
       yield* addPlugin()
+      // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+      // Endpoint routing is data-driven via api.shape: absent => responses,
+      // "chat" => chat. No model IDs are hardcoded in the selector.
       yield* aisdk.runLanguage({
         model: ModelV2.Info.make({
           ...ModelV2.Info.empty(ProviderV2.ID.amazonBedrock, ModelV2.ID.make("openai.gpt-5.5")),
@@ -361,6 +364,7 @@ describe("AmazonBedrockPlugin", () => {
             id: ModelV2.ID.make("openai.gpt-oss-safeguard-120b"),
             type: "aisdk",
             package: "@ai-sdk/amazon-bedrock/mantle",
+            shape: "chat",
           },
         }),
         sdk: fakeSelectorSdk(calls),
