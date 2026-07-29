@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// ANRCODE_CHANGE {"issue":310,"branch":"anr-token-based-auth","date":"2026-07-29"}
 /**
  * Provision a long-lived Cognito refresh token for ANR CI token auth.
  *

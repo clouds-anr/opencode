@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":310,"branch":"anr-token-based-auth","date":"2026-07-29"}
 // DANGER ZONE: Shared across CLI + ANR + Desktop sidecar surfaces.
 // Changes here must be tested with all flavors. See /AGENTS.md#surface-flavor-rules
 import yargs from "yargs"

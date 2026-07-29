@@ -1,3 +1,5 @@
+<!-- ANRCODE_CHANGE {"issue":310,"branch":"anr-token-based-auth","date":"2026-07-29"} -->
+
 # ANR Token-Based Authentication Mode
 
 Non-interactive, browserless auth for CI/CD pipelines. Set `OPENCODE_ANR_AUTH_MODE=token` to skip the OIDC browser flow.
