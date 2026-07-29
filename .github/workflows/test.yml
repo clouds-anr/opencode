@@ -322,14 +322,68 @@ jobs:
           bin="$(find packages/opencode/dist -type f -name 'opencode' | head -1)"
           OPENCODE_BIN="$bin" bun run .github/scripts/validate-opencode-config.ts
 
+  # Gates anr-token-auth-smoke: probes credential resolution directly (no CLI
+  # build) so a known external failure mode — the configured Cognito Identity
+  # Pool having been deleted/rotated server-side — shows as a skipped smoke
+  # job instead of a false regression. Any other failure (including "no
+  # secret configured") still runs the smoke job so it surfaces full
+  # diagnostics; this only suppresses the one specific, non-code condition.
+  anr-token-auth-preflight:
+    name: anr-token-auth-preflight
+    runs-on: ubuntu-latest
+    outputs:
+      run_smoke: ${{ steps.probe.outputs.run_smoke }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Probe token-auth credential resolution
+        id: probe
+        run: |
+          if [ -z "${{ secrets.ANR_REFRESH_TOKEN }}" ] && [ -z "${{ secrets.ANR_ID_TOKEN }}" ]; then
+            echo "run_smoke=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Neither ANR_REFRESH_TOKEN nor ANR_ID_TOKEN secret is set — skipping token-auth smoke."
+            exit 0
+          fi
+
+          result="$(bun run packages/opencode/script/anr-token-auth-preflight.ts .opencode/.env.commercial 2>preflight-stderr.log | tail -1)"
+
+          case "$result" in
+            AUTH_OK)
+              echo "run_smoke=true" >> "$GITHUB_OUTPUT"
+              ;;
+            SKIP_STALE_IDENTITY_POOL)
+              echo "run_smoke=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Configured Cognito Identity Pool was not found (deleted/rotated server-side) — skipping smoke until infra is restored."
+              cat preflight-stderr.log
+              ;;
+            *)
+              echo "run_smoke=true" >> "$GITHUB_OUTPUT"
+              cat preflight-stderr.log
+              ;;
+          esac
+        env:
+          OPENCODE_ANR_REFRESH_TOKEN: ${{ secrets.ANR_REFRESH_TOKEN }}
+          OPENCODE_ANR_ID_TOKEN: ${{ secrets.ANR_ID_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.ANR_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ANR_AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.ANR_AWS_SESSION_TOKEN }}
+
   # ANR token-auth smoke: verifies non-interactive token mode can initialize
   # and reach ANR backend services without opening a browser.
   # Requires a GitHub Actions secret: ANR_REFRESH_TOKEN (long-lived, recommended)
   # or ANR_ID_TOKEN (short-lived, needs manual rotation).
-  # Skips cleanly when secrets are absent so the job never blocks merges on
-  # unprovisioned repos. Promote to required gate once secrets are stable.
+  # Gated by anr-token-auth-preflight; promote to required gate once secrets
+  # and backend infra (Cognito Identity Pool) are stable.
   anr-token-auth-smoke:
     name: anr-token-auth-smoke
+    needs: anr-token-auth-preflight
+    if: needs.anr-token-auth-preflight.outputs.run_smoke == 'true'
     continue-on-error: true
     runs-on: ubuntu-latest
     defaults:
@@ -354,21 +408,7 @@ jobs:
         env:
           OPENCODE_VERSION: "0.0.0-smoke"
 
-      - name: Check for required secrets
-        id: secrets-check
-        run: |
-          if [ -z "${{ secrets.ANR_REFRESH_TOKEN }}" ] && [ -z "${{ secrets.ANR_ID_TOKEN }}" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Neither ANR_REFRESH_TOKEN nor ANR_ID_TOKEN secret is set — skipping token-auth smoke."
-            echo "To enable: add ANR_REFRESH_TOKEN (long-lived Cognito refresh token, recommended)"
-            echo "or ANR_ID_TOKEN (short-lived Cognito ID token) as a repo/org secret."
-            echo "Optional: ANR_AWS_ACCESS_KEY_ID, ANR_AWS_SECRET_ACCESS_KEY, ANR_AWS_SESSION_TOKEN"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run ANR token-auth smoke (agent list)
-        if: steps.secrets-check.outputs.skip == 'false'
         run: |
           bin="$(find packages/opencode/dist -type f -name 'opencode' | head -1)"
           echo "Binary: $bin"
