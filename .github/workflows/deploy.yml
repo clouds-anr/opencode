@@ -3,7 +3,10 @@ name: deploy
 on:
   push:
     branches:
-      - dev
+      # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+      # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
+      # dev removed: this workflow only executes in anomalyco/opencode (see job-level if).
+      # Keeping it on the push trigger wastes a runner on every dev push in this fork.
       - production
   workflow_dispatch:
 

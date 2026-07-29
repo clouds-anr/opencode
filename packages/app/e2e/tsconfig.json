@@ -6,10 +6,15 @@
     "types": ["node", "bun"]
   },
   "include": [
+    // ANRCODE_CHANGE {"issue":"e2e-stability","branch":"dev","date":"2026-07-17"}
+    "./global-setup.ts",
     "./performance/timeline-stability/**/*.spec.ts",
     "./performance/timeline-stability/fixture.test.ts",
     "./performance/timeline-stability/fixture.ts",
     "./performance/unit/visual-stability.test.ts",
+    "./reproduction/timeline-suspense/**/*.ts",
+    "./reproduction/timeline-suspense/**/*.tsx",
+    "../src/pages/session/timeline/observe-element-offset.ts",
     "./regression/new-session-panel-corner.spec.ts",
     "./regression/session-timeline-context-resize.spec.ts",
     "./utils/**/*.ts"

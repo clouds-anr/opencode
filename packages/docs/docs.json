@@ -11,6 +11,15 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "CLI",
+        "groups": [
+          {
+            "group": "Installation",
+            "pages": ["cli/install", "cli/downgrade"]
+          }
+        ]
+      },
+      {
         "tab": "SDK",
         "groups": [
           {

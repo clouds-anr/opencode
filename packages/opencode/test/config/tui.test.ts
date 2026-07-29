@@ -148,6 +148,7 @@ it.instance("resolves attention config defaults and overrides", () =>
       const test = yield* TestInstance
 
       expect((yield* getTuiConfig(test.directory)).attention).toEqual({
+        audio_device: "default",
         enabled: false,
         notifications: true,
         sound: true,
@@ -173,6 +174,7 @@ it.instance("resolves attention config defaults and overrides", () =>
       })
 
       expect((yield* getTuiConfig(test.directory)).attention).toEqual({
+        audio_device: "default",
         enabled: false,
         notifications: false,
         sound: false,

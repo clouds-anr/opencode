@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
 set -euo pipefail
 
 RULES_FILE="${RULES_FILE:-.github/conflict-rules.conf}"

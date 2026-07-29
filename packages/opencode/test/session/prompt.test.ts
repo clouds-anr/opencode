@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Database } from "@opencode-ai/core/database/database"
@@ -1667,7 +1668,7 @@ unixNoLLMServer(
   30_000,
 )
 
-it.instance(
+unix(
   "loop waits while shell runs and starts after shell exits",
   () =>
     Effect.gen(function* () {
@@ -1704,7 +1705,7 @@ it.instance(
   process.env.CI ? 20_000 : 10_000,
 )
 
-it.instance(
+unix(
   "shell completion resumes queued loop callers",
   () =>
     Effect.gen(function* () {

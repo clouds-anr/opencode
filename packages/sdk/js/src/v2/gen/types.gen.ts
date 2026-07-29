@@ -1798,6 +1798,7 @@ export type ProviderConfig = {
       provider?: {
         npm?: string
         api?: string
+        shape?: string
       }
       options?: {
         [key: string]: unknown
@@ -1928,6 +1929,7 @@ export type Config = {
   model?: string
   small_model?: string
   default_agent?: string
+  subagent_depth?: number
   username?: string
   mode?: {
     build?: AgentConfig
@@ -2031,6 +2033,7 @@ export type Model = {
     id: string
     url: string
     npm: string
+    shape?: string
   }
   name: string
   family?: string
@@ -4772,6 +4775,7 @@ export type ModelApi =
       type: "aisdk"
       package: string
       url?: string
+      shape?: string
       settings?: {
         [key: string]: unknown
       }
@@ -4846,6 +4850,7 @@ export type ProviderAisdk = {
   type: "aisdk"
   package: string
   url?: string
+  shape?: string
   settings?: {
     [key: string]: unknown
   }

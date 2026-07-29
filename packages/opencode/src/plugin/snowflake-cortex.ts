@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { OAUTH_DUMMY_KEY } from "../auth"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
@@ -302,18 +303,18 @@ export async function SnowflakeCortexAuthPlugin(_input: PluginInput): Promise<Ho
             const tokens = await refreshAccessToken(oauth.accountId, oauth.refresh)
             const refreshedRefresh = tokens.refresh_token || oauth.refresh
             const refreshedExpires = Date.now() + (tokens.expires_in ?? 600) * 1000
-            await _input.client.auth
-              .set({
-                path: { id: "snowflake-cortex" },
-                body: {
-                  type: "oauth",
-                  access: tokens.access_token,
-                  refresh: refreshedRefresh,
-                  expires: refreshedExpires,
-                  ...(oauth.accountId && { accountId: oauth.accountId }),
-                },
-              })
-              .catch(() => {})
+             await _input.client.auth
+               .set({
+                 path: { id: "snowflake-cortex" },
+                 body: {
+                   type: "oauth",
+                   access: tokens.access_token,
+                   refresh: refreshedRefresh,
+                   expires: refreshedExpires,
+                   ...(oauth.accountId && { accountId: oauth.accountId }),
+                 },
+               })
+               .catch((err) => { console.warn("Snowflake Cortex provider error", err) })
           } catch {}
         }
 
@@ -337,25 +338,25 @@ export async function SnowflakeCortexAuthPlugin(_input: PluginInput): Promise<Ho
                 const refreshToken = currentOauth.refresh
                 refreshPromise = refreshAccessToken(accountId, refreshToken)
                   .then(async (tokens) => {
-                    const refreshedRefresh = tokens.refresh_token || refreshToken
-                    const refreshedExpires = Date.now() + (tokens.expires_in ?? 600) * 1000
-                    await _input.client.auth
-                      .set({
-                        path: { id: "snowflake-cortex" },
-                        body: {
-                          type: "oauth",
-                          access: tokens.access_token,
-                          refresh: refreshedRefresh,
-                          expires: refreshedExpires,
-                          ...(accountId && { accountId }),
-                        },
-                      })
-                      .catch(() => {})
-                    return {
-                      access: tokens.access_token,
-                      refresh: refreshedRefresh,
-                      expires: refreshedExpires,
-                    }
+                     const refreshedRefresh = tokens.refresh_token || refreshToken
+                     const refreshedExpires = Date.now() + (tokens.expires_in ?? 600) * 1000
+                     await _input.client.auth
+                       .set({
+                         path: { id: "snowflake-cortex" },
+                         body: {
+                           type: "oauth",
+                           access: tokens.access_token,
+                           refresh: refreshedRefresh,
+                           expires: refreshedExpires,
+                           ...(accountId && { accountId }),
+                         },
+                       })
+                       .catch((err) => { console.warn("Snowflake Cortex provider error", err) })
+                     return {
+                       access: tokens.access_token,
+                       refresh: refreshedRefresh,
+                       expires: refreshedExpires,
+                     }
                   })
                   .finally(() => {
                     refreshPromise = undefined

@@ -33,6 +33,7 @@ export const DiffStyle = Schema.Literals(["auto", "stacked"]).annotate({
 
 export const AttentionSounds = Schema.Record(AttentionSoundName, Schema.optionalKey(Schema.String))
 export type AttentionSoundPaths = Schema.Schema.Type<typeof AttentionSounds>
+// ANR: Audio device selection for attention notifications
 export const Attention = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
   notifications: Schema.optional(Schema.Boolean),
@@ -40,6 +41,10 @@ export const Attention = Schema.Struct({
   volume: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(1))),
   sound_pack: Schema.optional(Schema.String),
   sounds: Schema.optional(AttentionSounds),
+  // ANR: Allow users to specify audio output device for sounds (works on macOS, Windows, Linux)
+  audio_device: Schema.optional(Schema.String).annotate({
+    description: "Audio output device: 'default' for system default, 'builtin-speaker' for internal speaker (macOS/Windows/Linux), or exact device name",
+  }),
 }).annotate({ description: "Attention notification and sound settings" })
 
 const PromptSize = Schema.Int.check(Schema.isGreaterThan(0))
@@ -74,6 +79,8 @@ export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | 
     volume: number
     sound_pack: string
     sounds: AttentionSoundPaths
+    // ANR: Audio device selection preference
+    audio_device: string
   }
   keybinds: TuiKeybind.BindingLookupView
   leader_timeout: number
@@ -106,6 +113,8 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
       volume: input.attention?.volume ?? 0.4,
       sound_pack: input.attention?.sound_pack ?? "opencode.default",
       sounds: input.attention?.sounds ?? {},
+      // ANR: Default to system audio device selection
+      audio_device: input.attention?.audio_device ?? "default",
     },
     keybinds: createBindingLookup(TuiKeybind.toBindingConfig(TuiKeybind.parse(keybinds)), {
       commandMap: TuiKeybind.CommandMap,

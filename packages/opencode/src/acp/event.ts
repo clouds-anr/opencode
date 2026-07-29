@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { AgentSideConnection } from "@agentclientprotocol/sdk"
 import type {
   Event,
@@ -122,7 +123,7 @@ export class Subscription {
       for await (const event of events.stream) {
         if (this.abort.signal.aborted) return
         if (!event.payload) continue
-        await this.handle(event.payload).catch(() => {})
+        await this.handle(event.payload).catch((err) => { console.debug("ignored", err) })
       }
       if (!this.abort.signal.aborted) await new Promise((resolve) => setTimeout(resolve, 1000))
     }

@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"} -->
 # opencode database guide
 
 ## Database

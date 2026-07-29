@@ -45,15 +45,37 @@
 
 ### Installation
 
+GitHub Releases are the source of truth for all CLI distribution artifacts.
+See the **[platform install runbook](https://opencode.ai/docs/cli/install)** for
+full install, upgrade, and uninstall instructions per platform.
+
+**Primary paths by platform:**
+
+| Platform | Primary | Supported alternatives |
+|----------|---------|------------------------|
+| macOS | `brew install anomalyco/tap/opencode` | npm global, direct script |
+| Linux | `brew install anomalyco/tap/opencode` | AUR, npm global, direct script |
+| Windows | `choco install opencode` | Winget, npm global |
+
 ```bash
-# YOLO
+# macOS / Linux — Homebrew (primary, always up to date)
+brew install anomalyco/tap/opencode
+
+# Windows — Chocolatey (primary)
+choco install opencode
+
+# Windows — Winget (supported)
+winget install anomalyco.opencode
+
+# Any platform — npm global
+npm i -g opencode-ai@latest        # or bun/pnpm/yarn
+
+# Any platform — direct script
 curl -fsSL https://opencode.ai/install | bash
 
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
+# Additional channels
+choco install opencode             # Windows (Chocolatey)
+scoop install opencode             # Windows (community-maintained)
 brew install opencode              # macOS and Linux (official brew formula, updated less)
 sudo pacman -S opencode            # Arch Linux (Stable)
 paru -S opencode-bin               # Arch Linux (Latest from AUR)
@@ -63,6 +85,9 @@ nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev
 
 > [!TIP]
 > Remove versions older than 0.1.x before installing.
+
+For downgrade instructions and platform-specific cleanup paths, see the
+**[downgrade and cleanup runbook](https://opencode.ai/docs/cli/downgrade)**.
 
 ### Desktop App (BETA)
 
@@ -119,6 +144,50 @@ For more info on how to configure OpenCode, [**head over to our docs**](https://
 ### Contributing
 
 If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+
+### Windows Crash Diagnostics
+
+If users report intermittent crashes on Windows, first use the built-in diagnostic mode:
+
+```powershell
+opencode --diagnostic
+```
+
+At startup, OpenCode prints a banner with the diagnostics directory and application log file path on the local workstation.
+
+If OpenCode crashes too early to use built-in diagnostics reliably, run the one-click collector from the repo root in PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1
+```
+
+The script creates an `opencode-diagnostics-<timestamp>` folder in the current directory with captured stderr output, resolved OpenCode paths, key environment values (with sensitive fields redacted), and recent log file discovery.
+
+If crashes happen after several minutes of normal interactive use, run in interactive mode so terminal behavior is preserved:
+
+```powershell
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -InteractiveSession
+```
+
+Optional flags:
+
+```powershell
+# More retries
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -Attempts 5
+
+# Pass args to OpenCode after global flags
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -RunArgs run,hello
+
+# Interactive delayed-crash capture
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -InteractiveSession
+
+# Skip clean-environment probe
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -SkipCleanEnvProbe
+
+# Use explicit binary path
+.\packages\anr-core\script\windows-diagnostics\collect-opencode-diagnostics.ps1 -OpencodePath C:\path\to\opencode.exe
+```
 
 ### Building on OpenCode
 

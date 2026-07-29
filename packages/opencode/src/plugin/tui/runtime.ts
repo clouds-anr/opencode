@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import { runtimeModules as keymapRuntimeModules } from "@opentui/keymap/runtime-modules"
 import { ensureRuntimePluginSupport } from "@opentui/solid/runtime-plugin-support/configure"
 import {
@@ -271,7 +272,7 @@ function createThemeInstaller(
     await Flock.withLock(`tui-theme:${dest}`, async () => {
       const save = async () => {
         plugin.themes[name] = info
-        await PluginMeta.setTheme(plugin.id, name, info).catch(() => {})
+        await PluginMeta.setTheme(plugin.id, name, info).catch((err) => { console.debug("ignored", err) })
       }
 
       const exists = hasTheme(name)
@@ -300,12 +301,12 @@ function createThemeInstaller(
       }
 
       if (exists || !(await Filesystem.exists(dest))) {
-        await Filesystem.write(dest, text).catch(() => {})
+        await Filesystem.write(dest, text).catch((err) => { console.debug("ignored", err) })
       }
 
       upsertTheme(name, data)
       await save()
-    }).catch(() => {})
+    }).catch((err) => { console.debug("ignored", err) })
   }
 }
 
@@ -678,7 +679,7 @@ async function resolveExternalPlugins(list: ConfigPlugin.Origin[], wait: () => P
     items: list,
     kind: "tui",
     wait: async () => {
-      await wait().catch(() => {})
+      await wait().catch((err) => { console.debug("ignored", err) })
     },
     finish: async (loaded, origin, retry) => {
       const mod = await Promise.resolve()

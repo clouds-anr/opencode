@@ -11,6 +11,7 @@ Options:
       --print-logs   print logs to stderr                                                  [boolean]
       --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure         run without external plugins                                          [boolean]
+      --diagnostic   enable diagnostic capture and print local diagnostics paths           [boolean]
       --env-file     path to ANR .env config file                                           [string]
       --port         port to listen on                                         [number] [default: 0]
       --hostname     hostname to listen on                           [string] [default: "127.0.0.1"]
@@ -40,6 +41,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -57,6 +59,7 @@ Options:
       --print-logs    print logs to stderr                                                 [boolean]
       --log-level     log level                 [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure          run without external plugins                                         [boolean]
+      --diagnostic    enable diagnostic capture and print local diagnostics paths          [boolean]
       --env-file      path to ANR .env config file                                          [string]
       --dir           directory to run in                                                   [string]
   -c, --continue      continue the last session                                            [boolean]
@@ -84,6 +87,7 @@ Options:
       --print-logs   print logs to stderr                                                  [boolean]
       --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure         run without external plugins                                          [boolean]
+      --diagnostic   enable diagnostic capture and print local diagnostics paths           [boolean]
       --env-file     path to ANR .env config file                                           [string]
       --command      the command to run, use message for args                               [string]
   -c, --continue     continue the last session                                             [boolean]
@@ -138,6 +142,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -157,6 +162,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -175,6 +181,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -192,9 +199,10 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
   -m, --method      installation method to use
-                          [string] [choices: "curl", "npm", "pnpm", "bun", "brew", "choco", "scoop"]"
+            [string] [choices: "curl", "npm", "pnpm", "bun", "brew", "choco", "scoop", "standalone"]"
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode uninstall --help 1`] = `
@@ -208,6 +216,7 @@ Options:
       --print-logs   print logs to stderr                                                  [boolean]
       --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure         run without external plugins                                          [boolean]
+      --diagnostic   enable diagnostic capture and print local diagnostics paths           [boolean]
       --env-file     path to ANR .env config file                                           [string]
   -c, --keep-config  keep configuration files                             [boolean] [default: false]
   -d, --keep-data    keep session data and snapshots                      [boolean] [default: false]
@@ -226,6 +235,7 @@ Options:
       --print-logs   print logs to stderr                                                  [boolean]
       --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure         run without external plugins                                          [boolean]
+      --diagnostic   enable diagnostic capture and print local diagnostics paths           [boolean]
       --env-file     path to ANR .env config file                                           [string]
       --port         port to listen on                                         [number] [default: 0]
       --hostname     hostname to listen on                           [string] [default: "127.0.0.1"]
@@ -247,6 +257,7 @@ Options:
       --print-logs   print logs to stderr                                                  [boolean]
       --log-level    log level                  [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure         run without external plugins                                          [boolean]
+      --diagnostic   enable diagnostic capture and print local diagnostics paths           [boolean]
       --env-file     path to ANR .env config file                                           [string]
       --port         port to listen on                                         [number] [default: 0]
       --hostname     hostname to listen on                           [string] [default: "127.0.0.1"]
@@ -271,6 +282,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --verbose     use more verbose model output (includes metadata like costs)           [boolean]
       --refresh     refresh the models cache from models.dev                               [boolean]"
@@ -287,6 +299,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --days        show stats for the last N days (default: all time)                      [number]
       --tools       number of tools to show (default: all)                                  [number]
@@ -309,6 +322,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --sanitize    redact sensitive transcript and file data                              [boolean]"
 `;
@@ -327,6 +341,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -345,6 +360,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -362,6 +378,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -380,6 +397,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -397,6 +415,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
   -g, --global      install in global config                              [boolean] [default: false]
   -f, --force       replace existing plugin version                       [boolean] [default: false]"
@@ -420,6 +439,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
 `;
@@ -435,6 +455,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -452,6 +473,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --url         URL for a remote MCP server                                             [string]
       --env         environment variable for a local MCP server (KEY=VALUE)                  [array]
@@ -475,6 +497,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -492,6 +515,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -506,6 +530,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -523,6 +548,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
   -p, --provider    provider id or name to log in to (skips provider selection)             [string]
   -m, --method      login method label (skips method selection)                             [string]"
@@ -542,6 +568,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -556,6 +583,7 @@ Options:
       --print-logs            print logs to stderr                                         [boolean]
       --log-level             log level         [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure                  run without external plugins                                 [boolean]
+      --diagnostic            enable diagnostic capture and print local diagnostics paths  [boolean]
       --env-file              path to ANR .env config file                                  [string]
       --path                  directory path to generate the agent file                     [string]
       --description           what the agent should do                                      [string]
@@ -577,6 +605,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -591,6 +620,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
   -n, --max-count   limit to N most recent sessions                                         [number]
       --format      output format             [string] [choices: "table", "json"] [default: "table"]"
@@ -610,6 +640,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -624,6 +655,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;
 
@@ -638,6 +670,7 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]
       --event       GitHub mock event to run the agent for                                  [string]
       --token       GitHub personal access token (github_pat_********)                      [string]"
@@ -654,5 +687,6 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]
+      --diagnostic  enable diagnostic capture and print local diagnostics paths            [boolean]
       --env-file    path to ANR .env config file                                            [string]"
 `;

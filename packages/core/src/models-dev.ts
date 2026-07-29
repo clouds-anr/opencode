@@ -44,6 +44,21 @@ const Cost = Schema.Struct({
   ),
 })
 
+const ReasoningOption = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("effort"),
+    values: Schema.Array(Schema.NullOr(Schema.String)),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("toggle"),
+  }),
+  Schema.Struct({
+    type: Schema.Literal("budget_tokens"),
+    min: Schema.optional(Schema.Finite),
+    max: Schema.optional(Schema.Finite),
+  }),
+])
+
 export const Model = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -53,6 +68,7 @@ export const Model = Schema.Struct({
   reasoning: Schema.Boolean,
   temperature: Schema.Boolean,
   tool_call: Schema.Boolean,
+  reasoning_options: Schema.optional(Schema.Array(ReasoningOption)),
   interleaved: Schema.optional(
     Schema.Union([
       Schema.Literal(true),
@@ -92,8 +108,15 @@ export const Model = Schema.Struct({
     }),
   ),
   status: Schema.optional(CatalogModelStatus),
+  // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+  // `shape` selects the wire endpoint (e.g. "responses" | "chat") so per-model
+  // routing lives in the catalog instead of being hardcoded in provider code.
   provider: Schema.optional(
-    Schema.Struct({ npm: Schema.optional(Schema.String), api: Schema.optional(Schema.String) }),
+    Schema.Struct({
+      npm: Schema.optional(Schema.String),
+      api: Schema.optional(Schema.String),
+      shape: Schema.optional(Schema.String),
+    }),
   ),
 })
 export type Model = Schema.Schema.Type<typeof Model>
@@ -196,20 +219,25 @@ const layer = Layer.effect(
       )
       if (!response) return undefined as Record<string, Provider> | undefined
       const policy = response as Record<string, unknown>
-      // Check if response has models in DynamoDB format (with .M) or direct format
-      const modelsAttr = policy.models as { M?: Record<string, Record<string, unknown>> } | undefined
-      if (modelsAttr?.M) {
+      // ANRCODE_CHANGE {"issue":"audio-device-selection","branch":"audio-device-selection","date":"2026-07-27"}
+      // The catalog arrives under `providers` (commercial REST-style response)
+      // or `models` (legacy), and either may be wrapped in a DynamoDB attribute
+      // map (`.M`). Prefer `providers` since that is the current endpoint shape.
+      const catalog = (policy.providers ?? policy.models) as
+        | { M?: Record<string, Record<string, unknown>> }
+        | Record<string, Provider>
+        | undefined
+      if (!catalog || typeof catalog !== "object") return undefined as Record<string, Provider> | undefined
+      const ddbMap = (catalog as { M?: Record<string, Record<string, unknown>> }).M
+      if (ddbMap) {
         return Object.fromEntries(
-          Object.entries(modelsAttr.M).map(([providerID, providerDDB]) => [
+          Object.entries(ddbMap).map(([providerID, providerDDB]) => [
             providerID,
             fromDynamoDBValue(providerDDB) as Provider,
           ]),
         ) as Record<string, Provider>
       }
-      if (policy.models && typeof policy.models === "object") {
-        return policy.models as Record<string, Provider>
-      }
-      return undefined as Record<string, Provider> | undefined
+      return catalog as Record<string, Provider>
     })
 
     const loadFromDisk = fs.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).pipe(

@@ -2,6 +2,7 @@
 # The nightly schedule is commented out so this no longer runs automatically.
 # Kept as a reference / manual fallback only. Do not run it while v2 is active —
 # both push the same sync/upstream branch and would collide.
+# ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
 name: upstream-sync (deprecated)
 
 on:

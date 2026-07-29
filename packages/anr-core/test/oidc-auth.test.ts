@@ -7,6 +7,10 @@
  * These tests mock fetch() and the HTTP callback server to validate
  * the auth flow without requiring a real Cognito provider.
  */
+
+// ANRCODE_CHANGE {"issue":363,"branch":"anr/363/port-retry-logic","date":"2026-07-16"}
+// Updated test assertions to be port-agnostic (supports dynamic ports 8400-8404)
+
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { createServer } from "http"
 import { createHash } from "crypto"
@@ -74,7 +78,7 @@ describe("OIDC: PKCE code challenge generation", () => {
 describe("OIDC: authorization URL construction", () => {
   test("URL includes required OAuth2 parameters", () => {
     const config = testConfig()
-    const redirectURI = "http://localhost:8400/callback"
+    const redirectURI = "http://localhost:8400/callback" // Default port, may vary in practice
     const state = "test-state-value"
     const nonce = "test-nonce-value"
     const codeChallenge = "test-code-challenge"
@@ -96,7 +100,7 @@ describe("OIDC: authorization URL construction", () => {
     expect(authURL).toContain("client_id=test-client-id")
     expect(authURL).toContain("response_type=code")
     expect(authURL).toContain("scope=openid+email+profile")
-    expect(authURL).toContain("redirect_uri=http%3A%2F%2Flocalhost%3A8400%2Fcallback")
+    expect(authURL).toMatch(/redirect_uri=http%3A%2F%2Flocalhost%3A\d+%2Fcallback/)
     expect(authURL).toContain("state=test-state-value")
     expect(authURL).toContain("nonce=test-nonce-value")
     expect(authURL).toContain("code_challenge_method=S256")
@@ -111,10 +115,11 @@ describe("OIDC: authorization URL construction", () => {
     expect(authURL).toStartWith("https://custom-auth.govcloud.example.com/login?")
   })
 
-  test("redirect URI uses port 8400", () => {
-    const redirectPort = 8400
+  test("redirect URI uses dynamic port (default 8400)", () => {
+    const redirectPort = 8400 // Default, may be 8401-8404 if port is in use
     const redirectURI = `http://localhost:${redirectPort}/callback`
-    expect(redirectURI).toBe("http://localhost:8400/callback")
+    expect(redirectURI).toMatch(/^http:\/\/localhost:\d+\/callback$/)
+    expect(redirectURI).toContain("/callback")
   })
 })
 
@@ -166,7 +171,7 @@ describe("OIDC: token exchange request", () => {
 
   test("token exchange body includes required fields", () => {
     const config = testConfig()
-    const redirectURI = "http://localhost:8400/callback"
+    const redirectURI = "http://localhost:8400/callback" // Default port, may vary in practice
     const code = "auth-code-from-callback"
     const codeVerifier = "original-pkce-verifier"
 
@@ -182,7 +187,7 @@ describe("OIDC: token exchange request", () => {
     expect(params.grant_type).toBe("authorization_code")
     expect(params.client_id).toBe("test-client-id")
     expect(params.code).toBe("auth-code-from-callback")
-    expect(params.redirect_uri).toBe("http://localhost:8400/callback")
+    expect(params.redirect_uri).toMatch(/^http:\/\/localhost:\d+\/callback$/)
     expect(params.code_verifier).toBe("original-pkce-verifier")
   })
 

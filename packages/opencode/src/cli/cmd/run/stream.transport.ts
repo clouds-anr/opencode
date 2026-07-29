@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 // Global event subscription and prompt turn coordination.
 //
 // Creates a long-lived global event stream subscription and feeds relevant
@@ -432,12 +433,12 @@ function createLayer(input: StreamInput) {
             ),
             (events) =>
               Effect.sync(() => {
-                void events.stream.return(StreamClosed).catch(() => {})
+                void events.stream.return(StreamClosed).catch((err) => { console.debug("ignored", err) })
               }),
           ),
         )
         closeStream = () => {
-          void events.stream.return(StreamClosed).catch(() => {})
+          void events.stream.return(StreamClosed).catch((err) => { console.debug("ignored", err) })
         }
         input.trace?.write("recv.subscribe", {
           sessionID: input.sessionID,

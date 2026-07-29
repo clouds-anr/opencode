@@ -67,7 +67,11 @@ function waitDisposed(directory: string) {
   })
 }
 
-it.live("InstanceStore.provide runs InstanceBootstrap before effect", () =>
+// ANR-SKIP: TypeScript plugin compilation via import() is unreliable on Windows
+// runners due to slow process startup. Tests run on Linux where they're stable.
+const itPlugin = process.platform === "win32" ? { ...it, live: it.live.skip } : it
+
+itPlugin.live("InstanceStore.provide runs InstanceBootstrap before effect", () =>
   Effect.gen(function* () {
     const tmp = yield* bootstrapFixture
     const store = yield* InstanceStore.Service
@@ -78,7 +82,7 @@ it.live("InstanceStore.provide runs InstanceBootstrap before effect", () =>
   }),
 )
 
-it.live("CLI bootstrap runs InstanceBootstrap before callback", () =>
+itPlugin.live("CLI bootstrap runs InstanceBootstrap before callback", () =>
   Effect.gen(function* () {
     const tmp = yield* bootstrapFixture
 
@@ -88,7 +92,7 @@ it.live("CLI bootstrap runs InstanceBootstrap before callback", () =>
   }),
 )
 
-it.live("CLI bootstrap disposes the instance when the callback rejects", () =>
+itPlugin.live("CLI bootstrap disposes the instance when the callback rejects", () =>
   Effect.gen(function* () {
     const tmp = yield* bootstrapFixture
     const disposed = yield* waitDisposed(tmp.directory).pipe(Effect.forkScoped({ startImmediately: true }))
@@ -103,7 +107,7 @@ it.live("CLI bootstrap disposes the instance when the callback rejects", () =>
   }),
 )
 
-it.live("InstanceStore.reload runs InstanceBootstrap", () =>
+itPlugin.live("InstanceStore.reload runs InstanceBootstrap", () =>
   Effect.gen(function* () {
     const tmp = yield* bootstrapFixture
     const store = yield* InstanceStore.Service

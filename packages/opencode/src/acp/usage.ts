@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":331,"branch":"anr/331/fix-silent-catch-handlers","date":"2026-07-10"}
 import type { AgentSideConnection, Usage } from "@agentclientprotocol/sdk"
 import type { AssistantMessage as OpenCodeAssistantMessage, Message } from "@opencode-ai/sdk/v2"
 import { InstanceRef } from "@/effect/instance-ref"
@@ -212,7 +213,7 @@ const layer = Layer.effect(
               cost: { amount: totalSessionCost(messages), currency: "USD" },
             },
           })
-          .catch(() => {}),
+          .catch((err) => { console.debug("ignored", err) }),
       )
     })
 

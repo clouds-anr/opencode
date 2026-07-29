@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { expect } from "bun:test"
@@ -22,6 +23,8 @@ import { TestInstance } from "../fixture/fixture"
 import { pollWithTimeout, testEffect } from "../lib/effect"
 
 const it = testEffect(LayerNode.compile(MCP.node))
+// ANR-SKIP: abort signal propagation from Bun HTTP server is unreliable on Windows
+const itWin32Skip = process.platform === "win32" ? { ...it, instance: it.instance.skip } : it
 const stdioFixture = path.join(import.meta.dir, "../fixture/mcp-lifecycle-stdio.ts")
 
 type Page<T> = { items: T[]; nextCursor?: string }
@@ -528,7 +531,7 @@ it.instance("local stdio timeout terminates the real server process", () =>
   }),
 )
 
-it.instance("remote timeout aborts both real HTTP transport attempts", () =>
+itWin32Skip.instance("remote timeout aborts both real HTTP transport attempts", () =>
   Effect.gen(function* () {
     const server = yield* hangingLifecycleServer()
     const mcp = yield* MCP.Service

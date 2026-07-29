@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":341,"branch":"audio-device-selection","date":"2026-07-17"}
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient, path } from "@opencode-ai/core/effect/app-node-platform"
 import { NodePath } from "@effect/platform-node"
@@ -45,6 +46,21 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
         Effect.catch((err) => Effect.logError("failed to download", { url: url, error: err }).pipe(Effect.as(false))),
       )
     })
+
+    // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
+    // fs.rename fails on Windows with EPERM when moving a non-empty directory; fall
+    // back to a recursive copy-then-delete so every leg of the swap still lands. The
+    // destination is cleared first so stale files from a previous version never linger.
+    const move = (from: string, to: string) =>
+      fs.rename(from, to).pipe(
+        Effect.catch(() =>
+          fs.remove(to, { recursive: true, force: true }).pipe(
+            Effect.ignore,
+            Effect.flatMap(() => fs.copy(from, to, { overwrite: true })),
+            Effect.flatMap(() => fs.remove(from, { recursive: true, force: true }).pipe(Effect.ignore)),
+          ),
+        ),
+      )
 
     const pull = Effect.fn("Discovery.pull")(function* (url: string) {
       const base = url.endsWith("/") ? url : `${url}/`
@@ -103,14 +119,15 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
                 if (!downloaded.every(Boolean)) return
                 if (!(yield* fs.exists(path.join(staging, "SKILL.md")).pipe(Effect.orDie))) return
                 yield* fs.writeFileString(path.join(staging, ".opencode-version"), version)
+                // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
                 yield* Effect.uninterruptible(
                   Effect.gen(function* () {
                     const cached = yield* fs.exists(root).pipe(Effect.orDie)
-                    if (cached) yield* fs.rename(root, backup)
-                    yield* fs.rename(staging, root).pipe(
+                    if (cached) yield* move(root, backup)
+                    yield* move(staging, root).pipe(
                       Effect.catch((error) =>
                         Effect.gen(function* () {
-                          if (cached) yield* fs.rename(backup, root).pipe(Effect.ignore)
+                          if (cached) yield* move(backup, root).pipe(Effect.ignore)
                           return yield* Effect.fail(error)
                         }),
                       ),

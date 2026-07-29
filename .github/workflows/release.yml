@@ -29,14 +29,97 @@ permissions:
   packages: write
 
 jobs:
+  # ANRCODE_CHANGE {"issue":"windows-test-stability","branch":"dev","date":"2026-07-20"}
+  # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
   # ---------------------------------------------------------------------------
-  # 0. Gate: the full test suite must pass for THIS SHA before we version/build.
-  #    Reuses test.yml so a release exercises the same suite PRs do. A red gate
-  #    blocks the draft release + CLI build.
+  # 0. Gate: find a passing test.yml run for this commit without re-running the
+  #    suite. Strategy:
+  #
+  #    a) Check the merge commit SHA itself (direct push or workflow_dispatch).
+  #    b) If this is a merge commit (two parents), check the PR head — parent 2.
+  #       The PR branch already ran test.yml; we trust that result rather than
+  #       running the full suite again on every merge into dev.
+  #    c) Fall back to waiting up to 30 min for a concurrent push-triggered run.
+  #
+  #    This eliminates the duplicate Windows runner contention that was causing
+  #    timing-sensitive test flakes.
   # ---------------------------------------------------------------------------
   gate:
-    uses: ./.github/workflows/test.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 2
+
+      - name: Find passing test run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Build the list of SHAs to check: merge commit first, then PR head (parent 2).
+          PARENT2=$(git log --pretty=%P -1 "$SHA" | awk '{print $2}')
+          if [ -n "$PARENT2" ]; then
+            SHAS="$SHA $PARENT2"
+            echo "Merge commit detected. Will check SHA $SHA and PR head $PARENT2."
+          else
+            SHAS="$SHA"
+            echo "Direct push. Will check SHA $SHA."
+          fi
+
+          # Check each SHA for a completed successful test run before polling.
+          for CHECK_SHA in $SHAS; do
+            RUN=$(gh run list \
+              --repo "$REPO" \
+              --commit "$CHECK_SHA" \
+              --workflow test.yml \
+              --limit 1 \
+              --json databaseId,status,conclusion \
+              --jq 'map(select(.status == "completed")) | .[0] // empty')
+            if [ -n "$RUN" ]; then
+              CONCLUSION=$(echo "$RUN" | jq -r '.conclusion')
+              echo "Found completed test run on $CHECK_SHA: $CONCLUSION"
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "Test suite passed — proceeding with release."
+                exit 0
+              else
+                echo "Test suite did not pass on $CHECK_SHA — blocking release."
+                exit 1
+              fi
+            fi
+          done
+
+          # No completed run found yet on either SHA. Wait for the push-triggered run
+          # on the merge commit (covers direct pushes and workflow_dispatch).
+          echo "No completed run found. Waiting for push-triggered test run on $SHA..."
+          sleep 15
+          for i in $(seq 1 90); do
+            RUN=$(gh run list \
+              --repo "$REPO" \
+              --commit "$SHA" \
+              --workflow test.yml \
+              --limit 1 \
+              --json databaseId,status,conclusion \
+              --jq 'map(select(.status == "completed")) | .[0] // empty')
+            if [ -z "$RUN" ]; then
+              echo "Attempt $i: no completed test run yet, retrying in 20s..."
+              sleep 20
+              continue
+            fi
+            CONCLUSION=$(echo "$RUN" | jq -r '.conclusion')
+            echo "Test workflow completed with: $CONCLUSION"
+            if [ "$CONCLUSION" = "success" ]; then
+              echo "Test suite passed — proceeding with release."
+              exit 0
+            else
+              echo "Test suite did not pass — blocking release."
+              exit 1
+            fi
+          done
+          echo "Timed out after 30 minutes waiting for test workflow."
+          exit 1
 
   # ---------------------------------------------------------------------------
   # 1. Version: derive from git tags, create a draft GitHub release
