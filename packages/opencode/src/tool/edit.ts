@@ -94,10 +94,10 @@ export const EditTool = Tool.define(
                     "oldString cannot be empty when editing an existing file. Provide the exact text to replace, or use write for an intentional full-file replacement.",
                   )
                 }
-                const next = Bom.split(params.newString)
-                const desiredBom = next.bom
-                contentOld = ""
-                contentNew = next.text
+              const next = Bom.split(params.newString)
+              const desiredBom = false
+              contentOld = ""
+              contentNew = next.text
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
                 yield* ctx.ask({
                   permission: "edit",
@@ -131,7 +131,7 @@ export const EditTool = Tool.define(
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
-              const desiredBom = source.bom || next.bom
+              const desiredBom = source.bom
               contentNew = next.text
 
               diff = trimDiff(

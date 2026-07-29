@@ -71,7 +71,7 @@ describe("FileMutation", () => {
     ),
   )
 
-  it.live("preserves exactly one BOM for text writes and normalizes created text", () =>
+  it.live("preserves BOM from existing files but strips BOM from new content", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
         const preservedPath = path.join(directory, "preserved.txt")
@@ -84,7 +84,28 @@ describe("FileMutation", () => {
         yield* files.writeTextPreservingBom({ target: created, content: "\uFEFF\uFEFF\uFEFFcreated" })
 
         expect(yield* Effect.promise(() => fs.readFile(preservedPath, "utf8"))).toBe("\uFEFFafter")
-        expect(yield* Effect.promise(() => fs.readFile(created.canonical, "utf8"))).toBe("\uFEFFcreated")
+        expect(yield* Effect.promise(() => fs.readFile(created.canonical, "utf8"))).toBe("created")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("strips BOM from AI-generated content to fix Issue #368", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        // Simulates the Windows Issue #368 scenario where AI content arrives with BOM
+        const scriptPath = path.join(directory, "test_script.sh")
+        const script = yield* (yield* LocationMutation.Service).resolve({ path: "test_script.sh" })
+        const files = yield* FileMutation.Service
+
+        // AI generates content with BOM (simulating Windows behavior)
+        const aiGeneratedContent = "\uFEFF#!/bin/bash\necho hello\n"
+        
+        yield* files.writeTextPreservingBom({ target: script, content: aiGeneratedContent })
+
+        // File should NOT have BOM (shebang must be first bytes)
+        const content = yield* Effect.promise(() => fs.readFile(scriptPath, "utf8"))
+        expect(content).toBe("#!/bin/bash\necho hello\n")
+        expect(content.charCodeAt(0)).toBe(0x23) // '#' character, not BOM
       }).pipe(provide(directory)),
     ),
   )

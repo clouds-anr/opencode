@@ -335,7 +335,7 @@ export function deriveNewContentsFromChunks(
   return {
     unified_diff: unifiedDiff,
     content: newContent,
-    bom: originalContent.bom || next.bom,
+    bom: originalContent.bom,
   }
 }
 

@@ -192,7 +192,7 @@ const layer = Layer.effectDiscard(
                   files.writeIfUnchanged({
                     target,
                     expected: source.content,
-                    content: joinBom(next.text, source.bom || next.bom),
+                    content: joinBom(next.text, source.bom),
                   }),
                 )
                 return {

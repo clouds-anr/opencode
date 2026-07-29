@@ -114,7 +114,7 @@ const layer = Layer.effect(
             .pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)))
           yield* fs.writeWithDirs(
             input.target.canonical,
-            joinBom(next.text, Boolean(current && hasUtf8Bom(current)) || next.bom),
+            joinBom(next.text, Boolean(current && hasUtf8Bom(current))),
           )
           return writeResult(input.target, current !== undefined)
         }),
