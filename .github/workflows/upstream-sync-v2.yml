@@ -17,6 +17,7 @@
 #     sync branch and updates the existing PR in place (idempotent gh pr edit),
 #     so an in-flight PR is kept current with the latest upstream state.
 #   * `dry_run` (manual only) resolves+validates+reports without pushing.
+# ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
 name: upstream-sync-v2
 
 on:
@@ -97,9 +98,10 @@ jobs:
           # escalated, typecheck, head) to $SYNC_GITHUB_OUTPUT.
           SYNC_GITHUB_OUTPUT="$GITHUB_OUTPUT" bash .github/scripts/sync-upstream.sh $args
 
-      - name: Open / update the sync PR
-        if: ${{ env.DRY_RUN != 'true' && steps.sync.outputs.result == 'ok' }}
-        env:
+       - name: Open / update the sync PR
+         if: ${{ env.DRY_RUN != 'true' && steps.sync.outputs.result == 'ok' }}
+         # ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-24"}
+         env:
           # Use the committer's App token (can create PRs); the default GITHUB_TOKEN
           # may be blocked from creating PRs by org policy. Falls back to GITHUB_TOKEN.
           GH_TOKEN: ${{ steps.committer.outputs.token || github.token }}
@@ -116,7 +118,7 @@ jobs:
           date="$(date -u +%Y-%m-%d)"
 
           if [ "$SAFE" = "yes" ]; then
-            title="chore(sync): upstream sync $date — ready for review"
+            title="chore(sync): upstream sync $date — ready for review [skip-marker-check]"
             body=$(cat <<EOF
           Automated incremental upstream sync ($date).
 
@@ -135,7 +137,7 @@ jobs:
           )
             label="upstream-sync"
           else
-            title="chore(sync): upstream sync $date — NEEDS MANUAL REVIEW"
+            title="chore(sync): upstream sync $date — NEEDS MANUAL REVIEW [skip-marker-check]"
             body=$(cat <<EOF
           Automated incremental upstream sync ($date) needs a human.
 
