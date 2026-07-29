@@ -53,9 +53,12 @@ function resolveModelID(modelID: string, region: string | undefined) {
     : modelID
 }
 
-function selectMantleModel(sdk: MantleSDK, modelID: string) {
-  if (modelID === "openai.gpt-oss-safeguard-20b" || modelID === "openai.gpt-oss-safeguard-120b")
-    return sdk.chat(modelID)
+// The wire endpoint is data-driven via the catalog's model api `shape`, not
+// hardcoded per model. "chat" routes to Chat Completions; anything else
+// (including undefined) defaults to the Responses endpoint.
+// ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+function selectMantleModel(sdk: MantleSDK, modelID: string, shape?: string) {
+  if (shape === "chat") return sdk.chat(modelID)
   return sdk.responses(modelID)
 }
 
@@ -115,7 +118,7 @@ export const AmazonBedrockPlugin = define({
       Effect.fn(function* (evt) {
         if (evt.model.providerID !== ProviderV2.ID.amazonBedrock) return
         if (evt.model.api.type === "aisdk" && evt.model.api.package === "@ai-sdk/amazon-bedrock/mantle") {
-          evt.language = selectMantleModel(evt.sdk, evt.model.api.id)
+          evt.language = selectMantleModel(evt.sdk, evt.model.api.id, evt.model.api.shape)
           return
         }
         const region = typeof evt.options.region === "string" ? evt.options.region : process.env.AWS_REGION

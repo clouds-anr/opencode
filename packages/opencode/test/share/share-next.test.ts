@@ -281,10 +281,14 @@ describe("ShareNext", () => {
               },
             ],
           })
+          // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
+          // The coalescing debounce plus session/db setup already takes ~5.5s on a fast
+          // machine, so a 5s cap flakes on slow Windows CI runners. Poll longer while
+          // staying well under the 30s test timeout.
           yield* pollWithTimeout(
             Effect.sync(() => (seen.length === 1 ? true : undefined)),
             "timed out waiting for share sync",
-            "5 seconds",
+            "25 seconds",
           )
 
           expect(seen).toHaveLength(1)

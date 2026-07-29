@@ -133,7 +133,17 @@ const BUNDLED_PROVIDERS: Record<string, () => Promise<(opts: any) => BundledSDK>
   "venice-ai-sdk-provider": () => import("venice-ai-sdk-provider").then((m) => m.createVenice),
 }
 
-type CustomModelLoader = (sdk: any, modelID: string, options?: Record<string, any>, model?: Model) => Promise<any>
+// ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+// Verbose provider diagnostics. Emitted at DEBUG via the caller-supplied trace,
+// which is backed by the Effect logger pipeline (see getLanguage).
+type ProviderTrace = (message: string, fields: Record<string, unknown>) => void
+type CustomModelLoader = (
+  sdk: any,
+  modelID: string,
+  options?: Record<string, any>,
+  model?: Model,
+  trace?: ProviderTrace,
+) => Promise<any>
 type CustomVarsLoader = (options: Record<string, any>) => Record<string, string>
 type CustomDiscoverModels = () => Promise<Record<string, Model>>
 type CustomLoader = (provider: Info) => Effect.Effect<{
@@ -151,17 +161,26 @@ type CustomDep = {
   get: (key: string) => Effect.Effect<string | undefined>
 }
 
-function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
-  if (useChat && sdk.chat) return sdk.chat(modelID)
-  if (sdk.responses) return sdk.responses(modelID)
-  if (sdk.messages) return sdk.messages(modelID)
-  if (sdk.chat) return sdk.chat(modelID)
-  return sdk.languageModel(modelID)
+// ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean, trace?: ProviderTrace) {
+  const pick = (endpoint: string) => trace?.("provider.endpoint", { providerID: "azure", modelID, endpoint })
+  if (useChat && sdk.chat) return (pick("chat"), sdk.chat(modelID))
+  if (sdk.responses) return (pick("responses"), sdk.responses(modelID))
+  if (sdk.messages) return (pick("messages"), sdk.messages(modelID))
+  if (sdk.chat) return (pick("chat"), sdk.chat(modelID))
+  return (pick("languageModel"), sdk.languageModel(modelID))
 }
 
-function selectBedrockMantleLanguageModel(sdk: BundledSDK, modelID: string) {
-  if (modelID === "openai.gpt-oss-safeguard-20b" || modelID === "openai.gpt-oss-safeguard-120b")
+// The wire endpoint is data-driven via `model.api.shape` from the catalog, not
+// hardcoded per model. "chat" routes to the Chat Completions endpoint; anything
+// else (including undefined) defaults to the Responses endpoint.
+function selectBedrockMantleLanguageModel(sdk: BundledSDK, modelID: string, shape?: string, trace?: ProviderTrace) {
+  const pick = (endpoint: string) => trace?.("provider.endpoint", { providerID: "amazon-bedrock-mantle", modelID, endpoint })
+  if (shape === "chat") {
+    pick(sdk.chat ? "chat" : "languageModel")
     return sdk.chat?.(modelID) ?? sdk.languageModel(modelID)
+  }
+  pick(sdk.responses ? "responses" : "languageModel")
   return sdk.responses?.(modelID) ?? sdk.languageModel(modelID)
 }
 
@@ -202,7 +221,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     openai: () =>
       Effect.succeed({
         autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, _model?: Model, trace?: ProviderTrace) {
+          trace?.("provider.endpoint", { providerID: "openai", modelID, endpoint: "responses" })
           return sdk.responses(modelID)
         },
         options: { headerTimeout: OPENAI_HEADER_TIMEOUT_DEFAULT },
@@ -210,14 +231,18 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     meta: () =>
       Effect.succeed({
         autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, _model?: Model, trace?: ProviderTrace) {
+          trace?.("provider.endpoint", { providerID: "meta", modelID, endpoint: "responses" })
           return sdk.responses(modelID)
         },
       }),
     xai: () =>
       Effect.succeed({
         autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>) {
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, _model?: Model, trace?: ProviderTrace) {
+          trace?.("provider.endpoint", { providerID: "xai", modelID, endpoint: "responses" })
           return sdk.responses(modelID)
         },
         options: {},
@@ -225,15 +250,19 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
     "github-copilot": () =>
       Effect.succeed({
         autoload: false,
-        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, model?: Model) {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID)
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, model?: Model, trace?: ProviderTrace) {
+          const pick = (endpoint: string) =>
+            trace?.("provider.endpoint", { providerID: "github-copilot", modelID, endpoint })
+          if (sdk.responses === undefined && sdk.chat === undefined) return (pick("languageModel"), sdk.languageModel(modelID))
           if (model && "endpoint" in model.api) {
-            if (model.api.endpoint === "responses" && sdk.responses) return sdk.responses(modelID)
-            if (model.api.endpoint === "chat" && sdk.chat) return sdk.chat(modelID)
+            if (model.api.endpoint === "responses" && sdk.responses) return (pick("responses"), sdk.responses(modelID))
+            if (model.api.endpoint === "chat" && sdk.chat) return (pick("chat"), sdk.chat(modelID))
           }
           const match = /^gpt-(\d+)/.exec(modelID)
-          if (match && Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini")) return sdk.responses(modelID)
-          return sdk.chat(modelID)
+          if (match && Number(match[1]) >= 5 && !modelID.startsWith("gpt-5-mini"))
+            return (pick("responses"), sdk.responses(modelID))
+          return (pick("chat"), sdk.chat(modelID))
         },
         options: {},
       }),
@@ -261,8 +290,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
 
       return {
         autoload: false,
-        async getModel(sdk: any, modelID: string, options?: Record<string, any>) {
-          return selectAzureLanguageModel(sdk, modelID, Boolean(options?.["useCompletionUrls"]))
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, options?: Record<string, any>, _model?: Model, trace?: ProviderTrace) {
+          return selectAzureLanguageModel(sdk, modelID, Boolean(options?.["useCompletionUrls"]), trace)
         },
         options: {
           resourceName: resource,
@@ -383,7 +413,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           return { AWS_REGION: options.region ?? defaultRegion }
         },
         async getModel(sdk: any, modelID: string, options?: Record<string, any>, model?: Model) {
-          if (model?.api.npm === "@ai-sdk/amazon-bedrock/mantle") return selectBedrockMantleLanguageModel(sdk, modelID)
+          if (model?.api.npm === "@ai-sdk/amazon-bedrock/mantle")
+            return selectBedrockMantleLanguageModel(sdk, modelID, model.api.shape)
 
           // ANR mode: catalog is the source of truth. model.api.id is already
           // the exact identifier (ARN or model ID) the SDK needs — no rewriting.
@@ -491,6 +522,69 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
           }
 
           return sdk.languageModel(modelID)
+        },
+      }
+    }),
+    // ANRCODE_CHANGE {"issue":"audio-device-selection","branch":"audio-device-selection","date":"2026-07-27"}
+    "amazon-bedrock-mantle": Effect.fnUntraced(function* () {
+      const providerConfig = (yield* dep.config()).provider?.["amazon-bedrock-mantle"]
+      const auth = yield* dep.auth("amazon-bedrock-mantle")
+
+      const isANR = process.env.OPENCODE_FLAVOR === "anr"
+
+      const awsAccessKeyId = isANR ? process.env.AWS_ACCESS_KEY_ID : undefined
+
+      const awsBearerToken = iife(() => {
+        const envToken = process.env.AWS_BEARER_TOKEN_BEDROCK
+        if (envToken) return envToken
+        if (auth?.type === "api") {
+          process.env.AWS_BEARER_TOKEN_BEDROCK = auth.key
+          return auth.key
+        }
+        return undefined
+      })
+
+      const configApiKey = providerConfig?.options?.apiKey
+
+      // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+      const credSource = awsBearerToken
+        ? process.env.AWS_BEARER_TOKEN_BEDROCK
+          ? "bearer-env"
+          : "bearer-auth"
+        : configApiKey
+          ? "config-apikey"
+          : awsAccessKeyId
+            ? "access-key"
+            : "none"
+
+      if (!awsBearerToken && !configApiKey && !awsAccessKeyId) {
+        yield* Effect.logDebug("provider.load", {
+          providerID: "amazon-bedrock-mantle",
+          autoload: false,
+          reason: "no credentials",
+          credSource,
+        })
+        return { autoload: false }
+      }
+
+      const defaultRegion = process.env.AWS_REGION ?? providerConfig?.options?.region ?? "us-east-1"
+
+      yield* Effect.logDebug("provider.load", {
+        providerID: "amazon-bedrock-mantle",
+        autoload: true,
+        region: defaultRegion,
+        credSource,
+      })
+
+      return {
+        autoload: true,
+        options: { region: defaultRegion },
+        vars(options: Record<string, any>) {
+          return { AWS_REGION: options.region ?? defaultRegion }
+        },
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        async getModel(sdk: any, modelID: string, _options?: Record<string, any>, model?: Model, trace?: ProviderTrace) {
+          return selectBedrockMantleLanguageModel(sdk, modelID, model?.api.shape, trace)
         },
       }
     }),
@@ -1007,6 +1101,10 @@ const ProviderApiInfo = Schema.Struct({
   id: Schema.String,
   url: Schema.String,
   npm: Schema.String,
+  // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+  // Data-driven wire endpoint selector (e.g. "responses" | "chat"), sourced from
+  // the catalog's model.provider.shape. Absent => provider default.
+  shape: Schema.optional(Schema.String),
 })
 
 const ProviderModalities = Schema.Struct({
@@ -1255,6 +1353,8 @@ function fromModelsDevModel(provider: ModelsDev.Provider, key: string, model: Mo
       id: model.id,
       url: model.provider?.api ?? provider.api ?? "",
       npm: model.provider?.npm ?? provider.npm ?? "@ai-sdk/openai-compatible",
+      // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+      shape: model.provider?.shape,
     },
     status: model.status ?? "active",
     headers: {},
@@ -1489,6 +1589,8 @@ const layer = Layer.effect(
                 id: apiID,
                 npm: apiNpm,
                 url: model.provider?.api ?? provider?.api ?? existingModel?.api.url ?? modelsDev[providerID]?.api ?? "",
+                // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+                shape: model.provider?.shape ?? existingModel?.api.shape,
               },
               status: model.status ?? existingModel?.status ?? "active",
               name,
@@ -1610,6 +1712,16 @@ const layer = Layer.effect(
             continue
           }
           const result = yield* fn(data)
+          // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+          yield* Effect.logDebug("provider.load", {
+            providerID,
+            autoload: result?.autoload ?? false,
+            applied: Boolean(result && (result.autoload || providers[providerID])),
+            hasGetModel: Boolean(result?.getModel),
+            hasVars: Boolean(result?.vars),
+            hasDiscoverModels: Boolean(result?.discoverModels),
+            optionKeys: Object.keys(result?.options ?? {}),
+          })
           if (result && (result.autoload || providers[providerID])) {
             if (result.getModel) modelLoaders[providerID] = result.getModel
             if (result.vars) varsLoaders[providerID] = result.vars
@@ -1706,7 +1818,13 @@ const layer = Layer.effect(
 
     const list = Effect.fn("Provider.list")(() => InstanceState.use(state, (s) => s.providers))
 
-    async function resolveSDK(model: Model, s: State, envs: Record<string, string | undefined>) {
+    // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+    async function resolveSDK(
+      model: Model,
+      s: State,
+      envs: Record<string, string | undefined>,
+      trace?: ProviderTrace,
+    ) {
       try {
         const provider = s.providers[model.providerID]
         const options = { ...provider.options }
@@ -1760,6 +1878,16 @@ const layer = Layer.effect(
             ...model.headers,
           }
 
+        // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+        trace?.("provider.sdk", {
+          providerID: model.providerID,
+          apiModelID: model.api.id,
+          npm: model.api.npm,
+          baseURL: baseURL ?? "(sdk default)",
+          hasApiKey: options["apiKey"] !== undefined,
+          headerKeys: Object.keys(options["headers"] ?? {}),
+        })
+
         const key = Hash.fast(
           JSON.stringify({
             providerID: model.providerID,
@@ -1768,7 +1896,11 @@ const layer = Layer.effect(
           }),
         )
         const existing = s.sdk.get(key)
-        if (existing) return existing
+        if (existing) {
+          // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+          trace?.("provider.sdk.cache", { providerID: model.providerID, apiModelID: model.api.id, cacheHit: true })
+          return existing
+        }
 
         const customFetch = options["fetch"]
         const chunkTimeout = options["chunkTimeout"]
@@ -1779,6 +1911,15 @@ const layer = Layer.effect(
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
+          // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+          // Wire-level: reveals the actual endpoint path (e.g. /v1/responses vs
+          // /v1/chat/completions). URL + method only; never headers/body/secrets.
+          trace?.("provider.fetch", {
+            providerID: model.providerID,
+            apiModelID: model.api.id,
+            method: opts.method ?? (typeof input === "object" && input ? input.method : undefined) ?? "GET",
+            url: typeof input === "string" ? input : (input?.url ?? String(input)),
+          })
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const headerTimeoutMs = headerTimeout === false ? undefined : headerTimeout
           const headerTimeoutCtl = typeof headerTimeoutMs === "number" ? timeoutController(headerTimeoutMs) : undefined
@@ -1875,9 +2016,15 @@ const layer = Layer.effect(
       if (s.models.has(key)) return s.models.get(key)!
 
       const provider = s.providers[model.providerID]
+      // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+      // Bridge captures the Effect logger context so trace() emitted from the
+      // plain-async SDK resolution and the (later, detached) fetch wrapper still
+      // flow through the configured loggers and honor OPENCODE_LOG_LEVEL.
+      const bridge = yield* EffectBridge.make()
+      const trace: ProviderTrace = (message, fields) => bridge.fork(Effect.logDebug(message, fields))
       return yield* EffectPromise.refineRejection(
         async () => {
-          const sdk = await resolveSDK(model, s, envs)
+          const sdk = await resolveSDK(model, s, envs, trace)
           const language = s.modelLoaders[model.providerID]
             ? await s.modelLoaders[model.providerID](
                 sdk,
@@ -1887,8 +2034,14 @@ const layer = Layer.effect(
                   ...model.options,
                 },
                 model,
+                trace,
               )
-            : sdk.languageModel(model.api.id)
+            : (trace("provider.endpoint", {
+                providerID: model.providerID,
+                modelID: model.api.id,
+                endpoint: "languageModel(default)",
+              }),
+              sdk.languageModel(model.api.id))
           s.models.set(key, language)
           return language
         },
