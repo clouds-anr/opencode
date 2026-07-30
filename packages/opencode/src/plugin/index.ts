@@ -62,8 +62,8 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
 }
 
 // Built-in plugins that are directly imported (not installed from npm)
-function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
-  return [
+async function internalPlugins(flags: RuntimeFlags.Info): Promise<PluginInstance[]> {
+  let plugins: PluginInstance[] = [
     // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
     (input) =>
       CodexAuthPlugin(input, {
@@ -79,6 +79,22 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     SnowflakeCortexAuthPlugin,
     XaiAuthPlugin,
   ]
+
+  // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+  if (process.env.OPENCODE_FLAVOR === "anr") {
+    const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
+    plugins = plugins.filter((plugin) => {
+      const authProvider = plugin.auth?.provider
+      if (!authProvider) return true
+      const allowed = ANR_ALLOWED_PROVIDERS.includes(authProvider as any)
+      if (!allowed) {
+        console.warn(`[ANR] Skipping plugin "${plugin.name}" - provider "${authProvider}" not allowed`)
+      }
+      return allowed
+    })
+  }
+
+  return plugins
 }
 
 function isServerPlugin(value: unknown): value is PluginInstance {
@@ -163,7 +179,7 @@ const layer = Layer.effect(
           $: typeof Bun === "undefined" ? undefined : Bun.$,
         }
 
-        for (const plugin of flags.disableDefaultPlugins ? [] : internalPlugins(flags)) {
+        for (const plugin of flags.disableDefaultPlugins ? [] : await internalPlugins(flags)) {
           const init = yield* Effect.tryPromise({
             try: () => plugin(input),
             catch: errorMessage,
