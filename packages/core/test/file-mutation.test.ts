@@ -71,7 +71,7 @@ describe("FileMutation", () => {
     ),
   )
 
-  it.live("preserves exactly one BOM for text writes and normalizes created text", () =>
+  it.live("preserves BOM from existing files but strips BOM from new content", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
         const preservedPath = path.join(directory, "preserved.txt")
@@ -84,7 +84,27 @@ describe("FileMutation", () => {
         yield* files.writeTextPreservingBom({ target: created, content: "\uFEFF\uFEFF\uFEFFcreated" })
 
         expect(yield* Effect.promise(() => fs.readFile(preservedPath, "utf8"))).toBe("\uFEFFafter")
-        expect(yield* Effect.promise(() => fs.readFile(created.canonical, "utf8"))).toBe("\uFEFFcreated")
+        expect(yield* Effect.promise(() => fs.readFile(created.canonical, "utf8"))).toBe("created")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("strips BOM from AI-generated content in new files (Issue #368)", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const files = yield* FileMutation.Service
+        const mutation = yield* LocationMutation.Service
+        const testPath = path.join(directory, "ai-generated.txt")
+        const target = yield* mutation.resolve({ path: "ai-generated.txt" })
+
+        // AI generates content with BOM
+        const aiGeneratedContent = "\uFEFF# Test Script\necho 'Hello'\n"
+        yield* files.writeTextPreservingBom({ target, content: aiGeneratedContent })
+
+        // File should not have BOM
+        const result = yield* Effect.promise(() => fs.readFile(testPath, "utf8"))
+        expect(result).toBe("# Test Script\necho 'Hello'\n")
+        expect(result.startsWith("\uFEFF")).toBe(false)
       }).pipe(provide(directory)),
     ),
   )

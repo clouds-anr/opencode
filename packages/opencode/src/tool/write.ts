@@ -46,7 +46,8 @@ export const WriteTool = Tool.define(
           const exists = yield* fs.existsSafe(filepath)
           const source = exists ? yield* Bom.readFile(fs, filepath) : { bom: false, text: "" }
           const next = Bom.split(params.content)
-          const desiredBom = source.bom || next.bom
+          // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
+          const desiredBom = source.bom
           const contentOld = source.text
           const contentNew = next.text
 

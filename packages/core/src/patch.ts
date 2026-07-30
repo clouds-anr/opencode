@@ -77,7 +77,8 @@ export function derive(path: string, chunks: ReadonlyArray<UpdateFileChunk>, ori
   for (const [start, remove, insert] of replacements.toReversed()) updated.splice(start, remove, ...insert)
   if (updated.at(-1) !== "") updated.push("")
   const next = splitBom(updated.join("\n"))
-  return { content: next.text, bom: source.bom || next.bom }
+  // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
+  return { content: next.text, bom: source.bom }
 }
 
 export function joinBom(text: string, bom: boolean) {

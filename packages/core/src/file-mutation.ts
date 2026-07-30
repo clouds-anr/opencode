@@ -112,9 +112,10 @@ const layer = Layer.effect(
           const current = yield* fs
             .readFile(input.target.canonical)
             .pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)))
+          // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
           yield* fs.writeWithDirs(
             input.target.canonical,
-            joinBom(next.text, Boolean(current && hasUtf8Bom(current)) || next.bom),
+            joinBom(next.text, Boolean(current && hasUtf8Bom(current))),
           )
           return writeResult(input.target, current !== undefined)
         }),

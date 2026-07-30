@@ -95,7 +95,8 @@ export const EditTool = Tool.define(
                   )
                 }
                 const next = Bom.split(params.newString)
-                const desiredBom = next.bom
+                // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
+                const desiredBom = false
                 contentOld = ""
                 contentNew = next.text
                 diff = trimDiff(createTwoFilesPatch(filePath, filePath, contentOld, contentNew))
@@ -131,7 +132,8 @@ export const EditTool = Tool.define(
               const replacement = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
               const next = Bom.split(replace(contentOld, old, replacement, params.replaceAll))
-              const desiredBom = source.bom || next.bom
+              // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
+              const desiredBom = source.bom
               contentNew = next.text
 
               diff = trimDiff(
