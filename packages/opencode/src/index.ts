@@ -568,6 +568,15 @@ function detectANR(): boolean {
   return false
 }
 
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+// Prevent OPENCODE_FLAVOR override when ANR markers are detected
+function enforceANRFlavor(): void {
+  if (detectANR() && process.env.OPENCODE_FLAVOR !== "anr") {
+    console.warn(`[ANR] ANR markers detected but OPENCODE_FLAVOR="${process.env.OPENCODE_FLAVOR}". Forcing to "anr".`)
+    process.env.OPENCODE_FLAVOR = "anr"
+  }
+}
+
 /**
  * Interactive env file picker for ANR mode.
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
@@ -647,6 +656,10 @@ export async function main(argv?: string[]) {
   if (!process.env.OPENCODE_FLAVOR && detectANR()) {
     process.env.OPENCODE_FLAVOR = "anr"
   }
+
+  // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+  // Enforce ANR flavor when markers are detected
+  enforceANRFlavor()
 
   // Check if running in ANR mode
   const anrMode =

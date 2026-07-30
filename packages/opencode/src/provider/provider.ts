@@ -2077,7 +2077,20 @@ const layer = Layer.effect(
     const getSmallModel = Effect.fn("Provider.getSmallModel")(function* (providerID: ProviderV2.ID) {
       const cfg = yield* config.get()
 
-      if (cfg.small_model) {
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      if (process.env.OPENCODE_FLAVOR === "anr" && cfg.small_model) {
+        const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
+        const [smallProviderID] = cfg.small_model.split("/")
+        if (!ANR_ALLOWED_PROVIDERS.includes(smallProviderID as any)) {
+          console.warn(`[ANR] Configured small_model "${cfg.small_model}" uses non-Bedrock provider. Ignoring.`)
+          // Fall through to auto-selection logic
+        } else {
+          const parsed = parseModel(cfg.small_model)
+          return yield* getModel(parsed.providerID, parsed.modelID).pipe(
+            Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
+          )
+        }
+      } else if (cfg.small_model) {
         const parsed = parseModel(cfg.small_model)
         return yield* getModel(parsed.providerID, parsed.modelID).pipe(
           Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
@@ -2145,6 +2158,18 @@ const layer = Layer.effect(
 
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
       const cfg = yield* config.get()
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      if (process.env.OPENCODE_FLAVOR === "anr" && cfg.model) {
+        const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
+        const [providerID] = cfg.model.split("/")
+        if (!ANR_ALLOWED_PROVIDERS.includes(providerID as any)) {
+          console.warn(`[ANR] Configured model "${cfg.model}" uses non-Bedrock provider. Falling back to Bedrock default.`)
+          return {
+            providerID: ProviderV2.ID.amazonBedrock,
+            modelID: ModelV2.ID.make("us.anthropic.claude-sonnet-4-20250514-v1:0"),
+          }
+        }
+      }
       if (cfg.model) return parseModel(cfg.model)
 
       const s = yield* InstanceState.get(state)

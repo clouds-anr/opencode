@@ -44,11 +44,11 @@ bun dev
 ## Bypass Attempts
 
 All 8 confirmed bypass paths are now blocked:
-1. ✅ OPENCODE_ANR_SKIP_AUTH - hardened with channel check
-2. ✅ Environment variable injection - keys cleared
-3. ✅ Config file poisoning - not yet implemented
-4. ✅ HTTP API bypass - guarded
-5. ✅ Plugin bypass - filtered
-6. ✅ OPENCODE_FLAVOR override - not yet implemented
-7. ✅ Model config override - not yet implemented
-8. ✅ BUNDLED_PROVIDERS growth - CI check added
+1. ✅ OPENCODE_ANR_SKIP_AUTH - hardened with channel check + audit log
+2. ✅ Environment variable injection - API keys cleared in clearStaleEnv()
+3. ✅ Config file poisoning - non-Bedrock providers stripped from merged config
+4. ✅ HTTP API bypass - PUT /auth/:providerID guarded
+5. ✅ Plugin bypass - plugins filtered to Bedrock-compatible only
+6. ✅ OPENCODE_FLAVOR override - forced to "anr" when ANR markers detected
+7. ✅ Model config override - cfg.model and cfg.small_model validated
+8. ✅ BUNDLED_PROVIDERS growth - CI check fails build on unlisted providers

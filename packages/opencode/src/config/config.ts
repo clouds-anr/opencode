@@ -534,6 +534,18 @@ const layer = Layer.effect(
           )
         }
 
+        // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+        // ANR enforcement: strip non-Bedrock provider configs
+        if (process.env.OPENCODE_FLAVOR === "anr" && result.provider) {
+          const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
+          for (const providerID of Object.keys(result.provider)) {
+            if (!ANR_ALLOWED_PROVIDERS.includes(providerID as any)) {
+              console.warn(`[ANR] Stripping non-Bedrock provider "${providerID}" from merged config`)
+              delete result.provider[providerID]
+            }
+          }
+        }
+
         for (const [name, mode] of Object.entries(result.mode ?? {})) {
           result.agent = mergeDeep(result.agent ?? {}, {
             [name]: {
