@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 ---
 name: agent-tuning
 description: Configure and optimize AI coding agents (OpenCode/Claude). Use when setting up or improving agent behavior.
@@ -10,11 +11,11 @@ description: Configure and optimize AI coding agents (OpenCode/Claude). Use when
 ~/.config/opencode/
 ├── opencode.json          # Main config
 ├── agent/                 # Custom agent prompts
-│   ├── ammo_team_lead.md
+│   ├── team_lead.md
 │   ├── researcher.md
 │   ├── implementor_cpp.md
 │   ├── tester_cpp.md
-│   ├── documentation.md
+│   ├── documentarian.md
 │   └── truth_teller.md
 ├── skills/                # Reusable skills
 │   └── <name>/SKILL.md
@@ -139,7 +140,8 @@ permission:
 
 ## Agent Roles
 
-### AMMO Team Lead Agent
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
+### Team Lead Agent
 - Has `task: true` to delegate
 - Has `question: true` to interact with user
 - Limited direct tool access
@@ -167,7 +169,7 @@ permission:
 - Bash access for `cmake`, `ctest`, sanitizer runs
 - Focuses on regression protection and risk reporting
 
-### Documentation Agent
+### Documentarian Agent
 - Write access to docs and diagrams
 - Maintains PlantUML and ADR/API docs
 - Ensures architecture docs match runtime behavior
@@ -175,7 +177,7 @@ permission:
 ## C++ Workflow Gates
 
 - Run a testing gate after implementation (`@tester_cpp`)
-- Run a documentation gate when architecture/API behavior changes (`@documentation`)
+- Run a documentation gate when architecture/API behavior changes (`@documentarian`)
 - For risky refactors, include Truth-Teller challenge before implementation
 - Prefer CMake presets and target-scoped options over global flags
 - Use `ci-cmake-sanitizers` for GitHub Actions sanitizer matrix setup
@@ -195,7 +197,7 @@ Begin with minimal permissions, expand as needed.
 ```
 
 ### 3. Separate Concerns
-- AMMO Team Lead: coordinates
+- Team Lead: coordinates
 - Researcher: investigates
 - Implementor C++: changes code
 - Reviewer: validates

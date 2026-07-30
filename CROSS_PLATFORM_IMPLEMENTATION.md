@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # Cross-Platform Agent Configuration Updates
 
 This document provides step-by-step instructions to update your agents for cross-platform compatibility based on the Session Report from 2026-07-01.
@@ -12,7 +13,7 @@ This document provides step-by-step instructions to update your agents for cross
 
 ## Problem Statement (From Session Report)
 
-The documentation_maintainer agent has overly restrictive bash permissions:
+The documentarian agent has overly restrictive bash permissions:
 
 ```yaml
 # Current (UNIX-ONLY)
@@ -52,9 +53,9 @@ For rare cases requiring platform-specific logic, document alternatives in agent
 
 ## Implementation: Step-by-Step
 
-### Step 1: Update documentation.md
+### Step 1: Update documentarian.md
 
-**File:** `.opencode/agent/documentation.md`
+**File:** `.opencode/agent/documentarian.md`
 
 **Current Configuration (UNIX-ONLY):**
 ```yaml
@@ -208,7 +209,7 @@ OK:    bash: git diff docs/api.md
 
 ### Step 3: Update tester.md
 
-**File:** `.opencode/agent/tester.md`
+**File:** `.opencode/agent/anr_tester.md`
 
 **Current bash permission section:**
 ```yaml
@@ -263,13 +264,9 @@ permission:
 - ✅ Kept language-specific test runners (they handle platform differences)
 - ✅ Kept git commands (universally available)
 
-### Step 4: Update implementor.md (if it exists)
+### Step 4: Update other agent files (if they exist)
 
-Similar pattern — remove Unix-specific commands, keep universal ones.
-
-### Step 5: Update researcher.md (if it exists)
-
-Similar pattern — remove Unix-specific commands, keep universal ones.
+Similar pattern for any other agents — remove Unix-specific commands, keep universal ones.
 
 ---
 
@@ -343,7 +340,7 @@ Expected: Agent does NOT use "git commit" or "git push"
 ```bash
 # Edit the file
 cd /Users/dontadalpoas/Development/Repos/opencode
-nano .opencode/agent/documentation.md
+nano .opencode/agent/documentarian.md
 
 # Replace the permission section with the cross-platform version above
 # Save and exit (Ctrl+O, Enter, Ctrl+X)
@@ -359,13 +356,13 @@ npm run build
 ls -1 .opencode/agent/
 
 # Edit each one following the pattern above
-nano .opencode/agent/documentation.md
-nano .opencode/agent/tester.md
-nano .opencode/agent/implementor.md
-nano .opencode/agent/researcher.md
-nano .opencode/agent/triage.md
+nano .opencode/agent/anr_documentarian.md
+nano .opencode/agent/anr_tester.md
+nano .opencode/agent/anr_implementor.md
+nano .opencode/agent/anr_researcher.md
+nano .opencode/agent/anr_team_lead.md
+nano .opencode/agent/anr_truth_teller.md
 nano .opencode/agent/truth_teller.md
-nano .opencode/agent/ammo_team_lead.md
 
 # Verify all changes
 npm run build

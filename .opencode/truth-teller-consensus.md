@@ -1,8 +1,9 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # Truth-Teller Consensus — How It Works
 
 ## Overview
 
-The Truth-Teller Consensus is a multi-model verification gate. Three AI models with **different architectures and optimization targets** independently review the same findings, then the AMMO Team Lead synthesizes their perspectives into a single recommendation.
+The Truth-Teller Consensus is a multi-model verification gate. Three AI models with **different architectures and optimization targets** independently review the same findings, then the Team Lead synthesizes their perspectives into a single recommendation.
 
 This ensures no single model's blind spots, biases, or training gaps go unchecked.
 
@@ -22,8 +23,8 @@ graph TD
         U[User Question / Assessment Findings]
     end
 
-    subgraph "AMMO Team Lead"
-        O[AMMO Team Lead Agent]
+    subgraph "Team Lead"
+        O[Team Lead Agent]
     end
 
     subgraph "Truth-Teller Consensus Gate"
@@ -34,7 +35,7 @@ graph TD
     end
 
     subgraph Synthesis
-        S[AMMO Team Lead Synthesizes]
+        S[Team Lead Synthesizes]
         A["✅ Points of Agreement<br/>(High Confidence)"]
         D["⚠️ Points of Disagreement<br/>(Needs Discussion)"]
         I["💡 Unique Insights<br/>(One model caught it)"]
