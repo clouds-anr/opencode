@@ -1756,6 +1756,16 @@ const layer = Layer.effect(
           })
         }
 
+        // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+        if (process.env.OPENCODE_FLAVOR === "anr") {
+          const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
+          for (const id of Object.keys(providers)) {
+            if (!ANR_ALLOWED_PROVIDERS.includes(id as any)) {
+              delete providers[id]
+            }
+          }
+        }
+
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {

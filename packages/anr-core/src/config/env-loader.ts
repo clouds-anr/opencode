@@ -136,6 +136,9 @@ export function clearStaleEnv(): void {
   for (const key of STALE_KEYS) {
     delete process.env[key]
   }
+  // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+  const keys = ["ANTHROPIC_API_KEY","OPENAI_API_KEY","GROQ_API_KEY","MISTRAL_API_KEY","XAI_API_KEY","COHERE_API_KEY"]
+  keys.forEach(k => delete process.env[k])
 }
 
 /**
