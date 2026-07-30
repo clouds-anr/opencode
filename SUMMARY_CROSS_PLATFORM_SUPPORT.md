@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # Summary: Agent Cross-Platform Support
 
 **Date:** 2026-07-02  
@@ -97,7 +98,7 @@ TIER 3: Platform-Specific (AVOID)
 
 ### Before (Session Report Issue)
 ```yaml
-# documentation_maintainer.md (BROKEN on Windows)
+# documentarian.md (BROKEN on Windows)
 permission:
   bash:
     allow:
@@ -115,7 +116,7 @@ permission:
 
 ### After (Recommended)
 ```yaml
-# documentation_maintainer.md (WORKS EVERYWHERE)
+# documentarian.md (WORKS EVERYWHERE)
 tools:
   glob: true          # ✅ Cross-platform file finding
   read: true          # ✅ Cross-platform file reading
@@ -151,9 +152,9 @@ permission:
 ## What Needs to Be Done
 
 ### Immediate (1-2 hours total)
-1. Update `.opencode/agent/documentation.md` 
-2. Update `.opencode/agent/tester.md`
-3. Review/update other agents (implementor, researcher, triage, truth_teller, ammo_team_lead)
+1. Review and update agents in `.opencode/agent/` directory
+2. Ensure cross-platform tool usage (glob, read, grep, list)
+3. Remove Unix-specific bash commands
 4. Run `npm run build` to verify syntax
 5. Test on all three platforms (Windows, macOS, Linux)
 
@@ -166,7 +167,7 @@ permission:
 
 ## Real-World Example: Your Session Report
 
-From your session report, the documentation agent needs to:
+From your session report, the documentarian agent needs to:
 
 1. **Find hardware component files** 
    - ❌ Currently: `bash: find . -name "*.hpp"` (fails on Windows)
@@ -260,7 +261,7 @@ npm run build
 npm run test
 
 # Test specific agent
-npm run test -- -t "documentation_agent"
+npm run test -- -t "agent_test"
 
 # Check for platform issues
 grep -r "ls \*\|find \*\|grep \*\|cat \*" .opencode/agent/

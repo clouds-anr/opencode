@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # 📋 Documentation Delivered: Cross-Platform Agent Support
 
 ## What You Asked
@@ -152,13 +153,7 @@ permission:
 
 ### Step 1: Edit Agent Configs (1 hour)
 ```bash
-# Update each agent:
-# .opencode/agent/documentation.md
-# .opencode/agent/tester.md  
-# .opencode/agent/implementor.md
-# .opencode/agent/researcher.md
-# (etc.)
-
+# Update each agent in .opencode/agent/
 # Remove Unix-specific bash permissions
 # Add tool-based permissions instead
 ```
@@ -226,13 +221,12 @@ Repository Root
 ├── CROSS_PLATFORM_IMPLEMENTATION.md         ← Step-by-step
 ├── HOW_AGENTS_DETECT_OS.md                  ← Technical details
 └── .opencode/agent/
-    ├── documentation.md                     ← UPDATE THIS
-    ├── tester.md                           ← UPDATE THIS
-    ├── implementor.md                       ← UPDATE THIS
-    ├── researcher.md                        ← UPDATE THIS
-    ├── triage.md                           ← CHECK THIS
-    ├── truth_teller.md                     ← CHECK THIS
-    └── ammo_team_lead.md                   ← CHECK THIS
+    ├── anr_documentarian.md                 ← UPDATE THESE
+    ├── anr_tester.md                        ← UPDATE THESE
+    ├── anr_implementor.md                   ← UPDATE THESE
+    ├── anr_researcher.md                    ← UPDATE THESE
+    ├── anr_team_lead.md                     ← CHECK THIS
+    └── truth_teller.md                      ← CHECK THIS
 ```
 
 ---

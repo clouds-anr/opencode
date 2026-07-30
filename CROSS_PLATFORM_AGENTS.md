@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # Cross-Platform Agent Configuration Guide
 
 ## Executive Summary
@@ -658,4 +659,4 @@ mkdir -p docs/api/v2
 5. **Update bash permissions** to only allow platform-agnostic commands
 6. **Document platform constraints** for any remaining bash-based operations
 
-For your specific case, update [documentation.md](.opencode/agent/documentation.md) following the template in Section 4.1.
+For your specific case, update [anr_documentarian.md](.opencode/agent/anr_documentarian.md) following the template in Section 4.1.

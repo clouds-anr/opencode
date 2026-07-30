@@ -1,3 +1,4 @@
+<!-- ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"} -->
 # Quick Reference: Cross-Platform Agent Configuration
 
 **For:** Users with Windows, macOS, and Linux  
@@ -174,7 +175,7 @@ tool.list(".")
 ### Step 1: Edit Agent Config (5 min each)
 
 ```bash
-nano .opencode/agent/documentation.md
+nano .opencode/agent/anr_documentarian.md
 ```
 
 Remove:
@@ -216,13 +217,12 @@ npm run test           # Run tests
 
 ## Files to Update
 
-1. `.opencode/agent/documentation.md` — ✅ PRIMARY (from session report)
-2. `.opencode/agent/tester.md` — Has `ls`, `find`, `grep`, `rg`
-3. `.opencode/agent/implementor.md` — Check for Unix-specific commands
-4. `.opencode/agent/researcher.md` — Check for Unix-specific commands
-5. `.opencode/agent/triage.md` — Check for Unix-specific commands
-6. `.opencode/agent/truth_teller.md` — Check for Unix-specific commands
-7. `.opencode/agent/ammo_team_lead.md` — Check for Unix-specific commands
+1. `.opencode/agent/anr_documentarian.md` — Review agent configurations
+2. `.opencode/agent/anr_tester.md` — Review agent configurations
+3. `.opencode/agent/anr_implementor.md` — Review agent configurations
+4. `.opencode/agent/anr_researcher.md` — Review agent configurations
+5. `.opencode/agent/anr_team_lead.md` — Review agent configurations
+6. `.opencode/agent/truth_teller.md` — Review agent configurations
 
 ---
 

@@ -17,39 +17,9 @@
 		"github-pr-search": false
 	},
 	// Agents live in .opencode/agent/ and .github/agents/ — skills live in .opencode/skills/
-	// Use @ammo_team_lead as the main entry point for any task.
+	// ANRCODE_CHANGE {"issue":383,"branch":"anr/383/move-ammo-to-aitemplates-doco","date":"2026-07-30"}
+	// AMMO team moved to https://github.com/clouds-anr/AITemplates-Doco/tree/main/Agents/AmmoTeam
 	"agent": {
-		// ── Core agents ───────────────────────────────────────────────────────
-		"ammo_team_lead": {
-			"description": "AMMO Team Lead - coordinates all work, delegates to specialists",
-			"mode": "primary",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-6",
-			"prompt": "{file:agent/ammo_team_lead.md}"
-		},
-		"researcher": {
-			"description": "Researcher + Planner - deep codebase analysis, actionable plans",
-			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:agent/researcher.md}"
-		},
-		"implementor": {
-			"description": "Implementor - features, fixes, and refactors across any language or domain",
-			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:agent/implementor.md}"
-		},
-		"tester": {
-			"description": "Tester - test design, execution, and regression validation",
-			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:agent/tester.md}"
-		},
-		"documentation": {
-			"description": "Documentation - PlantUML diagrams, ADRs, API docs, release notes",
-			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
-			"prompt": "{file:agent/documentation.md}"
-		},
 		// ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"}
 		"anr_team_lead": {
 			"description": "ANR Team Lead - coordinates all ANRCode work, delegates to ANR specialists",
