@@ -332,10 +332,11 @@ export function deriveNewContentsFromChunks(
   // Generate unified diff
   const unifiedDiff = generateUnifiedDiff(originalContent.text, newContent)
 
+  // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
   return {
     unified_diff: unifiedDiff,
     content: newContent,
-    bom: originalContent.bom || next.bom,
+    bom: originalContent.bom,
   }
 }
 

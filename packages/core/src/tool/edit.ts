@@ -188,11 +188,12 @@ const layer = Layer.effectDiscard(
                   { additions: 0, deletions: 0 },
                 )
                 const next = splitBom(replaced)
+                // ANRCODE_CHANGE {"issue":368,"branch":"anr/368/strip-bom-ai-content","date":"2026-07-30"}
                 const result = yield* unableToEdit(
                   files.writeIfUnchanged({
                     target,
                     expected: source.content,
-                    content: joinBom(next.text, source.bom || next.bom),
+                    content: joinBom(next.text, source.bom),
                   }),
                 )
                 return {
