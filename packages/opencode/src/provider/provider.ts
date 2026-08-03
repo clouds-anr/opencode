@@ -28,6 +28,8 @@ import { optional } from "@opencode-ai/core/schema"
 import { ProviderTransform } from "./transform"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { isANRAllowedProvider } from "../anr/policy"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
@@ -1758,10 +1760,10 @@ const layer = Layer.effect(
 
         // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
         if (process.env.OPENCODE_FLAVOR === "anr") {
-          const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
           for (const id of Object.keys(providers)) {
-            if (!ANR_ALLOWED_PROVIDERS.includes(id as any)) {
-              delete providers[id]
+            const providerID = ProviderV2.ID.make(id)
+            if (!isANRAllowedProvider(providerID)) {
+              delete providers[providerID]
             }
           }
         }
@@ -2078,19 +2080,15 @@ const layer = Layer.effect(
       const cfg = yield* config.get()
 
       // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
-      if (process.env.OPENCODE_FLAVOR === "anr" && cfg.small_model) {
-        const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
-        const [smallProviderID] = cfg.small_model.split("/")
-        if (!ANR_ALLOWED_PROVIDERS.includes(smallProviderID as any)) {
-          console.warn(`[ANR] Configured small_model "${cfg.small_model}" uses non-Bedrock provider. Ignoring.`)
-          // Fall through to auto-selection logic
-        } else {
-          const parsed = parseModel(cfg.small_model)
-          return yield* getModel(parsed.providerID, parsed.modelID).pipe(
-            Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
-          )
-        }
-      } else if (cfg.small_model) {
+      // ANR mode ignores a non-Bedrock small_model so auto-selection falls through to a Bedrock model.
+      const smallModelBlocked =
+        process.env.OPENCODE_FLAVOR === "anr" &&
+        !!cfg.small_model &&
+        !isANRAllowedProvider(cfg.small_model.split("/")[0])
+      if (smallModelBlocked)
+        yield* Effect.logWarning("[ANR] ignoring non-Bedrock small_model", { small_model: cfg.small_model })
+
+      if (cfg.small_model && !smallModelBlocked) {
         const parsed = parseModel(cfg.small_model)
         return yield* getModel(parsed.providerID, parsed.modelID).pipe(
           Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
@@ -2159,18 +2157,13 @@ const layer = Layer.effect(
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
       const cfg = yield* config.get()
       // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
-      if (process.env.OPENCODE_FLAVOR === "anr" && cfg.model) {
-        const { ANR_ALLOWED_PROVIDERS } = await import("../anr/policy")
-        const [providerID] = cfg.model.split("/")
-        if (!ANR_ALLOWED_PROVIDERS.includes(providerID as any)) {
-          console.warn(`[ANR] Configured model "${cfg.model}" uses non-Bedrock provider. Falling back to Bedrock default.`)
-          return {
-            providerID: ProviderV2.ID.amazonBedrock,
-            modelID: ModelV2.ID.make("us.anthropic.claude-sonnet-4-20250514-v1:0"),
-          }
-        }
-      }
-      if (cfg.model) return parseModel(cfg.model)
+      // ANR mode ignores a non-Bedrock cfg.model and falls through to auto-selection below, which only
+      // ever sees Bedrock providers because the registry is filtered at load time.
+      const modelBlocked =
+        process.env.OPENCODE_FLAVOR === "anr" && !!cfg.model && !isANRAllowedProvider(cfg.model.split("/")[0])
+      if (modelBlocked) yield* Effect.logWarning("[ANR] ignoring non-Bedrock model", { model: cfg.model })
+
+      if (cfg.model && !modelBlocked) return parseModel(cfg.model)
 
       const s = yield* InstanceState.get(state)
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(

@@ -4,6 +4,8 @@ import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { described } from "./metadata"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { ForbiddenError } from "../errors"
 
 const AuthParams = Schema.Struct({
   providerID: ProviderV2.ID,
@@ -40,7 +42,9 @@ export const ControlApi = HttpApi.make("control").add(
         params: AuthParams,
         payload: Auth.Info,
         success: described(Schema.Boolean, "Successfully set authentication credentials"),
-        error: HttpApiError.BadRequest,
+        // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+        // ForbiddenError is returned when ANR mode rejects a non-Bedrock provider.
+        error: [HttpApiError.BadRequest, ForbiddenError],
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "auth.set",
