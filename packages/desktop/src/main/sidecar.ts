@@ -54,7 +54,19 @@ async function start(command: StartCommand) {
     ensureLoopbackNoProxy()
     useSystemCertificates()
     useEnvProxy()
-    const { Server } = await import("virtual:opencode-server")
+    const { Server, initializeANR, detectANR, selectEnvFile, clearStaleEnv } = await import("virtual:opencode-server")
+
+    // Run the ANR boot sequence (OIDC auth, AWS credentials, quota) when in ANR mode.
+    // This mirrors what main() does in the CLI path — the sidecar skips main() entirely
+    // so we must run it here before the server starts.
+    if (!process.env.OPENCODE_FLAVOR && detectANR()) {
+      process.env.OPENCODE_FLAVOR = "anr"
+    }
+    if (process.env.OPENCODE_FLAVOR === "anr" && !process.env.OPENCODE_ANR_SKIP_AUTH) {
+      const envFile = process.env.OPENCODE_ANR_ENV_FILE ?? (await selectEnvFile())
+      clearStaleEnv()
+      await initializeANR(envFile)
+    }
 
     listener = await Server.listen({
       port: command.port,
