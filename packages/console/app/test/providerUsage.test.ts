@@ -1,3 +1,8 @@
+// ANRCODE_CHANGE {"issue":"upstream-google-usage-semantics","branch":"sync/upstream","date":"2026-08-04"}
+// Upstream changed googleHelper.normalizeUsage to report outputTokens as
+// candidatesTokenCount + thoughtsTokenCount, but left these expectations at the
+// old candidates-only value. Upstream defines no `test` script for this package,
+// so the stale test only runs — and only fails — in our fork.
 import { describe, expect, test } from "bun:test"
 import type { ZenData } from "@opencode-ai/console-core/model.js"
 import type { ProviderHelper } from "../src/routes/zen/util/provider/provider"
@@ -26,7 +31,7 @@ describe("provider usage extraction", () => {
 
     expect(providers.google.normalizeUsage(usage)).toEqual({
       inputTokens: 6,
-      outputTokens: 3,
+      outputTokens: 5,
       reasoningTokens: 2,
       cacheReadTokens: 4,
       cacheWrite5mTokens: undefined,
@@ -42,7 +47,7 @@ describe("provider usage extraction", () => {
 
     expect(providers.google.normalizeUsage(usageParser.retrieve())).toEqual({
       inputTokens: 6,
-      outputTokens: 3,
+      outputTokens: 5,
       reasoningTokens: 2,
       cacheReadTokens: 4,
       cacheWrite5mTokens: undefined,
