@@ -23,6 +23,8 @@ import { Context, Duration, Effect, Exit, Fiber, Layer, Option, Schema } from "e
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { EffectFlock } from "@opencode-ai/core/util/effect-flock"
 import { containsPath, type InstanceContext } from "../project/instance-context"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { isANRAllowedProvider } from "../anr/policy"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { RemoteAuthError } from "@opencode-ai/core/v1/config/error"
 import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
@@ -532,6 +534,17 @@ const layer = Layer.effect(
               source: managed.source,
             }),
           )
+        }
+
+        // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+        // ANR enforcement: strip non-Bedrock provider configs
+        if (process.env.OPENCODE_FLAVOR === "anr" && result.provider) {
+          for (const providerID of Object.keys(result.provider)) {
+            if (!isANRAllowedProvider(providerID)) {
+              yield* Effect.logWarning("[ANR] stripping non-Bedrock provider from merged config", { providerID })
+              delete result.provider[providerID]
+            }
+          }
         }
 
         for (const [name, mode] of Object.entries(result.mode ?? {})) {

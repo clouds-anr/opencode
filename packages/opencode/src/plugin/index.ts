@@ -31,6 +31,8 @@ import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { isANRAllowedProvider } from "../anr/policy"
 
 type State = {
   hooks: Hooks[]
@@ -61,24 +63,36 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
   return input.enabled || ["local", "dev", "beta"].includes(input.channel ?? InstallationChannel)
 }
 
-// Built-in plugins that are directly imported (not installed from npm)
+// Built-in plugins that are directly imported (not installed from npm).
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+// Each entry carries the auth provider it registers. A Plugin is a bare function, so the provider it
+// serves is only visible on the Hooks it resolves to at init time — too late to gate on. Tagging the
+// list here keeps the ANR filter honest; keep the tag in sync when adding a plugin.
 function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
-  return [
-    // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
-    (input) =>
-      CodexAuthPlugin(input, {
-        experimentalWebSockets: experimentalWebSocketsEnabled({ enabled: flags.experimentalWebSockets }),
-      }),
-    CopilotAuthPlugin,
-    GitlabAuthPlugin,
-    PoeAuthPlugin,
-    CloudflareWorkersAuthPlugin,
-    CloudflareAIGatewayAuthPlugin,
-    AzureAuthPlugin,
-    DigitalOceanAuthPlugin,
-    SnowflakeCortexAuthPlugin,
-    XaiAuthPlugin,
+  const tagged: { provider: string; plugin: PluginInstance }[] = [
+    {
+      provider: "openai",
+      // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
+      plugin: (input) =>
+        CodexAuthPlugin(input, {
+          experimentalWebSockets: experimentalWebSocketsEnabled({ enabled: flags.experimentalWebSockets }),
+        }),
+    },
+    { provider: "github-copilot", plugin: CopilotAuthPlugin },
+    { provider: "gitlab", plugin: GitlabAuthPlugin },
+    { provider: "poe", plugin: PoeAuthPlugin },
+    { provider: "cloudflare-workers-ai", plugin: CloudflareWorkersAuthPlugin },
+    { provider: "cloudflare-ai-gateway", plugin: CloudflareAIGatewayAuthPlugin },
+    { provider: "azure", plugin: AzureAuthPlugin },
+    { provider: "digitalocean", plugin: DigitalOceanAuthPlugin },
+    { provider: "snowflake-cortex", plugin: SnowflakeCortexAuthPlugin },
+    { provider: "xai", plugin: XaiAuthPlugin },
   ]
+
+  if (process.env.OPENCODE_FLAVOR === "anr")
+    return tagged.filter((entry) => isANRAllowedProvider(entry.provider)).map((entry) => entry.plugin)
+
+  return tagged.map((entry) => entry.plugin)
 }
 
 function isServerPlugin(value: unknown): value is PluginInstance {

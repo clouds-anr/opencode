@@ -711,6 +711,13 @@ export async function main(argv?: string[]) {
 
   if (anrMode) {
     if (skipANRAuth) {
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      const channel = process.env.OPENCODE_CHANNEL || "dev"
+      if (channel === "release" || channel === "beta") {
+        process.stderr.write("[ANR] FATAL: OPENCODE_ANR_SKIP_AUTH not allowed on release/beta channels\n")
+        process.exit(1)
+      }
+      process.stderr.write(`[ANR] AUDIT: skip_auth used on ${channel} channel at ${new Date().toISOString()}\n`)
       process.stderr.write("[ANR] Skipping authentication/telemetry initialization via OPENCODE_ANR_SKIP_AUTH=1\n")
     } else {
     // If no --env-file flag, show picker (or auto-select if only one)

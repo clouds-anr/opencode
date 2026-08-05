@@ -28,6 +28,8 @@ import { optional } from "@opencode-ai/core/schema"
 import { ProviderTransform } from "./transform"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { isANRAllowedProvider } from "../anr/policy"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
@@ -1756,6 +1758,16 @@ const layer = Layer.effect(
           })
         }
 
+        // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+        if (process.env.OPENCODE_FLAVOR === "anr") {
+          for (const id of Object.keys(providers)) {
+            const providerID = ProviderV2.ID.make(id)
+            if (!isANRAllowedProvider(providerID)) {
+              delete providers[providerID]
+            }
+          }
+        }
+
         for (const [id, provider] of Object.entries(providers)) {
           const providerID = ProviderV2.ID.make(id)
           if (!isProviderAllowed(providerID)) {
@@ -2067,7 +2079,16 @@ const layer = Layer.effect(
     const getSmallModel = Effect.fn("Provider.getSmallModel")(function* (providerID: ProviderV2.ID) {
       const cfg = yield* config.get()
 
-      if (cfg.small_model) {
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      // ANR mode ignores a non-Bedrock small_model so auto-selection falls through to a Bedrock model.
+      const smallModelBlocked =
+        process.env.OPENCODE_FLAVOR === "anr" &&
+        !!cfg.small_model &&
+        !isANRAllowedProvider(cfg.small_model.split("/")[0])
+      if (smallModelBlocked)
+        yield* Effect.logWarning("[ANR] ignoring non-Bedrock small_model", { small_model: cfg.small_model })
+
+      if (cfg.small_model && !smallModelBlocked) {
         const parsed = parseModel(cfg.small_model)
         return yield* getModel(parsed.providerID, parsed.modelID).pipe(
           Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
@@ -2135,7 +2156,14 @@ const layer = Layer.effect(
 
     const defaultModel = Effect.fn("Provider.defaultModel")(function* () {
       const cfg = yield* config.get()
-      if (cfg.model) return parseModel(cfg.model)
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      // ANR mode ignores a non-Bedrock cfg.model and falls through to auto-selection below, which only
+      // ever sees Bedrock providers because the registry is filtered at load time.
+      const modelBlocked =
+        process.env.OPENCODE_FLAVOR === "anr" && !!cfg.model && !isANRAllowedProvider(cfg.model.split("/")[0])
+      if (modelBlocked) yield* Effect.logWarning("[ANR] ignoring non-Bedrock model", { model: cfg.model })
+
+      if (cfg.model && !modelBlocked) return parseModel(cfg.model)
 
       const s = yield* InstanceState.get(state)
       const recent = yield* fs.readJson(path.join(Global.Path.state, "model.json")).pipe(

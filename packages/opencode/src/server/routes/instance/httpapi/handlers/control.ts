@@ -5,6 +5,9 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { RootHttpApi } from "../api"
 import { LogInput } from "../groups/control"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+// ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+import { ForbiddenError } from "../errors"
+import { isANRAllowedProvider } from "@/anr/policy"
 
 export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (handlers) =>
   Effect.gen(function* () {
@@ -14,6 +17,12 @@ export const controlHandlers = HttpApiBuilder.group(RootHttpApi, "control", (han
       params: { providerID: ProviderV2.ID }
       payload: Auth.Info
     }) {
+      // ANRCODE_CHANGE {"issue":17,"branch":"anr-bedrock-enforcement","date":"2026-07-30"}
+      if (process.env.OPENCODE_FLAVOR === "anr" && !isANRAllowedProvider(ctx.params.providerID))
+        return yield* new ForbiddenError({
+          message: `Provider ${ctx.params.providerID} not allowed in ANR mode. Only Bedrock providers permitted.`,
+        })
+
       yield* auth.set(ctx.params.providerID, ctx.payload).pipe(Effect.orDie)
       return true
     })
