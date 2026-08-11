@@ -1,4 +1,3 @@
-// ANRCODE_CHANGE {"issue":350,"branch":"fork-identify-agent-enforce","date":"2026-07-22"}
 {
 	"$schema": "https://opencode.ai/config.json",
 	"provider": {
@@ -23,80 +22,80 @@
 		"ammo_team_lead": {
 			"description": "AMMO Team Lead - coordinates all work, delegates to specialists",
 			"mode": "primary",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-6",
+			"model": "amazon-bedrock-mantle/anthropic.claude-sonnet-4-5",
 			"prompt": "{file:agent/ammo_team_lead.md}"
 		},
 		"researcher": {
 			"description": "Researcher + Planner - deep codebase analysis, actionable plans",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/researcher.md}"
 		},
 		"implementor": {
 			"description": "Implementor - features, fixes, and refactors across any language or domain",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/implementor.md}"
 		},
 		"tester": {
 			"description": "Tester - test design, execution, and regression validation",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/tester.md}"
 		},
 		"documentation": {
 			"description": "Documentation - PlantUML diagrams, ADRs, API docs, release notes",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/documentation.md}"
 		},
 		// ANRCODE_CHANGE {"issue":321,"branch":"anr/321/create-anrcode-agentic-dev-team","date":"2026-07-06"}
 		"anr_team_lead": {
 			"description": "ANR Team Lead - coordinates all ANRCode work, delegates to ANR specialists",
 			"mode": "primary",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-6",
+			"model": "amazon-bedrock-mantle/anthropic.claude-sonnet-4-5",
 			"prompt": "{file:agent/anr_team_lead.md}"
 		},
 		"anr_researcher": {
 			"description": "ANR Researcher - ANRCode codebase analysis and implementation planning",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/anr_researcher.md}"
 		},
 		"anr_implementor": {
 			"description": "ANR Implementor - ANRCode changes, branch management, and PR creation",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/anr_implementor.md}"
 		},
 		"anr_tester": {
 			"description": "ANR Tester - validates ANRCode changes against opencode test conventions",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/anr_tester.md}"
 		},
 		"anr_documentarian": {
 			"description": "ANR Documentarian - enforces ANRCode documentation patterns and ADRs",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/anr_documentarian.md}"
 		},
 		"anr_truth_teller": {
 			"description": "ANR Truth-Teller - challenges risky ANRCode plans before implementation",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/anr_truth_teller.md}"
 		},
 		"truth_teller": {
 			"description": "Truth-Teller (default) - challenges assumptions and risky plans",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
-		"truth_teller_sonnet": {
-			"description": "Truth-Teller (Sonnet) - Claude Sonnet perspective",
+		"truth_teller_gpt": {
+			"description": "Truth-Teller (GPT) - OpenAI GPT perspective",
 			"mode": "subagent",
-			"model": "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
+			"model": "amazon-bedrock-mantle/openai.gpt-4o",
 			"prompt": "{file:agent/truth_teller.md}"
 		},
 		"truth_teller_nova": {
