@@ -46,7 +46,8 @@ test("reports a divergent native offset once and ignores equal offsets and unrel
   route.remove()
   document.body.append(route)
   await new Promise((resolve) => setTimeout(resolve, 0))
-  await frames(3)
+  // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
+  await waitForCalls(calls, 1)
   expect(calls).toEqual([[0, false]])
 
   route.remove()
@@ -194,6 +195,16 @@ test("cleanup cancels reconnect checks and delegated offset observation", async 
 
 async function frames(count: number) {
   for (let index = 0; index < count; index++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+}
+
+// ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
+// A reconnect callback lands after a MutationObserver task schedules a rAF, so a fixed
+// `frames(n)` wait races the scheduler and flakes on slow Windows CI. Spin frames until
+// the expected number of callbacks arrives (bounded), then let the caller assert.
+async function waitForCalls(calls: readonly unknown[], count: number, maxFrames = 120) {
+  for (let index = 0; calls.length < count && index < maxFrames; index++) {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
   }
 }

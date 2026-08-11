@@ -47,6 +47,21 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
       )
     })
 
+    // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
+    // fs.rename fails on Windows with EPERM when moving a non-empty directory; fall
+    // back to a recursive copy-then-delete so every leg of the swap still lands. The
+    // destination is cleared first so stale files from a previous version never linger.
+    const move = (from: string, to: string) =>
+      fs.rename(from, to).pipe(
+        Effect.catch(() =>
+          fs.remove(to, { recursive: true, force: true }).pipe(
+            Effect.ignore,
+            Effect.flatMap(() => fs.copy(from, to, { overwrite: true })),
+            Effect.flatMap(() => fs.remove(from, { recursive: true, force: true }).pipe(Effect.ignore)),
+          ),
+        ),
+      )
+
     const pull = Effect.fn("Discovery.pull")(function* (url: string) {
       const base = url.endsWith("/") ? url : `${url}/`
       const index = new URL("index.json", base).href
@@ -104,25 +119,17 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient
                 if (!downloaded.every(Boolean)) return
                 if (!(yield* fs.exists(path.join(staging, "SKILL.md")).pipe(Effect.orDie))) return
                 yield* fs.writeFileString(path.join(staging, ".opencode-version"), version)
+                // ANRCODE_CHANGE {"issue":380,"branch":"Donta/Mantle","date":"2026-07-29"}
                 yield* Effect.uninterruptible(
                   Effect.gen(function* () {
                     const cached = yield* fs.exists(root).pipe(Effect.orDie)
-                    if (cached) yield* fs.rename(root, backup)
-                    // fs.rename for non-empty directories fails on Windows with EPERM;
-                    // fall back to a recursive copy-then-delete so the swap still lands.
-                    yield* fs.rename(staging, root).pipe(
-                      Effect.catch(() =>
-                        fs.copy(staging, root, { overwrite: true }).pipe(
-                          Effect.flatMap(() =>
-                            fs.remove(staging, { recursive: true, force: true }).pipe(Effect.ignore),
-                          ),
-                          Effect.catch((error) =>
-                            Effect.gen(function* () {
-                              if (cached) yield* fs.rename(backup, root).pipe(Effect.ignore)
-                              return yield* Effect.fail(error)
-                            }),
-                          ),
-                        ),
+                    if (cached) yield* move(root, backup)
+                    yield* move(staging, root).pipe(
+                      Effect.catch((error) =>
+                        Effect.gen(function* () {
+                          if (cached) yield* move(backup, root).pipe(Effect.ignore)
+                          return yield* Effect.fail(error)
+                        }),
                       ),
                     )
                     if (cached) yield* fs.remove(backup, { recursive: true, force: true }).pipe(Effect.ignore)

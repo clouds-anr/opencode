@@ -223,6 +223,8 @@ function migrateModel(info: typeof ConfigProviderV1.Model.Type, packageName?: st
           type: "aisdk" as const,
           package: info.provider.npm,
           ...(info.provider.api === undefined ? {} : { url: info.provider.api }),
+          // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+          ...(info.provider.shape === undefined ? {} : { shape: info.provider.shape }),
           settings: {},
         }
       : info.id === undefined

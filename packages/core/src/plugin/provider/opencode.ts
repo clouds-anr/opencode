@@ -131,6 +131,8 @@ export const OpencodePlugin = define<HttpClient.HttpClient | EventV2.Service | S
                     type: "aisdk",
                     package: config.provider.npm,
                     url: config.provider.api,
+                    // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+                    shape: config.provider.shape,
                   }
                 : { id: model.api.id, type: "native", url: config.provider.api, settings: {} }
             }

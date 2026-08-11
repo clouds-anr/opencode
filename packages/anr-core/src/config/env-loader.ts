@@ -206,8 +206,7 @@ export async function loadANRConfig(envPath?: string, quiet = false): Promise<AN
  */
 async function loadEnvFile(path: string): Promise<void> {
   try {
-    const file = Bun.file(path)
-    const text = await file.text()
+    const text = readFileSync(path, "utf-8")
 
     const lines = text.split("\n")
     for (const line of lines) {

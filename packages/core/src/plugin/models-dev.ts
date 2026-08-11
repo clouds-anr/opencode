@@ -90,6 +90,8 @@ function applyModel(
         type: "aisdk",
         package: model.provider.npm,
         url: model.provider.api,
+        // ANRCODE_CHANGE {"issue":"mantle-endpoint-shape","branch":"provider-logging","date":"2026-07-28"}
+        shape: model.provider.shape,
       }
     : {
         id: model.id,

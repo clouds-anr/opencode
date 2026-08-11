@@ -1,3 +1,4 @@
+// ANRCODE_CHANGE {"issue":310,"branch":"anr-token-based-auth","date":"2026-07-29"}
 // DANGER ZONE: Shared across CLI + ANR + Desktop sidecar surfaces.
 // Changes here must be tested with all flavors. See /AGENTS.md#surface-flavor-rules
 import yargs from "yargs"
@@ -38,6 +39,8 @@ import {
   authenticateWithOIDC,
   refreshOIDCTokens,
   exchangeTokenForAWSCredentials,
+  parseANRAuthMode,
+  resolveTokenModeCredentials,
   initializeOTEL,
   shutdownOTEL,
   trackSessionStart,
@@ -234,7 +237,7 @@ function buildTelemetryContext(idToken: string, config: any, sessionId: string):
 /**
  * Initialize ANR mode: authentication, quota, telemetry
  */
-async function initializeANR(envFile?: string): Promise<void> {
+export async function initializeANR(envFile?: string): Promise<void> {
   // Clear OTEL logs from previous session for clean debugging
   clearOTELLogs()
 
@@ -250,40 +253,60 @@ async function initializeANR(envFile?: string): Promise<void> {
   // Generate session ID
   const sessionId = randomUUID()
 
-  // Authenticate with OIDC
-  console.error("🔐 Authenticating...")
-  let tokens
-  try {
-    tokens = await authenticateWithOIDC(config)
-  } catch (err) {
-    console.error("❌ Authentication failed:", err instanceof Error ? err.message : err)
-    process.exit(1)
-  }
-  console.error("✅ Authenticated")
-  console.error("📍 Debug: Received tokens from OIDC")
-  console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
-  console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
-  console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
-  console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s`)
+  // Authenticate — branch on auth mode
+  const authMode = parseANRAuthMode(process.env)
+  console.error(`🔐 Authenticating... (mode: ${authMode})`)
 
-  // Build telemetry context
+  let tokens: { idToken: string; accessToken: string; refreshToken?: string; expiresIn?: number }
+  let awsCredentials: Awaited<ReturnType<typeof exchangeTokenForAWSCredentials>>
+  let credentialSource: "interactive" | "static" | "exchange" | "refresh-exchange" = "interactive"
+
+  if (authMode === "token") {
+    let result
+    try {
+      result = await resolveTokenModeCredentials(config, process.env)
+    } catch (err) {
+      console.error("❌ Token auth failed:", err instanceof Error ? err.message : err)
+      process.exit(1)
+    }
+    tokens = { idToken: result.idToken, accessToken: "", refreshToken: result.refreshToken }
+    awsCredentials = result.awsCredentials
+    credentialSource = result.credentialSource
+    console.error(`✅ Token auth resolved (source: ${credentialSource})`)
+    console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
+    console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
+  } else {
+    try {
+      tokens = await authenticateWithOIDC(config)
+    } catch (err) {
+      console.error("❌ Authentication failed:", err instanceof Error ? err.message : err)
+      process.exit(1)
+    }
+    console.error("✅ Authenticated")
+    console.error("📍 Debug: Received tokens from OIDC")
+    console.error(`   - idToken length: ${tokens.idToken?.length || 0}`)
+    console.error(`   - accessToken length: ${tokens.accessToken?.length || 0}`)
+    console.error(`   - refreshToken: ${tokens.refreshToken ? "present" : "not provided"}`)
+    console.error(`   - expiresIn: ${tokens.expiresIn ?? "not provided"}s`)
+
+    // Exchange token for AWS credentials
+    console.error("💱 Exchanging token for AWS credentials...")
+    try {
+      awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
+    } catch (err) {
+      console.error("❌ AWS credential exchange failed:", err instanceof Error ? err.message : err)
+      process.exit(1)
+    }
+    console.error("✅ AWS credentials obtained")
+    console.error("📍 Debug: AWS credentials exchanged")
+    console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
+    console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
+    console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
+    console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}`)
+  }
+
+  // Build telemetry context from the resolved ID token
   const telemetryContext = buildTelemetryContext(tokens.idToken, config, sessionId)
-
-  // Exchange token for AWS credentials
-  console.error("💱 Exchanging token for AWS credentials...")
-  let awsCredentials
-  try {
-    awsCredentials = await exchangeTokenForAWSCredentials(tokens.idToken, config)
-  } catch (err) {
-    console.error("❌ AWS credential exchange failed:", err instanceof Error ? err.message : err)
-    process.exit(1)
-  }
-  console.error("✅ AWS credentials obtained")
-  console.error("📍 Debug: AWS credentials exchanged")
-  console.error(`   - accessKeyId length: ${awsCredentials.accessKeyId?.length || 0}`)
-  console.error(`   - secretAccessKey length: ${awsCredentials.secretAccessKey?.length || 0}`)
-  console.error(`   - sessionToken length: ${awsCredentials.sessionToken?.length || 0}`)
-  console.error(`   - expiration: ${awsCredentials.expiration?.toISOString() ?? "not provided"}`)
 
   // Set AWS credentials in environment for model calls
   process.env.AWS_ACCESS_KEY_ID = awsCredentials.accessKeyId
@@ -299,18 +322,47 @@ async function initializeANR(envFile?: string): Promise<void> {
     async refresh() {
       let refreshedTokens
 
-      // Try silent refresh first
-      if (currentRefreshToken) {
-        try {
-          refreshedTokens = await refreshOIDCTokens(config, currentRefreshToken)
-          console.error("🔄 Silently refreshed OIDC tokens")
-        } catch {
-          console.error("🔄 Silent token refresh failed, opening browser for re-authentication...")
-          refreshedTokens = await authenticateWithOIDC(config)
+      if (authMode === "token") {
+        // Token mode: use refresh token if available; never open a browser.
+        if (currentRefreshToken) {
+          try {
+            refreshedTokens = await refreshOIDCTokens(config, currentRefreshToken)
+            console.error("🔄 [token mode] Silently refreshed OIDC tokens")
+          } catch {
+            console.error("❌ [token mode] Refresh token exchange failed. No interactive fallback in CI.")
+            console.error(
+              "   Credentials will remain in use until STS expiry. Check that OPENCODE_ANR_REFRESH_TOKEN is still valid.",
+            )
+            return {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+              sessionToken: process.env.AWS_SESSION_TOKEN || "",
+            }
+          }
+        } else {
+          // No refresh token — warn once, keep using existing creds until expiry.
+          console.error("⚠️  [token mode] No OPENCODE_ANR_REFRESH_TOKEN provided. Token refresh is disabled.")
+          console.error("   AWS credentials will remain valid until STS expiry. No interactive fallback will occur.")
+          return {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+            sessionToken: process.env.AWS_SESSION_TOKEN || "",
+          }
         }
       } else {
-        console.error("🔄 No refresh token available, opening browser for re-authentication...")
-        refreshedTokens = await authenticateWithOIDC(config)
+        // Interactive mode: try silent refresh first, fall back to browser.
+        if (currentRefreshToken) {
+          try {
+            refreshedTokens = await refreshOIDCTokens(config, currentRefreshToken)
+            console.error("🔄 Silently refreshed OIDC tokens")
+          } catch {
+            console.error("🔄 Silent token refresh failed, opening browser for re-authentication...")
+            refreshedTokens = await authenticateWithOIDC(config)
+          }
+        } else {
+          console.error("🔄 No refresh token available, opening browser for re-authentication...")
+          refreshedTokens = await authenticateWithOIDC(config)
+        }
       }
 
       // Exchange new ID token for AWS credentials
@@ -533,7 +585,7 @@ process.on("uncaughtException", (e) => {
 
 const ANR_MARKERS = ["OPENCODE_API_ENDPOINT", "PROVIDER_DOMAIN", "IDENTITY_POOL_ID"]
 
-function detectANR(): boolean {
+export function detectANR(): boolean {
   if (process.env.OPENCODE_FLAVOR === "anr") return true
   const home = process.env.HOME || process.env.USERPROFILE
   if (!home) return false
@@ -572,7 +624,7 @@ function detectANR(): boolean {
  * Interactive env file picker for ANR mode.
  * Matches Donta's ui.Select() behavior from GovClaudeClient.
  */
-async function selectEnvFile(): Promise<string | undefined> {
+export async function selectEnvFile(): Promise<string | undefined> {
   // Search for .env files in standard .opencode locations (3-tier):
   // 1. Project-level: <cwd>/.opencode/ — developer overrides
   //    (+ monorepo root for dev mode where cwd is packages/opencode)
@@ -667,7 +719,10 @@ export async function main(argv?: string[]) {
       }
 
       // Clear stale env vars before loading new config
+      // Save externally-provided OPENCODE_ANR_ID_TOKEN so token auth mode works
+      const externalIdToken = process.env.OPENCODE_ANR_ID_TOKEN
       clearStaleEnv()
+      if (externalIdToken) process.env.OPENCODE_ANR_ID_TOKEN = externalIdToken
 
       await initializeANR(envFile)
     }

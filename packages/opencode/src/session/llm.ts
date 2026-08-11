@@ -83,6 +83,7 @@ const live: Layer.Layer<
     const flags = yield* RuntimeFlags.Service
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
+      // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
       yield* Effect.logInfo("stream", {
         providerID: input.model.providerID,
         modelID: input.model.id,
@@ -90,6 +91,8 @@ const live: Layer.Layer<
         small: (input.small ?? false).toString(),
         agent: input.agent.name,
         mode: input.agent.mode,
+        npm: input.model.api.npm,
+        apiURL: input.model.api.url ?? "(sdk default)",
       })
 
       const [language, cfg, item, info] = yield* Effect.all(
@@ -288,6 +291,20 @@ const live: Layer.Layer<
                 agent: input.agent.name,
                 mode: input.agent.mode,
                 error,
+              }),
+            )
+          },
+          // ANRCODE_CHANGE {"issue":"provider-logging","branch":"provider-logging","date":"2026-07-28"}
+          onFinish(event) {
+            bridge.fork(
+              Effect.logDebug("stream finish", {
+                providerID: input.model.providerID,
+                modelID: input.model.id,
+                "session.id": input.sessionID,
+                finishReason: event.finishReason,
+                inputTokens: event.totalUsage?.inputTokens,
+                outputTokens: event.totalUsage?.outputTokens,
+                totalTokens: event.totalUsage?.totalTokens,
               }),
             )
           },
