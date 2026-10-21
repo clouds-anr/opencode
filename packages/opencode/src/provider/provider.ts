@@ -297,15 +297,39 @@ export namespace Provider {
         })
       }
 
-      // Add custom endpoint if specified (endpoint takes precedence over baseURL)
-      const endpoint = providerConfig?.options?.endpoint ?? providerConfig?.options?.baseURL
-      if (endpoint && !isANR) {
-        providerOptions.baseURL = endpoint
+      // Check for Bedrock proxy gateway (JWT-authenticated gateway for per-user attribution)
+      const bedrockProxyUrl = Env.get("OPENCODE_BEDROCK_PROXY_URL")
+      if (bedrockProxyUrl && !isANR) {
+        // Use gateway instead of direct Bedrock access
+        providerOptions.baseURL = bedrockProxyUrl
+        log.info("Bedrock: Using JWT-authenticated gateway", {
+          baseURL: bedrockProxyUrl,
+        })
+        
+        // Add JWT token from Auth to headers
+        // For Cognito OAuth, use the access token
+        if (auth?.type === "oauth" && auth.access) {
+          providerOptions.headers = {
+            Authorization: `Bearer ${auth.access}`,
+          }
+          log.info("Bedrock: Added JWT token to gateway request")
+        } else {
+          log.warn("Bedrock: Gateway URL set but no JWT token available", {
+            authType: auth?.type,
+            hasAccess: auth?.type === "oauth" ? !!auth.access : false,
+          })
+        }
       }
-
+      // Add custom endpoint if specified (endpoint takes precedence over baseURL and gateway)
+      else if (providerConfig?.options?.endpoint || providerConfig?.options?.baseURL) {
+        const endpoint = providerConfig?.options?.endpoint ?? providerConfig?.options?.baseURL
+        if (endpoint && !isANR) {
+          providerOptions.baseURL = endpoint
+        }
+      }
       // WORKAROUND: Explicitly set the Bedrock runtime endpoint to prevent SDK from using doc URLs
       // See: https://github.com/anomalyco/opencode/issues/XXX
-      if (!providerOptions.baseURL) {
+      else if (!providerOptions.baseURL) {
         providerOptions.baseURL = `https://bedrock-runtime.${defaultRegion}.amazonaws.com`
         log.info("Bedrock: Setting explicit runtime endpoint", {
           baseURL: providerOptions.baseURL,
